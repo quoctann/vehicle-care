@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="8050bdc0-5ba0-4f77-a493-67ad495ad1fa"></script>
+
+
+
+
+
+
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><style>/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("45c6b6a2-96db-47fd-b7ca-24de3ba26ae8") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("48b1f112-44f4-4f86-b054-0906ca63d380") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("5afe4ca3-0283-46f1-ba84-bfa6fb70bc96") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("2e746391-554e-4f55-9f1e-5f5efa2690dd") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f6fe3f1e-b6b6-4662-a08a-ac602718ea4a") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("628520b2-567b-4920-96de-c8ab597098e5") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("f703116e-274a-4f98-8d88-18e9df6e640e") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("45c6b6a2-96db-47fd-b7ca-24de3ba26ae8") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("48b1f112-44f4-4f86-b054-0906ca63d380") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("5afe4ca3-0283-46f1-ba84-bfa6fb70bc96") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("2e746391-554e-4f55-9f1e-5f5efa2690dd") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f6fe3f1e-b6b6-4662-a08a-ac602718ea4a") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("628520b2-567b-4920-96de-c8ab597098e5") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f703116e-274a-4f98-8d88-18e9df6e640e") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style><style>
+@font-face{font-family:Archivo;src:url("17a02f1b-076d-497a-8d8d-f3bf93816e93") format("truetype-variations");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
+html,body{height:100%}
+body{margin:0;background:#F9F9FB;font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+*{box-sizing:border-box}
+a{color:#0638CD}a:hover{color:#003CFF}
+@keyframes vcUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes vcFade{from{opacity:0}to{opacity:1}}
+
+/* Breakpoints live here, not in JS: phone is the base layer, tablet and desktop
+   layer on top. Nothing depends on mount timing or a measured width. */
+[data-vc-shell] .vc-phone-header{display:flex}
+[data-vc-shell] .vc-side{display:none}
+[data-vc-shell] .vc-desktop-title{display:none}
+[data-vc-shell] .vc-main{max-width:none;padding-top:0}
+[data-vc-shell] .vc-sheet{position:fixed;left:0;right:0;bottom:0;width:auto;background:#fff;border-radius:24px 24px 0 0;padding:16px 16px 22px;animation:vcUp 220ms cubic-bezier(.2,.7,.2,1) both}
+[data-vc-shell] .vc-toast{position:fixed;left:16px;right:16px;bottom:84px;width:auto;max-width:560px;margin:0 auto;display:flex;align-items:center;gap:10px;background:rgba(20,20,20,.94);backdrop-filter:blur(8px);border-radius:14px;padding:12px 14px;animation:vcUp 200ms cubic-bezier(.2,.7,.2,1) both}
+[data-vc-shell] .vc-scansheet{border-radius:24px 24px 0 0;margin-top:-20px;border-top:0}
+
+@media (min-width:768px){
+  [data-vc-shell] .vc-status{display:none}
+  [data-vc-shell] .vc-main{max-width:600px;padding-top:18px}
+  [data-vc-shell] .vc-sheet{left:0;right:0;width:min(600px,100%);margin-inline:auto;padding-bottom:26px}
+  [data-vc-shell] .vc-scansheet{border-radius:0;margin-top:0;border-top:1px solid #E2E2E4}
+}
+
+@media (min-width:1024px){
+  [data-vc-shell] .vc-side{display:flex}
+  [data-vc-shell] .vc-desktop-title{display:block}
+  [data-vc-shell] .vc-phone-header{display:none}
+  [data-vc-shell] .vc-tabbar{display:none}
+  [data-vc-shell] .vc-footer-cta{display:none}
+  [data-vc-shell] .vc-grabber{display:none}
+  [data-vc-shell] .vc-main{max-width:760px;padding-top:24px}
+  [data-vc-shell] .vc-sheet{top:50%;bottom:auto;left:50%;transform:translate(-50%,-50%);width:440px;max-width:calc(100vw - 32px);border:1px solid #F0F0F3;border-radius:20px;box-shadow:0 1px 2px rgba(2,6,23,.08),inset 0 0 0 2px #fff;padding:18px;animation:vcFade 160ms both}
+  [data-vc-shell] .vc-toast{left:auto;right:24px;bottom:24px;width:340px;max-width:340px;margin:0}
+}
+
+/* forceLayout tweak — attribute selectors outrank the media queries above */
+[data-vc-shell][data-layout="phone"] .vc-status{display:block}
+[data-vc-shell][data-layout="phone"] .vc-side{display:none}
+[data-vc-shell][data-layout="phone"] .vc-desktop-title{display:none}
+[data-vc-shell][data-layout="phone"] .vc-phone-header{display:flex}
+[data-vc-shell][data-layout="phone"] .vc-tabbar{display:block}
+[data-vc-shell][data-layout="phone"] .vc-footer-cta{display:block}
+[data-vc-shell][data-layout="phone"] .vc-grabber{display:block}
+[data-vc-shell][data-layout="phone"] .vc-main{max-width:none;padding-top:0}
+[data-vc-shell][data-layout="phone"] .vc-sheet{left:0;right:0;bottom:0;top:auto;transform:none;width:auto;max-width:none;border:0;border-radius:24px 24px 0 0;box-shadow:none;padding:16px 16px 22px;animation:vcUp 220ms cubic-bezier(.2,.7,.2,1) both}
+[data-vc-shell][data-layout="phone"] .vc-toast{left:16px;right:16px;bottom:84px;width:auto;max-width:560px;margin:0 auto}
+[data-vc-shell][data-layout="phone"] .vc-scansheet{border-radius:24px 24px 0 0;margin-top:-20px;border-top:0}
+
+[data-vc-shell][data-layout="tablet"] .vc-status{display:none}
+[data-vc-shell][data-layout="tablet"] .vc-side{display:none}
+[data-vc-shell][data-layout="tablet"] .vc-desktop-title{display:none}
+[data-vc-shell][data-layout="tablet"] .vc-phone-header{display:flex}
+[data-vc-shell][data-layout="tablet"] .vc-tabbar{display:block}
+[data-vc-shell][data-layout="tablet"] .vc-footer-cta{display:block}
+[data-vc-shell][data-layout="tablet"] .vc-grabber{display:block}
+[data-vc-shell][data-layout="tablet"] .vc-main{max-width:600px;padding-top:18px}
+[data-vc-shell][data-layout="tablet"] .vc-sheet{left:0;right:0;top:auto;bottom:0;width:min(600px,100%);margin-inline:auto;max-width:none;border:0;border-radius:24px 24px 0 0;box-shadow:none;padding:16px 16px 26px;animation:vcUp 220ms cubic-bezier(.2,.7,.2,1) both}
+[data-vc-shell][data-layout="tablet"] .vc-toast{left:16px;right:16px;bottom:84px;width:auto;max-width:560px;margin:0 auto}
+[data-vc-shell][data-layout="tablet"] .vc-scansheet{border-radius:0;margin-top:0;border-top:1px solid #E2E2E4}
+
+[data-vc-shell][data-layout="desktop"] .vc-status{display:none}
+[data-vc-shell][data-layout="desktop"] .vc-side{display:flex}
+[data-vc-shell][data-layout="desktop"] .vc-desktop-title{display:block}
+[data-vc-shell][data-layout="desktop"] .vc-phone-header{display:none}
+[data-vc-shell][data-layout="desktop"] .vc-tabbar{display:none}
+[data-vc-shell][data-layout="desktop"] .vc-footer-cta{display:none}
+[data-vc-shell][data-layout="desktop"] .vc-grabber{display:none}
+[data-vc-shell][data-layout="desktop"] .vc-main{max-width:760px;padding-top:24px}
+[data-vc-shell][data-layout="desktop"] .vc-sheet{top:50%;bottom:auto;left:50%;transform:translate(-50%,-50%);width:440px;max-width:calc(100vw - 32px);border:1px solid #F0F0F3;border-radius:20px;box-shadow:0 1px 2px rgba(2,6,23,.08),inset 0 0 0 2px #fff;padding:18px;animation:vcFade 160ms both}
+[data-vc-shell][data-layout="desktop"] .vc-toast{left:auto;right:24px;bottom:24px;width:340px;max-width:340px;margin:0}
+[data-vc-shell][data-layout="desktop"] .vc-scansheet{border-radius:0;margin-top:0;border-top:1px solid #E2E2E4}
+
+/* the camera screen is full-bleed at every size — last word wins */
+[data-vc-shell][data-scan="1"] .vc-main{max-width:none;padding-top:0}
+[data-vc-shell][data-scan="1"] .vc-side{display:none}
+</style></helmet>
+
+<div data-vc-shell="1" data-layout="{{ layoutAttr }}" data-scan="{{ scanAttr }}" style="height:100dvh;display:flex;overflow:hidden;background:#F9F9FB;color:#1C2024">
+
+  <div class="vc-side" style="width:240px;flex:none;height:100%;background:#fff;border-right:1px solid #E2E2E4;flex-direction:column;padding:16px 12px 14px">
+    <div sc-camel-on-click="{{ openVehicleSheet }}" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 120ms cubic-bezier(.2,.7,.2,1)" style-hover="background:#F9F9FB">
+      <div style="width:36px;height:36px;flex:none;border-radius:11px;background:#FFF8EB;border:1px solid #F0CD86;display:flex;align-items:center;justify-content:center;font:700 12px Archivo,sans-serif;color:#7A5A12;letter-spacing:-.02em">{{ vehicleInitials }}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:4px"><span style="font:600 13.5px/1.25 Archivo,sans-serif;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ vehicleName }}</span><span style="color:rgba(28,32,36,.45);display:flex"><dc-import name="VC Icon" glyph="chevron-down" size="{{ s14 }}" hint-size="14px,14px"></dc-import></span></div>
+        <div style="font:400 11.5px/1.35 Archivo,sans-serif;color:rgba(28,32,36,.52)">{{ plate }}</div>
+      </div>
+    </div>
+
+    <div sc-camel-on-click="{{ goLog }}" style="font:500 13.5px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#2C2C2C,#141414);border-radius:10px;height:40px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;margin-top:14px" style-active="transform:translateY(.5px)"><dc-import name="VC Icon" glyph="plus" size="{{ s17 }}" hint-size="17px,17px"></dc-import>Log service</div>
+
+    <div style="display:flex;flex-direction:column;gap:2px;margin-top:18px">
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="4">
+        <div sc-camel-on-click="{{ item.onClick }}" style="{{ item.style }}">
+          <dc-import name="VC Icon" glyph="{{ item.glyph }}" size="{{ item.size }}" hint-size="19px,19px"></dc-import>
+          <span style="font:500 13.5px Archivo,sans-serif;letter-spacing:-.01em">{{ item.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div sc-camel-on-click="{{ flushQueue }}" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-radius:10px;cursor:pointer;transition:background 120ms cubic-bezier(.2,.7,.2,1)" style-hover="background:#F9F9FB">
+      <span style="{{ syncDot }}"></span>
+      <span style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.55);flex:1">{{ syncLabel }}</span>
+    </div>
+  </div>
+
+  <div class="vc-main" style="position:relative;flex:1;min-width:0;height:100%;display:flex;flex-direction:column;overflow:hidden;width:100%;margin:0 auto">
+
+    <sc-if value="{{ darkChrome }}"><div style="position:absolute;left:0;right:0;top:0;height:92px;background:#141414"></div></sc-if>
+    <div class="vc-status" style="flex:none;position:relative">
+      <sc-if value="{{ darkChrome }}"><dc-import name="VC StatusBar" sc-camel-on-dark="{{ yes }}" on-dark="{{ yes }}" hint-size="100%,44px"></dc-import></sc-if>
+      <sc-if value="{{ lightChrome }}" hint-placeholder-val="{{ true }}"><dc-import name="VC StatusBar" hint-size="100%,44px"></dc-import></sc-if>
+    </div>
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div class="vc-phone-header" style="flex:none;padding:4px 16px 12px;align-items:center;gap:10px">
+        <div sc-camel-on-click="{{ openVehicleSheet }}" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;-webkit-tap-highlight-color:transparent">
+          <div style="width:40px;height:40px;flex:none;border-radius:12px;background:#FFF8EB;border:1px solid #F0CD86;display:flex;align-items:center;justify-content:center;font:700 13px Archivo,sans-serif;color:#7A5A12;letter-spacing:-.02em">{{ vehicleInitials }}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:5px"><span style="font:600 14.5px/1.25 Archivo,sans-serif;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ vehicleName }}</span><span style="color:rgba(28,32,36,.45);display:flex"><dc-import name="VC Icon" glyph="chevron-down" size="{{ s14 }}" hint-size="14px,14px"></dc-import></span></div>
+            <div style="font:400 12px/1.35 Archivo,sans-serif;color:rgba(28,32,36,.52);letter-spacing:-.01em">{{ plate }}</div>
+          </div>
+        </div>
+        <div sc-camel-on-click="{{ goYou }}" style="width:36px;height:36px;flex:none;border-radius:10px;border:1px solid #E2E2E4;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 1px rgba(44,54,53,.025);cursor:pointer" style-hover="border-color:#1C2024"><dc-import name="VC Icon" glyph="gear" size="{{ s19 }}" hint-size="19px,19px"></dc-import></div>
+      </div>
+      <div class="vc-desktop-title" style="flex:none;padding:2px 16px 14px"><span style="font:700 24px Archivo,sans-serif;letter-spacing:-.03em">Home</span></div>
+
+      <div style="flex:1;overflow-y:auto;padding:0 16px 24px">
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;padding:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Odometer</div>
+            <div style="font:700 30px/1.05 Archivo,sans-serif;letter-spacing:-.03em;margin-top:4px">{{ odoDisplay }} <span style="font:500 15px Archivo,sans-serif;color:rgba(28,32,36,.45)">{{ units }}</span></div>
+            <div style="font:400 12px/1.35 Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:3px">{{ odoUpdatedLabel }}</div>
+          </div>
+          <div sc-camel-on-click="{{ openOdoSheet }}" style="font:500 13px Inter Tight,sans-serif;color:#1C2024;background:#fff;border:1px solid #E2E2E4;box-shadow:0 1px 1px rgba(44,54,53,.025);border-radius:10px;height:36px;padding:0 14px;display:flex;align-items:center;cursor:pointer" style-hover="border-color:#1C2024">Update</div>
+        </div>
+
+        <sc-if value="{{ hasOverdue }}">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin:20px 2px 8px">
+            <span style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Overdue</span>
+          </div>
+          <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+            <sc-for list="{{ overdueItems }}" as="item" hint-placeholder-count="1">
+              <sc-if value="{{ item.showDivider }}"><div style="height:1px;background:#F0F0F3;margin-left:62px"></div></sc-if>
+              <dc-import name="VC Row" title="{{ item.title }}" subtitle="{{ item.subtitle }}" trailing="{{ item.trailing }}" sc-camel-trailing-sub="{{ item.trailingSub }}" trailing-sub="{{ item.trailingSub }}" icon="{{ item.icon }}" tone="overdue" sc-camel-on-click="{{ item.onClick }}" hint-size="100%,64px"></dc-import>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:20px 2px 8px">
+          <span style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Due soon</span>
+          <span style="font:400 11px Archivo,sans-serif;color:rgba(28,32,36,.52)">{{ dueCountLabel }}</span>
+        </div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <sc-for list="{{ dueItems }}" as="item" hint-placeholder-count="3">
+            <sc-if value="{{ item.showDivider }}"><div style="height:1px;background:#F0F0F3;margin-left:62px"></div></sc-if>
+            <dc-import name="VC Row" title="{{ item.title }}" subtitle="{{ item.subtitle }}" trailing="{{ item.trailing }}" sc-camel-trailing-sub="{{ item.trailingSub }}" trailing-sub="{{ item.trailingSub }}" icon="{{ item.icon }}" tone="{{ item.tone }}" sc-camel-on-click="{{ item.onClick }}" hint-size="100%,64px"></dc-import>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:20px 2px 8px">
+          <span style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Recently logged</span>
+          <span sc-camel-on-click="{{ goHistory }}" style="font:500 11px Archivo,sans-serif;color:#0638CD;cursor:pointer">See all</span>
+        </div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <sc-for list="{{ recentEntries }}" as="item" hint-placeholder-count="2">
+            <sc-if value="{{ item.showDivider }}"><div style="height:1px;background:#F0F0F3;margin-left:62px"></div></sc-if>
+            <dc-import name="VC Row" title="{{ item.title }}" subtitle="{{ item.subtitle }}" trailing="{{ item.trailing }}" icon="{{ item.icon }}" hint-size="100%,58px"></dc-import>
+          </sc-for>
+        </div>
+      </div>
+
+      <div class="vc-footer-cta" style="flex:none;padding:12px 16px 10px">
+        <div sc-camel-on-click="{{ goLog }}" style="font:500 14px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#2C2C2C,#141414);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer" style-active="transform:translateY(.5px)"><dc-import name="VC Icon" glyph="plus" size="{{ s18 }}" hint-size="18px,18px"></dc-import>Log service</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isHistory }}">
+      <div style="flex:none;padding:2px 16px 12px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font:700 24px Archivo,sans-serif;letter-spacing:-.03em">History</span>
+        <div style="display:flex;gap:8px">
+          <div style="width:36px;height:36px;border-radius:10px;border:1px solid #E2E2E4;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 1px rgba(44,54,53,.025);cursor:pointer" style-hover="border-color:#1C2024"><dc-import name="VC Icon" glyph="filter" size="{{ s19 }}" hint-size="19px,19px"></dc-import></div>
+          <div style="width:36px;height:36px;border-radius:10px;border:1px solid #E2E2E4;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 1px rgba(44,54,53,.025);cursor:pointer" style-hover="border-color:#1C2024"><dc-import name="VC Icon" glyph="download" size="{{ s19 }}" hint-size="19px,19px"></dc-import></div>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 16px 24px">
+        <div style="font:400 12px/1.4 Archivo,sans-serif;color:rgba(28,32,36,.52);margin:0 2px 12px">{{ historySummary }}</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <sc-for list="{{ allEntries }}" as="item" hint-placeholder-count="6">
+            <sc-if value="{{ item.showDivider }}"><div style="height:1px;background:#F0F0F3;margin-left:62px"></div></sc-if>
+            <dc-import name="VC Row" title="{{ item.title }}" subtitle="{{ item.subtitle }}" trailing="{{ item.trailing }}" sc-camel-trailing-sub="{{ item.trailingSub }}" trailing-sub="{{ item.trailingSub }}" icon="{{ item.icon }}" chevron="{{ yes }}" hint-size="100%,64px"></dc-import>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCosts }}">
+      <div style="flex:none;padding:2px 16px 12px"><span style="font:700 24px Archivo,sans-serif;letter-spacing:-.03em">Costs</span></div>
+      <div style="flex:1;overflow-y:auto;padding:0 16px 24px">
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;padding:16px 14px">
+          <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">September so far</div>
+          <div style="font:700 30px/1.05 Archivo,sans-serif;letter-spacing:-.03em;margin-top:5px">{{ monthTotal }}</div>
+          <div style="display:flex;gap:2px;margin-top:14px;height:10px;border-radius:9999px;overflow:hidden;background:#F0F0F3">
+            <div style="width:64%;background:linear-gradient(180deg,#2C2C2C,#141414)"></div>
+            <div style="width:29%;background:#B9B9BD"></div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#141414;display:block"></span><span style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.6)">Fuel 1.54M₫</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:#B9B9BD;display:block"></span><span style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.6)">Service 0.70M₫</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <div style="flex:1;background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;padding:13px"><div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Cost / {{ units }}</div><div style="font:700 19px Archivo,sans-serif;letter-spacing:-.02em;margin-top:5px">1,980₫</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">last 3 months</div></div>
+          <div style="flex:1;background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;padding:13px"><div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Efficiency</div><div style="font:700 19px Archivo,sans-serif;letter-spacing:-.02em;margin-top:5px">7.2 L</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">per 100 {{ units }}</div></div>
+        </div>
+
+        <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase;margin:20px 2px 8px">By month</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;padding:16px 14px;display:flex;align-items:flex-end;gap:10px;height:132px">
+          <sc-for list="{{ monthBars }}" as="bar" hint-placeholder-count="6">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+              <div style="{{ bar.style }}"></div>
+              <span style="font:500 10px Archivo,sans-serif;color:rgba(28,32,36,.5)">{{ bar.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font:400 12px/1.5 Archivo,sans-serif;color:rgba(28,32,36,.52);margin:12px 2px 0;text-wrap:pretty">Fuel efficiency needs two consecutive full-tank fills to be accurate. Log a full tank next time to firm this up.</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isYou }}">
+      <div style="flex:none;padding:2px 16px 12px"><span style="font:700 24px Archivo,sans-serif;letter-spacing:-.03em">You</span></div>
+      <div style="flex:1;overflow-y:auto;padding:0 16px 24px">
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;display:flex;align-items:center;gap:12px;padding:14px">
+          <div style="width:44px;height:44px;flex:none;border-radius:9999px;background:#FFF8EB;border:1px solid #F0CD86;display:flex;align-items:center;justify-content:center;font:700 15px Archivo,sans-serif;color:#7A5A12">MT</div>
+          <div style="flex:1;min-width:0"><div style="font:600 14.5px Archivo,sans-serif;letter-spacing:-.01em">John Snow</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">minh@gmail.com · Free plan</div></div>
+          <div sc-camel-on-click="{{ goUpgrade }}" style="font:500 11px Archivo,sans-serif;letter-spacing:-.01em;padding:5px 10px;border-radius:9999px;border:1px solid #E2E2E4;background:#fff;color:#1C2024;cursor:pointer;flex:none" style-hover="border-color:#1C2024">Upgrade</div>
+        </div>
+
+        <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase;margin:16px 2px 8px">Garage</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <dc-import name="VC Row" title="{{ vehicleName }}" subtitle="{{ garageSubtitle }}" trailing="Active" icon="car" sc-camel-on-click="{{ goHome }}" hint-size="100%,64px"></dc-import>
+          <div style="height:1px;background:#F0F0F3;margin-left:62px"></div>
+          <dc-import name="VC Row" title="Add a vehicle" subtitle="Plus plan covers unlimited" icon="plus" sc-camel-on-click="{{ goUpgrade }}" chevron="{{ yes }}" hint-size="100%,64px"></dc-import>
+        </div>
+
+        <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase;margin:16px 2px 8px">Reminders</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px"><div style="flex:1"><div style="font:500 14.5px Archivo,sans-serif;letter-spacing:-.01em">Warn me ahead by</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:1px">Distance or days, whichever lands first</div></div><span style="font:500 13px Archivo,sans-serif;color:rgba(28,32,36,.55)">{{ warnAheadLabel }}</span></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div sc-camel-on-click="{{ toggleWeeklyPrompt }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer"><div style="flex:1"><div style="font:500 14.5px Archivo,sans-serif;letter-spacing:-.01em">Ask for odometer</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:1px">A single prompt, weekly</div></div><div style="{{ weeklyToggleTrack }}"><div style="width:20px;height:20px;border-radius:9999px;background:#fff;box-shadow:0 1px 1px rgba(44,54,53,.15)"></div></div></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div sc-camel-on-click="{{ toggleQuietHours }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer"><div style="flex:1"><div style="font:500 14.5px Archivo,sans-serif;letter-spacing:-.01em">Quiet hours</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:1px">No pushes 22:00 – 07:00</div></div><div style="{{ quietToggleTrack }}"><div style="width:20px;height:20px;border-radius:9999px;background:#fff;box-shadow:0 1px 1px rgba(44,54,53,.15)"></div></div></div>
+        </div>
+
+        <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase;margin:16px 2px 8px">App</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+          <div sc-camel-on-click="{{ toggleUnits }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer"><span style="font:500 14.5px Archivo,sans-serif;flex:1">Units</span><span style="font:500 13px Archivo,sans-serif;color:rgba(28,32,36,.55)">{{ unitsLabel }}</span></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div sc-camel-on-click="{{ flushQueue }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer"><span style="font:500 14.5px Archivo,sans-serif;flex:1">Sync</span><span style="font:500 13px Archivo,sans-serif;color:rgba(28,32,36,.55);display:flex;align-items:center;gap:6px"><span style="{{ syncDot }}"></span>{{ syncLabel }}</span></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isLog }}">
+      <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:2px 16px 12px">
+        <span sc-camel-on-click="{{ goBackTab }}" style="font:400 14px Archivo,sans-serif;color:rgba(28,32,36,.55);cursor:pointer">Cancel</span>
+        <span style="font:600 15px Archivo,sans-serif;letter-spacing:-.01em">New entry</span>
+        <span sc-camel-on-click="{{ saveEntry }}" style="font:500 14px Archivo,sans-serif;color:#0638CD;cursor:pointer">Save</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 16px 16px">
+        <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase;margin:0 2px 8px">Type</div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+          <sc-for list="{{ typeTiles }}" as="tile" hint-placeholder-count="4">
+            <div sc-camel-on-click="{{ tile.onClick }}" style="{{ tile.style }}">
+              <dc-import name="VC Icon" glyph="{{ tile.glyph }}" size="{{ tile.size }}" hint-size="20px,20px"></dc-import>
+              <span style="font:500 10.5px Archivo,sans-serif">{{ tile.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;margin-top:16px;padding:16px 14px">
+          <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Odometer</div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px"><span style="font:700 34px/1 Archivo,sans-serif;letter-spacing:-.035em">{{ odoDisplay }}</span><span style="font:400 14px Archivo,sans-serif;color:rgba(28,32,36,.52)">{{ units }}</span></div>
+          <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+            <div sc-camel-on-click="{{ resetOdoToLast }}" style="font:500 11px Archivo,sans-serif;letter-spacing:-.01em;padding:5px 9px;border-radius:9999px;border:1px solid #E2E2E4;background:#fff;color:rgba(28,32,36,.62);cursor:pointer" style-hover="border-color:#1C2024;color:#1C2024">{{ lastReadingChip }}</div>
+            <div sc-camel-on-click="{{ addFifty }}" style="font:500 11px Archivo,sans-serif;letter-spacing:-.01em;padding:5px 9px;border-radius:9999px;border:1px solid #E2E2E4;background:#fff;color:rgba(28,32,36,.62);cursor:pointer" style-hover="border-color:#1C2024;color:#1C2024">+50</div>
+            <div sc-camel-on-click="{{ addHundred }}" style="font:500 11px Archivo,sans-serif;letter-spacing:-.01em;padding:5px 9px;border-radius:9999px;border:1px solid #E2E2E4;background:#fff;color:rgba(28,32,36,.62);cursor:pointer" style-hover="border-color:#1C2024;color:#1C2024">+100</div>
+            <div sc-camel-on-click="{{ goScan }}" style="font:500 11px Archivo,sans-serif;letter-spacing:-.01em;padding:5px 9px;border-radius:9999px;border:1px solid #E2E2E4;background:#fff;color:rgba(28,32,36,.62);cursor:pointer;display:flex;align-items:center;gap:5px" style-hover="border-color:#1C2024;color:#1C2024"><dc-import name="VC Icon" glyph="camera" size="{{ s12 }}" hint-size="12px,12px"></dc-import>Scan</div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;margin-top:10px;overflow:hidden">
+          <div style="display:flex;align-items:center;padding:14px"><span style="font:500 14.5px Archivo,sans-serif;flex:1;color:rgba(28,32,36,.6)">Date</span><span style="font:500 14.5px Archivo,sans-serif">Today, 17 Sep</span></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div sc-camel-on-click="{{ cycleCost }}" style="display:flex;align-items:center;padding:14px;cursor:pointer"><span style="font:500 14.5px Archivo,sans-serif;flex:1;color:rgba(28,32,36,.6)">Cost</span><span style="font:500 14.5px Archivo,sans-serif">{{ logCostLabel }}</span></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div style="display:flex;align-items:center;padding:14px"><span style="font:500 14.5px Archivo,sans-serif;flex:1;color:rgba(28,32,36,.6)">Shop</span><span style="font:500 14.5px Archivo,sans-serif">Honda Long Biên</span></div>
+          <div style="height:1px;background:#F0F0F3"></div>
+          <div style="display:flex;align-items:center;padding:14px"><span style="font:500 14.5px Archivo,sans-serif;flex:1;color:rgba(28,32,36,.6)">Note</span><span style="font:400 14.5px Archivo,sans-serif;color:rgba(28,32,36,.35)">Optional</span></div>
+        </div>
+
+        <div sc-camel-on-click="{{ toggleReset }}" style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;margin-top:10px;display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer">
+          <div style="flex:1"><div style="font:500 14.5px Archivo,sans-serif;letter-spacing:-.01em">{{ resetTitle }}</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:1px">{{ resetSubtitle }}</div></div>
+          <div style="{{ resetToggleTrack }}"><div style="width:20px;height:20px;border-radius:9999px;background:#fff;box-shadow:0 1px 1px rgba(44,54,53,.15)"></div></div>
+        </div>
+      </div>
+      <div style="flex:none;padding:12px 16px 20px">
+        <div sc-camel-on-click="{{ saveEntry }}" style="font:500 14px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#003CFF,#0638CD);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:translateY(.5px)">Save entry</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isScan }}">
+      <div style="position:relative;flex:none;display:flex;align-items:center;justify-content:space-between;padding:2px 18px 14px;color:#fff">
+        <span sc-camel-on-click="{{ goLog }}" style="cursor:pointer;display:flex"><dc-import name="VC Icon" glyph="x" size="{{ s22 }}" hint-size="22px,22px"></dc-import></span>
+        <span style="font:600 14.5px Archivo,sans-serif">Scan odometer</span>
+        <span sc-camel-on-click="{{ retakeScan }}" style="cursor:pointer;display:flex"><dc-import name="VC Icon" glyph="refresh" size="{{ s22 }}" hint-size="22px,22px"></dc-import></span>
+      </div>
+      <div style="flex:1;position:relative;background:#242426;overflow:hidden">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg,#2a2a2d 0 22px,#303034 22px 44px)"></div>
+        <div style="position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);width:236px;height:96px;border-radius:14px;background:#151517;box-shadow:0 0 0 2px rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font:700 40px Archivo,sans-serif;color:#E8E8EA;letter-spacing:.04em">{{ scanRaw }}</div>
+        <div style="position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);width:268px;height:128px;border-radius:18px;border:2px solid #FF00FF;box-shadow:0 0 0 9999px rgba(10,10,12,.55)"></div>
+        <sc-if value="{{ scanReading }}"><div style="position:absolute;left:50%;top:calc(40% + 84px);transform:translateX(-50%);font:500 11px Archivo,sans-serif;color:#fff;letter-spacing:.04em;background:rgba(255,255,255,.14);padding:5px 10px;border-radius:9999px;backdrop-filter:blur(8px)">Hold steady — reading…</div></sc-if>
+      </div>
+      <sc-if value="{{ scanDone }}">
+        <div class="vc-scansheet" style="flex:none;background:#fff;padding:18px 16px 22px;position:relative;animation:vcUp 220ms cubic-bezier(.2,.7,.2,1) both">
+          <div style="width:100%;max-width:520px;margin:0 auto">
+            <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Detected</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+              <span style="font:700 32px/1 Archivo,sans-serif;letter-spacing:-.035em">{{ scanDisplay }}</span><span style="font:400 14px Archivo,sans-serif;color:rgba(28,32,36,.52)">{{ units }}</span>
+              <span style="margin-left:auto;font:500 11px Archivo,sans-serif;padding:4px 8px;border-radius:9999px;background:#FFF8EB;border:1px solid #F0CD86;color:#7A5A12">98% confident</span>
+            </div>
+            <div style="font:400 12px/1.4 Archivo,sans-serif;color:rgba(28,32,36,.52);margin-top:8px">{{ scanDelta }}</div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <div sc-camel-on-click="{{ retakeScan }}" style="font:500 14px Inter Tight,sans-serif;color:#1C2024;background:#fff;border:1px solid #E2E2E4;box-shadow:0 1px 1px rgba(44,54,53,.025);border-radius:12px;height:48px;padding:0 18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none" style-hover="border-color:#1C2024">Retake</div>
+              <div sc-camel-on-click="{{ acceptScan }}" style="flex:1;font:500 14px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#003CFF,#0638CD);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:translateY(.5px)">{{ scanAcceptLabel }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isUpgrade }}">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding:2px 16px 14px"><span sc-camel-on-click="{{ goYou }}" style="cursor:pointer;display:flex"><dc-import name="VC Icon" glyph="chevron-left" size="{{ s22 }}" hint-size="22px,22px"></dc-import></span><span style="font:600 15px Archivo,sans-serif;letter-spacing:-.01em">Plus</span></div>
+      <div style="flex:1;overflow-y:auto;padding:0 16px 16px">
+        <div style="font:700 25px/1.15 Archivo,sans-serif;letter-spacing:-.03em;text-wrap:pretty;margin:2px 2px 0;max-width:20ch">Every vehicle in the house, on one reminder list.</div>
+        <div style="font:400 13px/1.5 Archivo,sans-serif;color:rgba(28,32,36,.52);margin:8px 2px 0;text-wrap:pretty;max-width:52ch">Free covers one vehicle and 12 months of history. Plus lifts both, and keeps records where you can hand them to a buyer.</div>
+        <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;margin-top:18px;padding:14px">
+          <div style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Storage used</div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:5px"><span style="font:600 15px Archivo,sans-serif">{{ receiptsLabel }}</span><span style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">free tier</span></div>
+          <div style="height:8px;border-radius:9999px;background:#F0F0F3;margin-top:10px;overflow:hidden"><div style="{{ storageBar }}"></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+          <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden"><dc-import name="VC Row" title="Unlimited vehicles" subtitle="Car, bike, the family scooter" icon="car" hint-size="100%,64px"></dc-import></div>
+          <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden"><dc-import name="VC Row" title="Full service history" subtitle="Exportable PDF log per vehicle" icon="clock" hint-size="100%,64px"></dc-import></div>
+          <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden"><dc-import name="VC Row" title="Fuel efficiency trends" subtitle="{{ efficiencySubtitle }}" icon="chart" hint-size="100%,64px"></dc-import></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <div sc-camel-on-click="{{ pickYearly }}" style="{{ yearlyCardStyle }}"><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap"><span style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Yearly</span><span style="font:500 10px Archivo,sans-serif;padding:3px 7px;border-radius:9999px;background:#FFF8EB;border:1px solid #F0CD86;color:#7A5A12">2 months free</span></div><div style="font:700 20px Archivo,sans-serif;letter-spacing:-.02em;margin-top:6px">299,000₫</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">25,000₫ / month</div></div>
+          <div sc-camel-on-click="{{ pickMonthly }}" style="{{ monthlyCardStyle }}"><span style="font:600 10px Archivo,sans-serif;letter-spacing:.06em;color:rgba(28,32,36,.45);text-transform:uppercase">Monthly</span><div style="font:700 20px Archivo,sans-serif;letter-spacing:-.02em;margin-top:6px">35,000₫</div><div style="font:400 12px Archivo,sans-serif;color:rgba(28,32,36,.52)">cancel anytime</div></div>
+        </div>
+      </div>
+      <div style="flex:none;padding:12px 16px 18px">
+        <div sc-camel-on-click="{{ startTrial }}" style="font:500 14px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#003CFF,#0638CD);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:translateY(.5px)">Start 14-day trial</div>
+        <div style="font:400 11px/1.5 Archivo,sans-serif;color:rgba(28,32,36,.52);text-align:center;margin-top:9px">{{ trialFootnote }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ true }}">
+      <div class="vc-tabbar" style="flex:none">
+        <dc-import name="VC TabBar" active="{{ screen }}" sc-camel-on-nav="{{ onNav }}" on-nav="{{ onNav }}" hint-size="100%,64px"></dc-import>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <sc-if value="{{ sheetVehicle }}">
+    <div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;background:rgba(28,32,36,.55);backdrop-filter:blur(8px);animation:vcFade 160ms both"></div>
+    <div class="vc-sheet">
+      <div class="vc-grabber" style="width:36px;height:4px;border-radius:9999px;background:#E2E2E4;margin:0 auto 14px"></div>
+      <div style="font:600 15px Archivo,sans-serif;letter-spacing:-.01em;margin:0 2px 10px">Switch vehicle</div>
+      <div style="background:#fff;border:1px solid #F0F0F3;border-radius:16px;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;overflow:hidden">
+        <sc-for list="{{ vehicles }}" as="v" hint-placeholder-count="2">
+          <sc-if value="{{ v.showDivider }}"><div style="height:1px;background:#F0F0F3;margin-left:62px"></div></sc-if>
+          <dc-import name="VC Row" title="{{ v.name }}" subtitle="{{ v.subtitle }}" trailing="{{ v.trailing }}" icon="car" tone="{{ v.tone }}" sc-camel-on-click="{{ v.onClick }}" hint-size="100%,64px"></dc-import>
+        </sc-for>
+      </div>
+      <div sc-camel-on-click="{{ goUpgrade }}" style="font:500 14px Inter Tight,sans-serif;color:#1C2024;background:#fff;border:1px solid #E2E2E4;box-shadow:0 1px 1px rgba(44,54,53,.025);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;cursor:pointer" style-hover="border-color:#1C2024"><dc-import name="VC Icon" glyph="plus" size="{{ s18 }}" hint-size="18px,18px"></dc-import>Add a vehicle</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ sheetOdo }}">
+    <div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;background:rgba(28,32,36,.55);backdrop-filter:blur(8px);animation:vcFade 160ms both"></div>
+    <div class="vc-sheet">
+      <div class="vc-grabber" style="width:36px;height:4px;border-radius:9999px;background:#E2E2E4;margin:0 auto 14px"></div>
+      <div style="font:600 15px Archivo,sans-serif;letter-spacing:-.01em;margin:0 2px 2px">Update odometer</div>
+      <div style="font:400 12px/1.4 Archivo,sans-serif;color:rgba(28,32,36,.52);margin:0 2px 14px">{{ sheetOdoHint }}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div sc-camel-on-click="{{ sheetMinus }}" style="width:48px;height:48px;flex:none;border-radius:14px;border:1px solid #E2E2E4;background:#fff;box-shadow:0 1px 1px rgba(44,54,53,.025);display:flex;align-items:center;justify-content:center;font:600 22px Archivo,sans-serif;color:#1C2024;cursor:pointer" style-hover="border-color:#1C2024">−</div>
+        <div style="flex:1;text-align:center;font:700 34px/1 Archivo,sans-serif;letter-spacing:-.035em">{{ sheetOdoDisplay }}</div>
+        <div sc-camel-on-click="{{ sheetPlus }}" style="width:48px;height:48px;flex:none;border-radius:14px;border:1px solid #E2E2E4;background:#fff;box-shadow:0 1px 1px rgba(44,54,53,.025);display:flex;align-items:center;justify-content:center;font:600 22px Archivo,sans-serif;color:#1C2024;cursor:pointer" style-hover="border-color:#1C2024">+</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <div sc-camel-on-click="{{ goScanFromSheet }}" style="font:500 14px Inter Tight,sans-serif;color:#1C2024;background:#fff;border:1px solid #E2E2E4;box-shadow:0 1px 1px rgba(44,54,53,.025);border-radius:12px;height:48px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;flex:none" style-hover="border-color:#1C2024"><dc-import name="VC Icon" glyph="camera" size="{{ s18 }}" hint-size="18px,18px"></dc-import>Scan</div>
+        <div sc-camel-on-click="{{ saveOdo }}" style="flex:1;font:500 14px Inter Tight,sans-serif;color:#fff;background:linear-gradient(180deg,#2C2C2C,#141414);border-radius:12px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:translateY(.5px)">Save reading</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}">
+    <div class="vc-toast">
+      <span style="color:#fff;display:flex"><dc-import name="VC Icon" glyph="check" size="{{ s18 }}" hint-size="18px,18px"></dc-import></span>
+      <span style="font:400 12.5px/1.4 Archivo,sans-serif;color:#fff;flex:1;text-wrap:pretty">{{ toast }}</span>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;vehicleName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Honda City 2021&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;forceLayout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;phone&quot;,&quot;tablet&quot;,&quot;desktop&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;\&quot;auto\&quot; | \&quot;phone\&quot; | \&quot;tablet\&quot; | \&quot;desktop\&quot;&quot;,&quot;section&quot;:&quot;Layout&quot;}}">
+const SERVICES = {
+  oil: { title: "Oil change", icon: "oil", interval: 5000, last: 38000 },
+  tire: { title: "Tire rotation", icon: "tire", interval: 10000, last: 33500 },
+  airfilter: { title: "Air filter", icon: "alert", interval: 20000, last: 21000 },
+  other: { title: "Other service", icon: "wrench", interval: 10000, last: 38000 },
+};
+
+class Component extends DCLogic {
+  state = {
+    screen: "home",
+    prevTab: "home",
+    sheet: null,
+    odo: 42180,
+    lastReading: 41910,
+    lastReadingDays: 2,
+    serviceLast: { oil: 38000, tire: 33500, airfilter: 21000, other: 38000 },
+    logType: "oil",
+    logCostIdx: 0,
+    resetReminder: true,
+    sheetOdo: 42180,
+    scanPhase: "reading",
+    queued: 2,
+    weeklyPrompt: true,
+    quietHours: true,
+    units: "km",
+    plan: "yearly",
+    receipts: 148,
+    toast: "",
+    entries: [
+      { id: 1, type: "fuel", title: "Fuel · 38.2 L", subtitle: "14 Sep · 41,910", trailing: "852,000₫", icon: "fuel" },
+      { id: 2, type: "tire", title: "Tire rotation", subtitle: "28 Aug · 40,140", trailing: "180,000₫", icon: "tire" },
+      { id: 3, type: "fuel", title: "Fuel · 36.0 L", subtitle: "21 Aug · 39,760", trailing: "798,000₫", icon: "fuel" },
+      { id: 4, type: "oil", title: "Oil change", subtitle: "12 Jun · 38,000", trailing: "640,000₫", icon: "oil" },
+    ],
+  };
+
+  componentWillUnmount() { clearTimeout(this._toastT); clearTimeout(this._scanT); }
+
+  fmt = (n) => n.toLocaleString("en-US");
+
+  flash(msg) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg });
+    this._toastT = setTimeout(() => this.setState({ toast: "" }), 3200);
+  }
+
+  go = (screen) => {
+    const tabs = ["home", "history", "costs", "you"];
+    this.setState((s) => ({ screen, sheet: null, prevTab: tabs.includes(s.screen) ? s.screen : s.prevTab }));
+  };
+
+  startScan = () => {
+    clearTimeout(this._scanT);
+    this.setState({ screen: "scan", sheet: null, scanPhase: "reading" });
+    this._scanT = setTimeout(() => this.setState({ scanPhase: "done" }), 1400);
+  };
+
+  renderVals() {
+    const s = this.state;
+    const u = s.units;
+    const conv = (km) => (u === "mi" ? Math.round(km * 0.621371) : km);
+    const odoU = conv(s.odo);
+    const scanned = s.odo + 270;
+    const isScan = s.screen === "scan";
+    const isTabScreen = ["home", "history", "costs", "you"].includes(s.screen);
+
+    const buildDue = (id) => {
+      const def = SERVICES[id];
+      const last = s.serviceLast[id];
+      const next = last + def.interval;
+      const remaining = next - s.odo;
+      return {
+        id,
+        title: def.title,
+        icon: def.icon,
+        subtitle: "Every " + this.fmt(conv(def.interval)) + " " + u + " · last at " + this.fmt(conv(last)),
+        trailing: this.fmt(Math.abs(conv(remaining))) + " " + u,
+        trailingSub: remaining < 0 ? "overdue" : "to go",
+        remaining,
+        tone: remaining <= 1000 ? "warn" : "neutral",
+        onClick: () => this.setState({ screen: "log", logType: id, resetReminder: true, sheet: null }),
+      };
+    };
+
+    const all = ["oil", "tire", "airfilter"].map(buildDue);
+    const overdueItems = all.filter((d) => d.remaining < 0).map((d, i) => ({ ...d, showDivider: i > 0 }));
+    const insurance = {
+      title: "Insurance renewal",
+      icon: "calendar",
+      subtitle: "Annual · policy PVI",
+      trailing: "12 Nov",
+      trailingSub: "in 8 weeks",
+      tone: "neutral",
+      onClick: () => this.flash("Insurance renewal is date-based — edit it from the vehicle's reminder list."),
+    };
+    const dueItems = all
+      .filter((d) => d.remaining >= 0)
+      .sort((a, b) => a.remaining - b.remaining)
+      .concat([insurance])
+      .map((d, i) => ({ ...d, showDivider: i > 0 }));
+
+    const entryRows = s.entries.map((e, i) => ({
+      ...e,
+      subtitle: e.subtitle + " " + u,
+      trailingSub: "",
+      showDivider: i > 0,
+    }));
+
+    const costs = [0, 250000, 640000, 1200000];
+    const tileDefs = [
+      { id: "oil", label: "Oil", glyph: "oil" },
+      { id: "fuel", label: "Fuel", glyph: "fuel" },
+      { id: "tire", label: "Tires", glyph: "tire" },
+      { id: "other", label: "Other", glyph: "wrench" },
+    ];
+    const tileBase =
+      "background:#fff;border-radius:16px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color 120ms cubic-bezier(.2,.7,.2,1);";
+    const monthBars = [
+      { label: "Apr", h: 44 }, { label: "May", h: 62 }, { label: "Jun", h: 96 },
+      { label: "Jul", h: 54 }, { label: "Aug", h: 71 }, { label: "Sep", h: 58 },
+    ].map((b, i) => ({
+      label: b.label,
+      style:
+        "width:100%;max-width:26px;border-radius:6px 6px 3px 3px;height:" + b.h + "px;background:" +
+        (i === 5 ? "linear-gradient(180deg,#2C2C2C,#141414)" : "#E2E2E4"),
+    }));
+
+    const track = (on) =>
+      "width:44px;height:26px;flex:none;border-radius:9999px;display:flex;align-items:center;padding:3px;box-sizing:border-box;transition:background 120ms cubic-bezier(.2,.7,.2,1);justify-content:" +
+      (on ? "flex-end" : "flex-start") +
+      ";background:" + (on ? "linear-gradient(180deg,#2C2C2C,#141414)" : "#E2E2E4");
+
+    const planCard = (active) =>
+      "flex:1;min-width:0;background:#fff;border-radius:16px;padding:13px;cursor:pointer;border:1px solid " +
+      (active ? "#1C2024" : "#F0F0F3") +
+      ";box-shadow:0 1px 2px rgba(2,6,23,.08),inset 0 0 0 2px #fff";
+
+    const navDefs = [
+      { id: "home", label: "Home", glyph: "home" },
+      { id: "history", label: "History", glyph: "list" },
+      { id: "costs", label: "Costs", glyph: "chart" },
+      { id: "you", label: "You", glyph: "user" },
+    ];
+    const navItems = navDefs.map((d) => {
+      const active = d.id === s.screen || (d.id === s.prevTab && !isTabScreen);
+      return {
+        ...d,
+        size: 19,
+        style:
+          "display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:10px;cursor:pointer;" +
+          "transition:background 120ms cubic-bezier(.2,.7,.2,1),color 120ms cubic-bezier(.2,.7,.2,1);" +
+          (active
+            ? "background:#F9F9FB;border:1px solid #F0F0F3;color:#1C2024;"
+            : "border:1px solid transparent;color:rgba(28,32,36,.55);"),
+        onClick: () => this.go(d.id),
+      };
+    });
+
+    const logDef = SERVICES[s.logType];
+    const isFuel = s.logType === "fuel";
+
+    return {
+      screen: s.screen,
+      isHome: s.screen === "home",
+      isHistory: s.screen === "history",
+      isCosts: s.screen === "costs",
+      isYou: s.screen === "you",
+      isLog: s.screen === "log",
+      isScan,
+      isUpgrade: s.screen === "upgrade",
+
+      layoutAttr: this.props.forceLayout ?? "auto",
+      scanAttr: isScan ? "1" : "0",
+      showTabBar: isTabScreen,
+      navItems,
+
+      darkChrome: isScan,
+      lightChrome: !isScan,
+      yes: true,
+      s12: 12, s14: 14, s17: 17, s18: 18, s19: 19, s22: 22,
+
+      units: u,
+      unitsLabel: u === "km" ? "km · litres" : "mi · gallons",
+      vehicleName: this.props.vehicleName ?? "Honda City 2021",
+      vehicleInitials: "HC",
+      plate: "51H-482.19",
+      garageSubtitle: this.fmt(odoU) + " " + u + " · 4 reminders",
+
+      odoDisplay: this.fmt(odoU),
+      odoUpdatedLabel: s.lastReadingDays === 0 ? "Updated just now" : "Updated " + s.lastReadingDays + " days ago",
+      dueCountLabel: dueItems.length + " items",
+      hasOverdue: overdueItems.length > 0,
+      overdueItems,
+      dueItems,
+      recentEntries: entryRows.slice(0, 2),
+      allEntries: entryRows,
+      historySummary: s.entries.length + " entries · " + this.fmt(conv(s.odo - 38000)) + " " + u + " covered",
+
+      monthTotal: "2.41M₫",
+      monthBars,
+
+      warnAheadLabel: (u === "km" ? "500 km" : "300 mi") + " / 7d",
+      weeklyToggleTrack: track(s.weeklyPrompt),
+      quietToggleTrack: track(s.quietHours),
+      syncLabel: s.queued > 0 ? s.queued + " entries queued" : "Up to date",
+      syncDot:
+        "width:6px;height:6px;border-radius:9999px;display:block;flex:none;background:" +
+        (s.queued > 0 ? "#F0CD86" : "#57D7E0"),
+
+      typeTiles: tileDefs.map((t) => ({
+        ...t,
+        size: 20,
+        style:
+          tileBase +
+          (s.logType === t.id
+            ? "border:1px solid #1C2024;box-shadow:0 1px 2px rgba(2,6,23,.08),inset 0 0 0 2px #fff;color:#1C2024"
+            : "border:1px solid #F0F0F3;box-shadow:0 1px 1px rgba(44,54,53,.025),inset 0 0 0 2px #fff;color:rgba(28,32,36,.6)"),
+        onClick: () => this.setState({ logType: t.id }),
+      })),
+      lastReadingChip: "Last: " + this.fmt(conv(s.lastReading)),
+      logCostLabel: costs[s.logCostIdx] === 0 ? "Add cost" : this.fmt(costs[s.logCostIdx]) + "₫",
+      resetTitle: isFuel ? "Log as a full tank" : "Reset the " + logDef.title.toLowerCase() + " reminder",
+      resetSubtitle: isFuel
+        ? "Needed for the efficiency calculation"
+        : "Next due at " + this.fmt(conv(s.odo + logDef.interval)) + " " + u,
+      resetToggleTrack: track(s.resetReminder),
+
+      scanRaw: String(scanned),
+      scanDisplay: this.fmt(conv(scanned)),
+      scanDelta: "+" + this.fmt(conv(270)) + " " + u + " since 14 Sep. Tap the number to correct it.",
+      scanAcceptLabel: "Use " + this.fmt(conv(scanned)),
+      scanReading: s.scanPhase === "reading",
+      scanDone: s.scanPhase === "done",
+
+      receiptsLabel: s.receipts + " receipts · 1 vehicle",
+      storageBar: "width:74%;height:100%;background:linear-gradient(90deg,#FF00FF,#DD00D8)",
+      efficiencySubtitle: "L/100 " + u + " over time, per fill",
+      yearlyCardStyle: planCard(s.plan === "yearly"),
+      monthlyCardStyle: planCard(s.plan === "monthly"),
+      trialFootnote:
+        s.plan === "yearly"
+          ? "No charge until 1 Oct, then 299,000₫ / year. Reminders keep working on free."
+          : "No charge until 1 Oct, then 35,000₫ / month. Reminders keep working on free.",
+
+      sheetVehicle: s.sheet === "vehicle",
+      sheetOdo: s.sheet === "odo",
+      sheetOdoDisplay: this.fmt(conv(s.sheetOdo)),
+      sheetOdoHint: "Last reading " + this.fmt(conv(s.lastReading)) + " " + u + " on 14 Sep.",
+      vehicles: [
+        { name: this.props.vehicleName ?? "Honda City 2021", subtitle: this.fmt(odoU) + " " + u, trailing: "Active", tone: "warn", showDivider: false, onClick: () => this.setState({ sheet: null }) },
+        { name: "Yamaha Janus", subtitle: "9,240 " + u + " · 1 reminder", trailing: "", tone: "neutral", showDivider: true, onClick: () => { this.setState({ sheet: null }); this.flash("A second vehicle needs Plus. Trial is free for 14 days."); } },
+      ],
+
+      hasToast: !!s.toast,
+      toast: s.toast,
+
+      onNav: (id) => this.go(id),
+      goHome: () => this.go("home"),
+      goHistory: () => this.go("history"),
+      goYou: () => this.go("you"),
+      goUpgrade: () => this.go("upgrade"),
+      goBackTab: () => this.go(s.prevTab || "home"),
+      goLog: () => this.setState({ screen: "log", sheet: null }),
+      goScan: this.startScan,
+      goScanFromSheet: this.startScan,
+      retakeScan: this.startScan,
+      openVehicleSheet: () => this.setState({ sheet: "vehicle" }),
+      openOdoSheet: () => this.setState({ sheet: "odo", sheetOdo: s.odo }),
+      closeSheet: () => this.setState({ sheet: null }),
+      sheetPlus: () => this.setState((p) => ({ sheetOdo: p.sheetOdo + 10 })),
+      sheetMinus: () => this.setState((p) => ({ sheetOdo: Math.max(p.odo - 500, p.sheetOdo - 10) })),
+      saveOdo: () => {
+        this.setState((p) => ({ odo: p.sheetOdo, lastReading: p.sheetOdo, lastReadingDays: 0, sheet: null, queued: p.queued + 1 }));
+        this.flash("Odometer saved. Queued until you're back online.");
+      },
+      addFifty: () => this.setState((p) => ({ odo: p.odo + 50 })),
+      addHundred: () => this.setState((p) => ({ odo: p.odo + 100 })),
+      resetOdoToLast: () => this.setState((p) => ({ odo: p.lastReading })),
+      cycleCost: () => this.setState((p) => ({ logCostIdx: (p.logCostIdx + 1) % 4 })),
+      toggleReset: () => this.setState((p) => ({ resetReminder: !p.resetReminder })),
+      toggleWeeklyPrompt: () => this.setState((p) => ({ weeklyPrompt: !p.weeklyPrompt })),
+      toggleQuietHours: () => this.setState((p) => ({ quietHours: !p.quietHours })),
+      toggleUnits: () => this.setState((p) => ({ units: p.units === "km" ? "mi" : "km" })),
+      flushQueue: () => {
+        if (s.queued === 0) return this.flash("Everything is already synced.");
+        this.setState({ queued: 0 });
+        this.flash("Synced " + s.queued + " entries.");
+      },
+      pickYearly: () => this.setState({ plan: "yearly" }),
+      pickMonthly: () => this.setState({ plan: "monthly" }),
+      startTrial: () => { this.go("you"); this.flash("Trial started. You're on Plus until 1 Oct."); },
+      acceptScan: () => {
+        this.setState({ odo: scanned, screen: "log" });
+        this.flash("Reading applied. Check the cost before saving.");
+      },
+      saveEntry: () => {
+        const def = SERVICES[s.logType] ?? SERVICES.other;
+        const label = s.logType === "fuel" ? "Fuel · 38.2 L" : def.title;
+        const cost = costs[s.logCostIdx];
+        this.setState((p) => {
+          const serviceLast = { ...p.serviceLast };
+          if (p.resetReminder && p.logType !== "fuel") serviceLast[p.logType] = p.odo;
+          return {
+            screen: "home",
+            queued: p.queued + 1,
+            receipts: p.receipts + 1,
+            lastReading: p.odo,
+            lastReadingDays: 0,
+            logCostIdx: 0,
+            serviceLast,
+            entries: [
+              { id: Date.now(), type: p.logType, title: label, subtitle: "17 Sep · " + this.fmt(conv(p.odo)), trailing: cost === 0 ? "—" : this.fmt(cost) + "₫", icon: def.icon },
+              ...p.entries,
+            ],
+          };
+        });
+        this.flash(
+          s.resetReminder && s.logType !== "fuel"
+            ? label + " logged. Next due at " + this.fmt(conv(s.odo + def.interval)) + " " + u + "."
+            : label + " logged."
+        );
+      },
+    };
+  }
+}
+</script>
+
+
+</body></html>

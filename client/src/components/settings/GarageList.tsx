@@ -1,0 +1,177 @@
+import { useState } from "react";
+import { Archive, Car, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import type { Vehicle } from "@/domain/types";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
+
+type PendingAction = { kind: "archive" | "delete"; vehicle: Vehicle } | null;
+
+export function GarageList({
+  vehicles,
+  activeVehicleId,
+  onOpen,
+  onAdd,
+  onArchive,
+  onRestore,
+  onDelete,
+}: {
+  vehicles: Vehicle[];
+  activeVehicleId: string | null;
+  onOpen: (vehicle: Vehicle) => void;
+  onAdd: () => void;
+  onArchive: (vehicle: Vehicle) => Promise<void>;
+  onRestore: (vehicle: Vehicle) => Promise<void>;
+  onDelete: (vehicle: Vehicle) => Promise<void>;
+}) {
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function restore(vehicle: Vehicle) {
+    setBusyId(vehicle.id);
+    try {
+      await onRestore(vehicle);
+    } catch {
+      // The page-level action reports repository failures and the row stays unchanged.
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirm() {
+    if (!pending) return;
+    setBusyId(pending.vehicle.id);
+    try {
+      if (pending.kind === "archive") await onArchive(pending.vehicle);
+      else await onDelete(pending.vehicle);
+      setPending(null);
+    } catch {
+      // Keep the confirmation open so the user can retry after the page reports the error.
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between px-0.5">
+        <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+          Garage
+        </h2>
+        <Button variant="ghost" size="xs" onClick={onAdd}>
+          <Plus /> Add vehicle
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
+        {vehicles.length === 0 ? (
+          <div className="flex flex-col items-center px-5 py-8 text-center">
+            <Car className="mb-3 size-6 text-muted-foreground" />
+            <p className="text-sm font-semibold">Your garage is empty</p>
+            <Button className="mt-4" size="sm" onClick={onAdd}>
+              Add a vehicle
+            </Button>
+          </div>
+        ) : (
+          vehicles.map((vehicle, index) => {
+            const archived = vehicle.archivedAt != null;
+            const isActive = vehicle.id === activeVehicleId && !archived;
+            return (
+              <div
+                key={vehicle.id}
+                className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${index > 0 ? "border-t border-border-subtle" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  onClick={() => onOpen(vehicle)}
+                  disabled={archived}
+                >
+                  <span
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${archived ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}
+                  >
+                    <Car className="size-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold">
+                        {vehicle.name}
+                      </span>
+                      {isActive && (
+                        <Badge variant="secondary" className="h-5">
+                          Active
+                        </Badge>
+                      )}
+                      {archived && (
+                        <Badge
+                          variant="outline"
+                          className="h-5 text-muted-foreground"
+                        >
+                          Archived
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {vehicle.plateNumber || "No plate number"}
+                    </span>
+                  </span>
+                </button>
+                <div className="flex items-center justify-end gap-1 pl-12 sm:pl-0">
+                  {archived ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === vehicle.id}
+                      onClick={() => void restore(vehicle)}
+                    >
+                      <RotateCcw /> Restore
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === vehicle.id}
+                      onClick={() => setPending({ kind: "archive", vehicle })}
+                    >
+                      <Archive /> Archive
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    aria-label={`Delete ${vehicle.name}`}
+                    disabled={busyId === vehicle.id}
+                    onClick={() => setPending({ kind: "delete", vehicle })}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <ConfirmActionDialog
+        open={pending != null}
+        title={
+          pending?.kind === "delete"
+            ? `Delete ${pending.vehicle.name}?`
+            : `Archive ${pending?.vehicle.name ?? "vehicle"}?`
+        }
+        description={
+          pending?.kind === "delete"
+            ? "This removes the vehicle from your garage on every synced device. Its append-only history is not edited."
+            : "Archived vehicles are hidden from normal navigation. You can restore this vehicle later from the garage."
+        }
+        confirmLabel={
+          pending?.kind === "delete" ? "Delete vehicle" : "Archive vehicle"
+        }
+        destructive={pending?.kind === "delete"}
+        busy={pending != null && busyId === pending.vehicle.id}
+        onOpenChange={(open) => !open && setPending(null)}
+        onConfirm={() => void confirm()}
+      />
+    </section>
+  );
+}
