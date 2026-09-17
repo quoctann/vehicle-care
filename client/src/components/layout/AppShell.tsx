@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Plus, Settings } from 'lucide-react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet'
-import { useVehicles } from '@/hooks/useVehicles'
+import { useVehicle, useVehicles } from '@/hooks/useVehicles'
 import { getLastVehicleId, setLastVehicleId } from '@/lib/lastVehicle'
 import { useSessionStore } from '@/stores/useSessionStore'
 import { BottomTabBar } from './BottomTabBar'
@@ -15,9 +15,11 @@ export function AppShell() {
   const accountId = useSessionStore((state) => state.account?.id)
   const vehicles = useVehicles(accountId)
   const routeVehicleId = location.pathname.match(/^\/v\/([^/]+)\//)?.[1]
+  const routeVehicleQuery = useVehicle(accountId, routeVehicleId)
+  const routeVehicleKey = accountId && routeVehicleId ? `${accountId}:${routeVehicleId}` : null
   const rememberedVehicleId = accountId ? getLastVehicleId(accountId) : null
   const vehicleId = routeVehicleId ?? rememberedVehicleId ?? undefined
-  const vehicle = vehicles?.find((candidate) => candidate.id === vehicleId)
+  const vehicle = routeVehicleId ? routeVehicleQuery.vehicle : vehicles?.find((candidate) => candidate.id === vehicleId)
   const isOnboarding = location.pathname.startsWith('/onboarding/')
   const isHome = location.pathname.endsWith('/home')
 
@@ -25,7 +27,7 @@ export function AppShell() {
     if (accountId && routeVehicleId && vehicle) setLastVehicleId(accountId, routeVehicleId)
   }, [accountId, routeVehicleId, vehicle])
 
-  if (vehicles === undefined) {
+  if (vehicles === undefined || routeVehicleQuery.queryKey !== routeVehicleKey) {
     return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">Loading your garage...</div>
   }
 

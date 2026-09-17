@@ -10,8 +10,13 @@ export function useVehicles(accountId: string | undefined, opts: { includeArchiv
 }
 
 export function useVehicle(accountId: string | undefined, vehicleId: string | undefined) {
+  const queryKey = accountId && vehicleId ? `${accountId}:${vehicleId}` : null
   return useLiveQuery(
-    () => (accountId && vehicleId ? getVehicle(accountId, vehicleId) : Promise.resolve(undefined)),
+    async () => ({
+      queryKey,
+      vehicle: accountId && vehicleId ? await getVehicle(accountId, vehicleId) : undefined,
+    }),
     [accountId, vehicleId],
+    { queryKey: null, vehicle: undefined },
   )
 }
