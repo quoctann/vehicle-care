@@ -136,7 +136,9 @@ export function SettingsPage() {
   }
 
   return (
-    <main className="flex-1 px-4 pt-5 pb-24 sm:px-6 lg:pb-8">
+    // min-h-0 + overflow-y-auto: AppShell's <main> là overflow-hidden nên page phải
+    // tự cuộn nội dung của mình, thiếu 2 class này thì nội dung dài sẽ bị cắt cụt.
+    <main className="min-h-0 flex-1 overflow-y-auto px-4 pt-5 pb-24 sm:px-6 lg:pb-8">
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-4">
           <p className="text-xs font-semibold tracking-[0.08em] text-primary uppercase">

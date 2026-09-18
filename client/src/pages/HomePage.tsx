@@ -29,6 +29,8 @@ export function HomePage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <h1 className="hidden shrink-0 px-4 pb-3 text-2xl font-bold tracking-[-0.03em] lg:block">Home</h1>
+      {/* min-h-0 + overflow-y-auto: AppShell's <main> là overflow-hidden nên page phải
+          tự cuộn nội dung của mình, thiếu 2 class này thì nội dung dài sẽ bị cắt cụt. */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         <OdometerCard odometerKm={currentOdometerKm} onUpdate={() => setOdometerOpen(true)} />
         <OverdueSection reminders={overdue} vehicleId={vehicleId} />
