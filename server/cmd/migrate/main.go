@@ -1,6 +1,7 @@
 // Command migrate applies, rolls back, and reports the status of PostgreSQL
-// schema migrations, and seeds the fixed part_types catalog. It is a
-// standalone tool: the API process never runs migrations on startup.
+// schema migrations, seeds the fixed part_types catalog, and scaffolds new
+// migration files. It is a standalone tool: the API process never runs
+// migrations on startup.
 //
 // Usage:
 //
@@ -8,8 +9,10 @@
 //	go run ./cmd/migrate down [N]
 //	go run ./cmd/migrate status
 //	go run ./cmd/migrate seed
+//	go run ./cmd/migrate create <name>
 //
-// DATABASE_URL must be set to a PostgreSQL connection string.
+// DATABASE_URL must be set for up|down|status|seed. create does not touch the
+// database and works offline.
 package main
 
 import (
@@ -18,7 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -38,7 +44,11 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: migrate up|down [N]|status|seed")
+		return errors.New("usage: migrate up|down [N]|status|seed|create <name>")
+	}
+
+	if args[0] == "create" {
+		return runCreate(args[1:])
 	}
 
 	dsn := os.Getenv("DATABASE_URL")
@@ -66,7 +76,7 @@ func run(args []string) error {
 	case "seed":
 		return runSeed(db)
 	default:
-		return fmt.Errorf("unknown subcommand %q (want up|down|status|seed)", args[0])
+		return fmt.Errorf("unknown subcommand %q (want up|down|status|seed|create)", args[0])
 	}
 }
 
@@ -145,4 +155,70 @@ func runSeed(db *sql.DB) error {
 	}
 	fmt.Printf("migrate: seeded %d part type(s)\n", len(seed.Manifest))
 	return nil
+}
+
+// migrationsDir is relative to the server module root, matching where
+// `go run ./cmd/migrate` is invoked from (see Makefile: `cd server && ...`).
+const migrationsDir = "db/migrations"
+
+func runCreate(args []string) error {
+	if len(args) == 0 || args[0] == "" {
+		return errors.New("usage: migrate create <name>")
+	}
+	name := sanitizeMigrationName(args[0])
+	if name == "" {
+		return fmt.Errorf("migration name %q has no usable characters after sanitizing to snake_case", args[0])
+	}
+
+	ts := time.Now().Unix()
+	upPath := filepath.Join(migrationsDir, fmt.Sprintf("%d_%s.up.sql", ts, name))
+	downPath := filepath.Join(migrationsDir, fmt.Sprintf("%d_%s.down.sql", ts, name))
+
+	if err := os.MkdirAll(migrationsDir, 0o755); err != nil {
+		return fmt.Errorf("create migrations directory: %w", err)
+	}
+	if err := writeIfAbsent(upPath, fmt.Sprintf("-- +migrate up\n-- %s\n", name)); err != nil {
+		return err
+	}
+	if err := writeIfAbsent(downPath, fmt.Sprintf("-- +migrate down\n-- %s\n", name)); err != nil {
+		return err
+	}
+
+	fmt.Printf("migrate: created %s\n", upPath)
+	fmt.Printf("migrate: created %s\n", downPath)
+	return nil
+}
+
+func writeIfAbsent(path, content string) error {
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("refusing to overwrite existing file %s", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("stat %s: %w", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
+}
+
+// sanitizeMigrationName lowercases the input and keeps only [a-z0-9_],
+// collapsing spaces/dashes/other separators into single underscores so the
+// generated filename stays a valid, greppable snake_case identifier.
+func sanitizeMigrationName(raw string) string {
+	lower := strings.ToLower(raw)
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range lower {
+		switch {
+		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastUnderscore = false
+		default:
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+		}
+	}
+	return strings.Trim(b.String(), "_")
 }

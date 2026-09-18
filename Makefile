@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 .PHONY: help install dev dev-fe dev-be test test-fe test-be lint lint-fe lint-be build build-fe build-be \
-	dev-infra dev-infra-down dev-infra-logs migrate-up migrate-down migrate-status migrate-seed
+	dev-infra dev-infra-down dev-infra-logs migrate-up migrate-down migrate-status migrate-seed migrate-create
 
 help:
 	@printf '%s\n' \
@@ -13,6 +13,7 @@ help:
 		'make dev-infra-down Stop Postgres + Redis' \
 		'make migrate-up     Apply database migrations (needs DATABASE_URL)' \
 		'make migrate-seed   Seed the part_types catalog (needs DATABASE_URL)' \
+		'make migrate-create name=<name>  Scaffold a new timestamp-prefixed migration pair' \
 		'make test           Run all tests' \
 		'make lint           Run frontend lint and Go vet' \
 		'make build          Build frontend and backend'
@@ -54,6 +55,10 @@ migrate-status:
 
 migrate-seed:
 	cd server && go run ./cmd/migrate seed
+
+migrate-create:
+	@if [ -z "$(name)" ]; then echo "Usage: make migrate-create name=<migration_name>"; exit 1; fi
+	cd server && go run ./cmd/migrate create "$(name)"
 
 test: test-fe test-be
 

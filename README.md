@@ -99,6 +99,12 @@ Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http:
 
 ## Hướng phát triển backend
 
-Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|seed` — API process không tự chạy migration khi startup.
+Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|seed|create <name>` (hoặc
+`make migrate-up`/`migrate-down`/`migrate-status`/`migrate-seed`/`migrate-create
+name=<name>`) — API process không tự chạy migration khi startup. File migration đặt
+tên theo unix timestamp (`<unix_timestamp>_<name>.up.sql`/`.down.sql`, ví dụ
+`1789663949_create_accounts.up.sql`) để tránh xung đột số thứ tự khi nhiều người cùng
+thêm migration trên các branch khác nhau; `migrate create` tự sinh timestamp và tên đã
+chuẩn hoá snake_case.
 
 Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/ARCHITECTURE.md`.
