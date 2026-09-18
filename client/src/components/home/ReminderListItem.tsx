@@ -8,15 +8,15 @@ import {
   Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { ReminderWithStatus } from '@/data/queries/reminderQueries'
+import { formatNumber } from '@/lib/formatters'
 
 type ReminderListItemProps = {
   reminder: ReminderWithStatus
   to: string
   divider?: boolean
 }
-
-const numberFormatter = new Intl.NumberFormat('en-US')
 
 function ReminderIcon({ code }: { code: string }) {
   const className = 'size-[18px]'
@@ -29,30 +29,31 @@ function ReminderIcon({ code }: { code: string }) {
   return <Wrench className={className} />
 }
 
-function intervalLabel(reminder: ReminderWithStatus): string {
+function intervalLabel(reminder: ReminderWithStatus, t: ReturnType<typeof useTranslation>['t']): string {
   const parts: string[] = []
-  if (reminder.config.intervalKm != null) parts.push(`Every ${numberFormatter.format(reminder.config.intervalKm)} km`)
-  if (reminder.config.intervalDays != null) parts.push(`Every ${numberFormatter.format(reminder.config.intervalDays)} days`)
+  if (reminder.config.intervalKm != null) parts.push(t('home.everyKm', { value: formatNumber(reminder.config.intervalKm) }))
+  if (reminder.config.intervalDays != null) parts.push(t('home.everyDays', { value: formatNumber(reminder.config.intervalDays) }))
   return parts.join(' · ')
 }
 
-function remainingLabel(reminder: ReminderWithStatus): { value: string; caption: string } {
+function remainingLabel(reminder: ReminderWithStatus, t: ReturnType<typeof useTranslation>['t']): string {
   const { result } = reminder
   if (result.status === 'overdue') {
     if (result.km && result.km.remaining <= 0) {
-      return { value: `${numberFormatter.format(Math.abs(result.km.remaining))} km`, caption: 'overdue' }
+      return t('home.overdueKm', { value: formatNumber(Math.abs(result.km.remaining)) })
     }
     if (result.days && result.days.remainingDays <= 0) {
-      return { value: `${numberFormatter.format(Math.abs(result.days.remainingDays))} days`, caption: 'overdue' }
+      return t('home.overdueDays', { value: formatNumber(Math.abs(result.days.remainingDays)) })
     }
   }
-  if (result.km) return { value: `${numberFormatter.format(Math.max(0, result.km.remaining))} km`, caption: 'to go' }
-  if (result.days) return { value: `${numberFormatter.format(Math.max(0, result.days.remainingDays))} days`, caption: 'to go' }
-  return { value: 'Needs data', caption: '' }
+  if (result.km) return t('home.remainingKm', { value: formatNumber(Math.max(0, result.km.remaining)) })
+  if (result.days) return t('home.remainingDays', { value: formatNumber(Math.max(0, result.days.remainingDays)) })
+  return t('home.needsData')
 }
 
 export function ReminderListItem({ reminder, to, divider = false }: ReminderListItemProps) {
-  const trailing = remainingLabel(reminder)
+  const { t } = useTranslation()
+  const trailing = remainingLabel(reminder, t)
   const ratios = [reminder.result.km?.ratioUsed, reminder.result.days?.ratioUsed].filter(
     (ratio): ratio is number => ratio != null,
   )
@@ -68,24 +69,23 @@ export function ReminderListItem({ reminder, to, divider = false }: ReminderList
     >
       <span
         className={`flex size-9 shrink-0 items-center justify-center rounded-[11px] border ${
-          overdue ? 'border-red-200 bg-red-50 text-red-700' : 'border-warn-border bg-warn-bg text-warn-fg'
+          overdue ? 'border-destructive/30 bg-destructive/10 text-destructive' : 'border-warn-border bg-warn-bg text-warn-fg'
         }`}
       >
         <ReminderIcon code={reminder.partType.code} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium tracking-[-0.01em]">{reminder.partType.displayName}</span>
-        <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">{intervalLabel(reminder)}</span>
+        <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">{intervalLabel(reminder, t)}</span>
         <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted">
           <span
-            className={`block h-full rounded-full ${overdue ? 'bg-red-500' : 'bg-[#d69a23]'}`}
+            className={`block h-full rounded-full ${overdue ? 'bg-destructive' : 'bg-warn-solid'}`}
             style={{ width: `${progress}%` }}
           />
         </span>
       </span>
-      <span className={`shrink-0 text-right ${overdue ? 'text-red-700' : 'text-foreground'}`}>
-        <span className="block text-xs font-semibold">{trailing.value}</span>
-        {trailing.caption ? <span className="block text-[10.5px] text-muted-foreground">{trailing.caption}</span> : null}
+      <span className={`shrink-0 text-right ${overdue ? 'text-destructive' : 'text-foreground'}`}>
+        <span className="block text-xs font-semibold">{trailing}</span>
       </span>
     </Link>
   )

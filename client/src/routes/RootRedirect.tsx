@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Navigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { db } from '@/data/db'
 import { useVehicles } from '@/hooks/useVehicles'
 import { getLastVehicleId } from '@/lib/lastVehicle'
@@ -9,6 +10,7 @@ import { runSync } from '@/sync/syncOrchestrator'
 
 /** "/" không phải 1 trang thật — luôn điều hướng sang xe dùng gần nhất hoặc màn thêm xe. */
 export function RootRedirect() {
+  const { t } = useTranslation()
   const accountId = useSessionStore((state) => state.account?.id)
   const vehicles = useVehicles(accountId)
   const syncMetaQuery = useLiveQuery(
@@ -27,7 +29,7 @@ export function RootRedirect() {
   if (vehicles === undefined || !accountId || syncMetaQuery.accountId !== accountId) return null
 
   if (vehicles.length === 0 && navigator.onLine && syncMeta?.bootstrapState !== 'ready' && !syncMeta?.lastSyncError) {
-    return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">Syncing your garage...</div>
+    return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">{t('navigation.syncingGarage')}</div>
   }
 
   const lastVehicleId = getLastVehicleId(accountId)

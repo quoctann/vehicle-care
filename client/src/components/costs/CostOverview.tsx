@@ -1,21 +1,8 @@
 import { BarChart3, Fuel, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { MonthlyCost } from "@/data/queries/costQueries";
-
-function formatVnd(value: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatMonth(month: string, style: "long" | "short"): string {
-  const [year, monthNumber] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, {
-    month: style,
-    year: style === "long" ? "numeric" : undefined,
-  }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
-}
+import { formatVnd } from "@/lib/currency";
+import { formatMonth } from "@/lib/formatters";
 
 export function CostOverview({
   monthlyCosts,
@@ -28,6 +15,7 @@ export function CostOverview({
   costPerKm: number | null;
   units: "km" | "mi";
 }) {
+  const { t } = useTranslation();
   const current = monthlyCosts.find((item) => item.month === currentMonth) ?? {
     month: currentMonth,
     fuelVnd: 0,
@@ -51,7 +39,7 @@ export function CostOverview({
     <div className="space-y-5">
       <section className="rounded-2xl border border-border-subtle bg-card p-5 shadow-sm">
         <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-          {formatMonth(currentMonth, "long")} so far
+          {t('costs.monthSoFar', { month: formatMonth(currentMonth, "long") })}
         </p>
         <p className="mt-1.5 text-3xl font-bold tracking-[-0.04em] tabular-nums">
           {formatVnd(current.totalVnd)}
@@ -59,7 +47,7 @@ export function CostOverview({
 
         <div
           className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-muted"
-          aria-label="Current month cost breakdown"
+          aria-label={t('costs.breakdown')}
         >
           {fuelShare > 0 && (
             <div className="bg-foreground" style={{ width: `${fuelShare}%` }} />
@@ -74,11 +62,11 @@ export function CostOverview({
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
             <span className="size-2 rounded-sm bg-foreground" />
-            Fuel {formatVnd(current.fuelVnd)}
+            {t('costs.fuel')} {formatVnd(current.fuelVnd)}
           </span>
           <span className="flex items-center gap-2">
             <span className="size-2 rounded-sm bg-muted-foreground/45" />
-            Service {formatVnd(current.serviceVnd)}
+            {t('costs.service')} {formatVnd(current.serviceVnd)}
           </span>
         </div>
       </section>
@@ -86,18 +74,18 @@ export function CostOverview({
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm">
           <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Cost / {units}
+            {t('costs.costPerUnit', { unit: units })}
           </p>
           <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">
             {unitCost == null
-              ? "Not enough data"
+              ? t('costs.notEnoughData')
               : formatVnd(Math.round(unitCost))}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Last 3 months</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('costs.lastThreeMonths')}</p>
         </div>
         <div className="rounded-2xl border border-border-subtle bg-card p-4 shadow-sm">
           <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Year to date
+            {t('costs.yearToDate')}
           </p>
           <p className="mt-1.5 text-xl font-bold tracking-tight tabular-nums">
             {formatVnd(
@@ -109,14 +97,14 @@ export function CostOverview({
             )}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Fuel and service
+            {t('costs.fuelAndService')}
           </p>
         </div>
       </section>
 
       <section>
         <h2 className="mb-2 px-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-          By month
+          {t('costs.byMonth')}
         </h2>
         {bars.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-6 text-center">
@@ -124,9 +112,9 @@ export function CostOverview({
               className="mb-3 size-6 text-muted-foreground"
               aria-hidden="true"
             />
-            <p className="font-semibold">No costs logged yet</p>
+            <p className="font-semibold">{t('costs.empty')}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add costs to fuel or service entries to build this chart.
+              {t('costs.emptyDescription')}
             </p>
           </div>
         ) : (
@@ -147,7 +135,7 @@ export function CostOverview({
                     <div
                       className="group relative flex w-full max-w-8 flex-col-reverse overflow-hidden rounded-t-md bg-muted"
                       style={{ height }}
-                      title={`${formatMonth(item.month, "long")}: ${formatVnd(item.totalVnd)}`}
+                      title={t('costs.chartValue', { month: formatMonth(item.month, "long"), amount: formatVnd(item.totalVnd) })}
                     >
                       {fuelHeight > 0 && (
                         <div
@@ -171,10 +159,10 @@ export function CostOverview({
             </div>
             <div className="mt-4 flex justify-center gap-5 border-t border-border-subtle pt-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <Fuel className="size-3.5" /> Fuel
+                <Fuel className="size-3.5" /> {t('costs.fuel')}
               </span>
               <span className="flex items-center gap-1.5">
-                <Wrench className="size-3.5" /> Service
+                <Wrench className="size-3.5" /> {t('costs.service')}
               </span>
             </div>
           </div>

@@ -11,6 +11,7 @@ import { HistoryPage } from '@/pages/HistoryPage'
 import { HomePage } from '@/pages/HomePage'
 import { LogEntryPage } from '@/pages/LogEntryPage'
 import { AddVehiclePage } from '@/pages/onboarding/AddVehiclePage'
+import { RemindersPage } from '@/pages/RemindersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequireAuth } from './RequireAuth'
 import { RootRedirect } from './RootRedirect'
@@ -29,6 +30,7 @@ export function AppRouter() {
         <Route element={<AppShell />}>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/v/:vehicleId/home" element={<HomePage />} />
+          <Route path="/v/:vehicleId/reminders" element={<RemindersPage />} />
           <Route path="/v/:vehicleId/history" element={<HistoryPage />} />
           <Route path="/v/:vehicleId/costs" element={<CostsPage />} />
           <Route path="/v/:vehicleId/log-entry" element={<LogEntryPage />} />

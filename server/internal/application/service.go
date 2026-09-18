@@ -113,7 +113,10 @@ func (s *Service) LoginGoogleDemo(ctx context.Context) (string, string, error) {
 
 // VerifyEmail consumes a verification token and marks its account verified.
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
-	accountID, ok := s.store.ConsumeToken(ctx, "verification", token, s.now())
+	accountID, ok, err := s.store.ConsumeToken(ctx, "verification", token, s.now())
+	if err != nil {
+		return &Error{Code: "internal_error", Message: "Token store is unavailable."}
+	}
 	if !ok {
 		return validation("Token xác thực không hợp lệ hoặc đã hết hạn.")
 	}
@@ -149,7 +152,10 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	if err != nil {
 		return err
 	}
-	accountID, ok := s.store.ConsumeToken(ctx, "reset", token, s.now())
+	accountID, ok, err := s.store.ConsumeToken(ctx, "reset", token, s.now())
+	if err != nil {
+		return &Error{Code: "internal_error", Message: "Token store is unavailable."}
+	}
 	if !ok {
 		return validation("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.")
 	}
@@ -161,12 +167,12 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 
 // ResolveSession returns the session and account represented by an opaque ID.
 func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.Session, domain.Account, error) {
-	session, found := s.store.Session(ctx, sessionID, s.now())
+	session, found, err := s.store.GetAndRefreshSession(ctx, sessionID, s.now(), s.now().Add(s.sessionTTL))
+	if err != nil {
+		return domain.Session{}, domain.Account{}, &Error{Code: "internal_error", Message: "Session store is unavailable."}
+	}
 	if !found {
 		return domain.Session{}, domain.Account{}, &Error{Code: "session_expired", Message: "Session expired or missing."}
-	}
-	if err := s.store.RefreshSession(ctx, sessionID, s.now().Add(s.sessionTTL)); err != nil {
-		return domain.Session{}, domain.Account{}, err
 	}
 	account, found := s.store.AccountByID(ctx, session.AccountID)
 	if !found {

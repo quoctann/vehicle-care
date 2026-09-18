@@ -1,4 +1,5 @@
 import { Fuel, Wrench } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type LogEntryType = 'fuel' | 'service'
 
@@ -7,16 +8,16 @@ type EntryTypeSelectorProps = {
   onChange: (value: LogEntryType) => void
 }
 
-const entryTypes = [
-  { value: 'fuel', label: 'Fuel', description: 'Fill-up details', icon: Fuel },
-  { value: 'service', label: 'Service', description: 'Completed maintenance', icon: Wrench },
-] as const
-
 export function EntryTypeSelector({ value, onChange }: EntryTypeSelectorProps) {
+  const { t } = useTranslation()
+  const entryTypes = [
+    { value: 'fuel', label: t('logEntry.fuel'), description: t('logEntry.fuelDescription'), icon: Fuel },
+    { value: 'service', label: t('logEntry.service'), description: t('logEntry.serviceDescription'), icon: Wrench },
+  ] as const
   return (
     <fieldset>
       <legend className="mb-2 px-0.5 text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-        Entry type
+        {t('logEntry.entryType')}
       </legend>
       <div className="grid grid-cols-2 gap-2">
         {entryTypes.map((entryType) => {
@@ -31,11 +32,11 @@ export function EntryTypeSelector({ value, onChange }: EntryTypeSelectorProps) {
               onClick={() => onChange(entryType.value)}
               className={`flex min-h-20 items-center gap-3 rounded-2xl border bg-card px-4 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none ${
                 selected
-                  ? 'border-foreground shadow-sm ring-2 ring-white'
+                  ? 'border-foreground shadow-sm ring-2 ring-background'
                   : 'border-border-subtle text-muted-foreground hover:border-border hover:text-foreground'
               }`}
             >
-              <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${selected ? 'bg-primary text-white' : 'bg-muted'}`}>
+              <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 <Icon className="size-4.5" aria-hidden="true" />
               </span>
               <span>

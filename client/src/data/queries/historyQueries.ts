@@ -6,6 +6,7 @@ export type HistoryEntry = {
   kind: 'fuel' | 'service'
   occurredAt: IsoDateTime
   title: string
+  liters: number | null
   costVnd: number | null
   note: string | null
 }
@@ -25,7 +26,8 @@ export async function listHistoryEntries(accountId: string, vehicleId: string): 
     id: f.id,
     kind: 'fuel',
     occurredAt: f.recordedAt,
-    title: f.liters != null ? `Fuel · ${f.liters} L` : 'Fuel',
+    title: '',
+    liters: f.liters,
     costVnd: f.costVnd,
     note: f.note,
   }))
@@ -34,7 +36,8 @@ export async function listHistoryEntries(accountId: string, vehicleId: string): 
     id: s.id,
     kind: 'service',
     occurredAt: s.servicedAt,
-    title: partTypeById.get(s.partTypeId)?.displayName ?? s.partTypeId,
+    title: partTypeById.get(s.partTypeId)?.displayName ?? '',
+    liters: null,
     costVnd: s.costVnd,
     note: s.note,
   }))

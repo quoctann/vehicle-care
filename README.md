@@ -76,19 +76,29 @@ make build
 - Push hỗ trợ idempotency, sequence theo account và LWW cho mutable entity.
 - Pull dùng stable watermark trong suốt một phiên phân trang.
 
+## Persistence: `STORE_DRIVER=memory` (mặc định) hoặc `live`
+
+- `memory` (mặc định): backend giữ nguyên hành vi mock — toàn bộ account, session và dữ liệu sync sống trong process, mất khi restart. Không cần Docker, phù hợp dev nhanh và test.
+- `live`: dùng PostgreSQL (account + sync data) và Redis (session/token) thật. Cần chạy:
+  ```bash
+  make dev-infra        # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
+  make migrate-up        # áp dụng schema (đọc DATABASE_URL)
+  make migrate-seed       # seed danh mục part_types
+  STORE_DRIVER=live make dev-be
+  ```
+  `APP_ENV=production` bắt buộc `STORE_DRIVER=live` (process từ chối khởi động nếu không, tránh deploy nhầm mock backend). Biến môi trường liên quan xem `.env.example` (`DATABASE_URL`, `REDIS_*`).
+- `/health/ready` khi `STORE_DRIVER=live` sẽ ping cả Postgres và Redis, trả 503 nếu 1 trong 2 không sẵn sàng; khi `memory` luôn trả `ready`.
+
 ## Giới hạn phase này
 
-- Toàn bộ account, session và dữ liệu sync mất khi backend restart.
 - Email verification, password reset và Google OAuth chưa gửi email hoặc gọi provider thật.
-- Chưa kết nối PostgreSQL hoặc Redis.
-- Chưa có rate limiting và persistence production.
-- Readiness hiện chỉ thể hiện process đã khởi tạo.
-- Process từ chối khởi động với `APP_ENV=production` cho đến khi adapter PostgreSQL/Redis được triển khai, tránh deploy nhầm mock backend.
+- Chưa có rate limiting.
+- `ApplyMutations` ở adapter Postgres chỉ hỗ trợ đúng 1 mutation/lần gọi (khớp caller thực tế hiện tại là `application.Service.Push`); xem plan tại `.claude/plans` để biết trade-off nếu cần batch thật sau này.
 
 Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http://localhost:5173`, `FRONTEND_ORIGIN` khớp chính xác và `COOKIE_SECURE=false` khi chạy HTTP local. Nếu port frontend thay đổi, cập nhật cả `FRONTEND_ORIGIN` và URL frontend.
 
 ## Hướng phát triển backend
 
-Domain và application chỉ phụ thuộc các port trong `server/internal/ports`. Phase persistence sẽ thêm PostgreSQL adapter dùng sqlc cho static typed query, sqlx cho connection/transaction orchestration, Redis adapter cho session và command migration trong `server/cmd/migrate`. API process không tự chạy migration khi startup.
+Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|seed` — API process không tự chạy migration khi startup.
 
-Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `server/ARCHITECTURE.md`.
+Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/ARCHITECTURE.md`.

@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vehicle
+      POSTGRES_PASSWORD: vehicle
+      POSTGRES_DB: vehicle_care
+    ports:
+      - "5432:5432"
+    volumes:
+      - vehicle_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vehicle -d vehicle_care"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Dev only: persistence disabled so the container starts fast; losing
+    # data on restart is fine locally. Production should enable AOF
+    # (appendfsync everysec) — see the plan doc's "Rủi ro còn lại" section.
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  vehicle_postgres_data:

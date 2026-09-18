@@ -1,40 +1,11 @@
 import { useState } from "react";
 import { Fuel, History, SlidersHorizontal, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { HistoryEntry } from "@/data/queries/historyQueries";
+import { formatDate, formatMonth, formatNumber } from "@/lib/formatters";
+import { formatVnd } from "@/lib/currency";
 
 type EntryFilter = "all" | HistoryEntry["kind"];
-
-const FILTERS: Array<{ value: EntryFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "service", label: "Service" },
-  { value: "fuel", label: "Fuel" },
-];
-
-function formatCost(costVnd: number | null): string {
-  if (costVnd == null) return "No cost";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(costVnd);
-}
-
-function formatDate(value: string, timezone: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: timezone,
-  }).format(new Date(value));
-}
-
-function monthLabel(value: string, timezone: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "long",
-    year: "numeric",
-    timeZone: timezone,
-  }).format(new Date(value));
-}
 
 export function HistoryTimeline({
   entries,
@@ -43,6 +14,12 @@ export function HistoryTimeline({
   entries: HistoryEntry[];
   timezone: string;
 }) {
+  const { t } = useTranslation();
+  const filters: Array<{ value: EntryFilter; label: string }> = [
+    { value: "all", label: t('history.all') },
+    { value: "service", label: t('history.service') },
+    { value: "fuel", label: t('history.fuel') },
+  ];
   const [filter, setFilter] = useState<EntryFilter>("all");
   const visibleEntries =
     filter === "all"
@@ -51,7 +28,7 @@ export function HistoryTimeline({
   const groups = visibleEntries.reduce<
     Array<{ label: string; entries: HistoryEntry[] }>
   >((result, entry) => {
-    const label = monthLabel(entry.occurredAt, timezone);
+    const label = formatMonth(entry.occurredAt, "long", timezone);
     const lastGroup = result.at(-1);
     if (lastGroup?.label === label) lastGroup.entries.push(entry);
     else result.push({ label, entries: [entry] });
@@ -62,17 +39,17 @@ export function HistoryTimeline({
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {entries.length} {entries.length === 1 ? "entry" : "entries"} recorded
+          {t('history.entryCount', { count: entries.length })}
         </p>
         <div
           className="flex items-center gap-1 rounded-xl border border-border-subtle bg-card p-1 shadow-sm"
-          aria-label="Filter history"
+          aria-label={t('history.filter')}
         >
           <SlidersHorizontal
             className="mx-1 size-4 text-muted-foreground"
             aria-hidden="true"
           />
-          {FILTERS.map((option) => (
+          {filters.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -96,10 +73,10 @@ export function HistoryTimeline({
             <History className="size-5" aria-hidden="true" />
           </div>
           <p className="font-semibold">
-            No {filter === "all" ? "" : `${filter} `}entries yet
+            {t(filter === 'all' ? 'history.emptyAll' : filter === 'service' ? 'history.emptyService' : 'history.emptyFuel')}
           </p>
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-            New fuel and service logs will appear here automatically.
+            {t('history.emptyDescription')}
           </p>
         </div>
       ) : (
@@ -136,14 +113,18 @@ export function HistoryTimeline({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <h3 className="truncate text-sm font-semibold">
-                              {entry.title}
+                              {entry.kind === 'fuel'
+                                ? entry.liters == null
+                                  ? t('history.fuel')
+                                  : t('history.fuelWithLiters', { value: formatNumber(entry.liters) })
+                                : entry.title || t('history.unknownService')}
                             </h3>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               {formatDate(entry.occurredAt, timezone)}
                             </p>
                           </div>
                           <span className="shrink-0 text-sm font-semibold tabular-nums">
-                            {formatCost(entry.costVnd)}
+                            {entry.costVnd == null ? t('history.noCost') : formatVnd(entry.costVnd)}
                           </span>
                         </div>
                         {entry.note && (

@@ -1,9 +1,9 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import * as api from '@/api/client'
 import { ENABLE_MSW } from '@/api/config'
 import { googleMockSignIn } from '@/api/devGoogleMock'
-import { ApiError } from '@/api/errors'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { GoogleButton } from '@/components/auth/GoogleButton'
 import { PasswordInput } from '@/components/auth/PasswordInput'
@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore'
+import { getUserError } from '@/lib/userError'
 
 export function SignInPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
   const [email, setEmail] = useState('')
@@ -29,7 +31,7 @@ export function SignInPage() {
       setAuthenticated(mapAccountDto(account))
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Đã có lỗi xảy ra, thử lại sau.')
+      setError(getUserError(err, t))
       setSubmitting(false)
     }
   }
@@ -46,26 +48,26 @@ export function SignInPage() {
       setAuthenticated(mapAccountDto(account))
       navigate('/', { replace: true })
     } catch {
-      setError('Đăng nhập Google thất bại, thử lại sau.')
+      setError(t('auth.googleSignInFailed'))
       setSubmitting(false)
     }
   }
 
   return (
     <AuthLayout
-      title="Sign in"
+      title={t('auth.signIn')}
       footer={
         <>
-          Don&apos;t have an account?{' '}
+          {t('auth.noAccount')}{' '}
           <Link to="/sign-up" className="font-medium text-primary hover:underline">
-            Sign up
+            {t('auth.signUp')}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('common.email')}</Label>
           <Input
             id="email"
             type="email"
@@ -77,9 +79,9 @@ export function SignInPage() {
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('common.password')}</Label>
             <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
-              Forgot password?
+              {t('auth.forgotPasswordQuestion')}
             </Link>
           </div>
           <PasswordInput
@@ -92,13 +94,13 @@ export function SignInPage() {
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={submitting} className="mt-1">
-          Sign in
+          {submitting ? t('auth.signingIn') : t('auth.signIn')}
         </Button>
       </form>
 
       <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
-        or
+        {t('auth.or')}
         <div className="h-px flex-1 bg-border" />
       </div>
 

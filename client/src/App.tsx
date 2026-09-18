@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
-import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge'
+import { ThemeColorSync } from '@/components/theme/ThemeColorSync'
 import { Toaster } from '@/components/ui/sonner'
 import { seedPartTypes } from '@/data/seed'
 import { AppRouter } from '@/routes/router'
@@ -21,10 +21,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ThemeColorSync />
       <AppRouter />
-      <div className="lg:hidden">
-        <SyncStatusBadge />
-      </div>
       <Toaster position="top-center" />
     </BrowserRouter>
   )

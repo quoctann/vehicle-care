@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { useTranslation } from 'react-i18next'
 
 function GoogleGlyph() {
   return (
@@ -14,16 +15,17 @@ function GoogleGlyph() {
 export function GoogleButton({
   onClick,
   loading = false,
-  label = 'Continue with Google',
+  label,
 }: {
   onClick: () => void
   loading?: boolean
   label?: string
 }) {
+  const { t } = useTranslation()
   return (
     <Button type="button" variant="outline" className="w-full gap-2" onClick={onClick} disabled={loading}>
       <GoogleGlyph />
-      {label}
+      {label ?? t('auth.continueGoogle')}
     </Button>
   )
 }

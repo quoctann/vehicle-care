@@ -1,4 +1,6 @@
-import { Gauge, Moon, Ruler, ShieldCheck } from "lucide-react";
+import { Gauge, Moon, Ruler, ShieldCheck, SunMoon } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 import {
   Select,
   SelectContent,
@@ -23,7 +25,7 @@ function SettingsRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5">
+    <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         <Icon className="size-4" />
       </span>
@@ -39,6 +41,8 @@ function SettingsRow({
 }
 
 export function AppSettings() {
+  const { t } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const [askForOdometer, setAskForOdometer] = useLocalStoragePreference(
     PREFERENCE_KEYS.askForOdometer,
     true,
@@ -57,38 +61,38 @@ export function AppSettings() {
     <div className="space-y-5">
       <section>
         <h2 className="mb-2 px-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-          Reminders
+          {t('settings.reminders')}
         </h2>
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
           <SettingsRow
             icon={ShieldCheck}
-            title="Warn me ahead by"
-            description="Read-only system threshold for distance or time"
+            title={t('settings.warnAhead')}
+            description={t('settings.warnAheadDescription')}
           >
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-              {dueSoonPercent}% remaining
+              {t('settings.remainingPercent', { value: dueSoonPercent })}
             </span>
           </SettingsRow>
           <SettingsRow
             icon={Gauge}
-            title="Ask for odometer"
-            description="A single prompt, weekly"
+            title={t('settings.askOdometer')}
+            description={t('settings.askOdometerDescription')}
           >
             <Switch
               checked={askForOdometer}
               onCheckedChange={setAskForOdometer}
-              aria-label="Ask for odometer weekly"
+              aria-label={t('settings.askOdometerAria')}
             />
           </SettingsRow>
           <SettingsRow
             icon={Moon}
-            title="Quiet hours"
-            description="No prompts from 22:00 to 07:00"
+            title={t('settings.quietHours')}
+            description={t('settings.quietHoursDescription')}
           >
             <Switch
               checked={quietHours}
               onCheckedChange={setQuietHours}
-              aria-label="Use quiet hours"
+              aria-label={t('settings.quietHoursAria')}
             />
           </SettingsRow>
         </div>
@@ -96,29 +100,46 @@ export function AppSettings() {
 
       <section>
         <h2 className="mb-2 px-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-          App
+          {t('settings.app')}
         </h2>
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
-          <SettingsRow icon={Ruler} title="Units">
+          <SettingsRow icon={Ruler} title={t('settings.units')}>
             <Select
               value={units}
               onValueChange={(value) => setUnits(value as "km" | "mi")}
             >
-              <SelectTrigger size="sm" aria-label="Units">
+              <SelectTrigger size="sm" aria-label={t('settings.units')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="km">Kilometres</SelectItem>
-                <SelectItem value="mi">Miles</SelectItem>
+                <SelectItem value="km">{t('settings.kilometres')}</SelectItem>
+                <SelectItem value="mi">{t('settings.miles')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+          <SettingsRow
+            icon={SunMoon}
+            title={t('settings.appearance')}
+            description={t('settings.appearanceDescription')}
+          >
+            <Select value={theme ?? 'light'} onValueChange={setTheme}>
+              <SelectTrigger size="sm" aria-label={t('settings.appearance')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">{t('settings.light')}</SelectItem>
+                <SelectItem value="dark">{t('settings.dark')}</SelectItem>
               </SelectContent>
             </Select>
           </SettingsRow>
           <SettingsRow
             icon={ShieldCheck}
-            title="Sync"
-            description="Changes save locally before syncing"
+            title={t('settings.sync')}
+            description={t('settings.syncDescription')}
           >
-            <SyncStatusBadge />
+            <div className="ml-11 shrink-0 sm:ml-0">
+              <SyncStatusBadge />
+            </div>
           </SettingsRow>
         </div>
       </section>

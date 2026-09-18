@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Check, LoaderCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,10 +12,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge'
 import { addFuelLog } from '@/data/repositories/fuelRepository'
 import { addServiceLog } from '@/data/repositories/serviceRepository'
 import { validateOdometerReading } from '@/domain/validation'
 import type { PartType } from '@/domain/types'
+import { formatNumber } from '@/lib/formatters'
 import { EntryTypeSelector, type LogEntryType } from './EntryTypeSelector'
 import { LogEntryDetailsCard } from './LogEntryDetailsCard'
 import { OdometerInputCard } from './OdometerInputCard'
@@ -39,6 +42,7 @@ export function LogEntryForm({
   onCancel,
   onSaved,
 }: LogEntryFormProps) {
+  const { t } = useTranslation()
   const [entryType, setEntryType] = useState<LogEntryType>('fuel')
   const [partTypeId, setPartTypeId] = useState<string | null>(null)
   const [occurredAt, setOccurredAt] = useState(toLocalDateTimeInput(new Date()))
@@ -77,7 +81,7 @@ export function LogEntryForm({
     if (parsedOdometer != null) {
       const validation = validateOdometerReading(parsedOdometer, currentOdometerKm)
       if (!validation.valid) {
-        setErrors({ odometerKm: 'Odometer cannot be negative.' })
+        setErrors({ odometerKm: t('logEntry.negativeOdometer') })
         return
       }
       if (validation.warning === 'lower_than_current' && !lowerOdometerConfirmed) {
@@ -91,27 +95,27 @@ export function LogEntryForm({
 
   function validateForm(): FormErrors {
     const nextErrors: FormErrors = {}
-    if (!occurredAt || Number.isNaN(new Date(occurredAt).getTime())) nextErrors.occurredAt = 'Choose a valid date and time.'
+    if (!occurredAt || Number.isNaN(new Date(occurredAt).getTime())) nextErrors.occurredAt = t('logEntry.invalidDate')
 
     const parsedOdometer = optionalNumber(displayedOdometerKm)
     if (displayedOdometerKm !== '' && (parsedOdometer == null || !Number.isFinite(parsedOdometer))) {
-      nextErrors.odometerKm = 'Enter a valid odometer reading.'
+      nextErrors.odometerKm = t('logEntry.invalidOdometer')
     } else if (parsedOdometer != null && !validateOdometerReading(parsedOdometer, currentOdometerKm).valid) {
-      nextErrors.odometerKm = 'Odometer cannot be negative.'
+      nextErrors.odometerKm = t('logEntry.negativeOdometer')
     }
 
     const parsedCost = optionalNumber(costVnd)
     if (costVnd !== '' && (parsedCost == null || !Number.isFinite(parsedCost) || parsedCost < 0)) {
-      nextErrors.costVnd = 'Cost must be zero or greater.'
+      nextErrors.costVnd = t('logEntry.invalidCost')
     }
 
     if (entryType === 'fuel') {
       const parsedLiters = optionalNumber(liters)
       if (liters !== '' && (parsedLiters == null || !Number.isFinite(parsedLiters) || parsedLiters <= 0)) {
-        nextErrors.liters = 'Liters must be greater than zero.'
+        nextErrors.liters = t('logEntry.invalidLiters')
       }
     } else if (!partTypeId) {
-      nextErrors.partTypeId = 'Choose the part that was serviced.'
+      nextErrors.partTypeId = t('logEntry.choosePart')
     }
 
     return nextErrors
@@ -136,7 +140,7 @@ export function LogEntryForm({
           odometerKm: parsedOdometer,
           isFullTank,
         })
-        toast.success('Fuel entry saved.')
+        toast.success(t('logEntry.fuelSaved'))
       } else {
         if (!selectedPartTypeId) return
         await addServiceLog({
@@ -148,11 +152,11 @@ export function LogEntryForm({
           costVnd: optionalNumber(costVnd),
           note: optionalText(note),
         })
-        toast.success('Service entry saved. The reminder cycle has restarted.')
+        toast.success(t('logEntry.serviceSaved'))
       }
       onSaved()
     } catch {
-      toast.error('Could not save this entry. Please try again.')
+      toast.error(t('logEntry.saveFailed'))
       setSubmitting(false)
     }
   }
@@ -165,21 +169,25 @@ export function LogEntryForm({
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-2xl items-center justify-between">
             <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting} className="-ml-2 text-muted-foreground">
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <h1 className="text-[15px] font-semibold tracking-tight">New entry</h1>
+            <h1 className="text-[15px] font-semibold tracking-tight">{t('logEntry.title')}</h1>
             <Button
               type="submit"
               variant="ghost"
               disabled={submitting || (entryType === 'service' && partTypes.length === 0)}
               className="-mr-2 text-primary hover:text-primary"
             >
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </header>
 
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-5 sm:px-6 sm:py-7">
+          <div className="flex justify-end">
+            <SyncStatusBadge />
+          </div>
+
           <EntryTypeSelector value={entryType} onChange={handleTypeChange} />
 
           {entryType === 'service' ? (
@@ -214,8 +222,8 @@ export function LogEntryForm({
           {entryType === 'fuel' ? (
             <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-card px-4 py-3.5">
               <div className="min-w-0 flex-1">
-                <label htmlFor="full-tank" className="text-sm font-medium">Log as a full tank</label>
-                <p className="mt-0.5 text-xs text-muted-foreground">Saved for future fuel-efficiency calculations.</p>
+                <label htmlFor="full-tank" className="text-sm font-medium">{t('logEntry.fullTank')}</label>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t('logEntry.fullTankDescription')}</p>
               </div>
               <Switch id="full-tank" checked={isFullTank} onCheckedChange={setIsFullTank} />
             </div>
@@ -226,9 +234,11 @@ export function LogEntryForm({
               </span>
               <div>
                 <p className="text-sm font-medium">
-                  {selectedPartType ? `${selectedPartType.displayName} reminder resets on save` : 'Service reminders reset on save'}
+                  {selectedPartType
+                    ? t('logEntry.resetPartReminder', { part: selectedPartType.displayName })
+                    : t('logEntry.resetServiceReminders')}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">A completed service always starts a new reminder cycle.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t('logEntry.resetDescription')}</p>
               </div>
             </div>
           )}
@@ -238,10 +248,10 @@ export function LogEntryForm({
           <Button
             type="submit"
             disabled={submitting || (entryType === 'service' && partTypes.length === 0)}
-            className="mx-auto h-12 w-full max-w-2xl rounded-xl bg-gradient-to-b from-[#003CFF] to-primary font-display text-sm hover:opacity-90"
+            className="mx-auto h-12 w-full max-w-2xl rounded-xl bg-primary font-display text-sm text-primary-foreground hover:bg-primary/90"
           >
             {submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {submitting ? 'Saving...' : 'Save entry'}
+            {submitting ? t('common.saving') : t('logEntry.saveEntry')}
           </Button>
         </footer>
       </form>
@@ -249,14 +259,14 @@ export function LogEntryForm({
       <Dialog open={confirmLowerOdometer} onOpenChange={setConfirmLowerOdometer}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Lower odometer reading</DialogTitle>
+            <DialogTitle>{t('logEntry.lowerTitle')}</DialogTitle>
             <DialogDescription>
-              This reading is below the current {currentOdometerKm?.toLocaleString()} km. You can still save it if the reading is correct.
+              {t('logEntry.lowerDescription', { value: formatNumber(currentOdometerKm ?? 0) })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setConfirmLowerOdometer(false)}>
-              Review
+              {t('logEntry.review')}
             </Button>
             <Button
               type="button"
@@ -265,7 +275,7 @@ export function LogEntryForm({
                 void prepareSave(true)
               }}
             >
-              Save anyway
+              {t('logEntry.saveAnyway')}
             </Button>
           </DialogFooter>
         </DialogContent>

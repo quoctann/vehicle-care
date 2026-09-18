@@ -85,17 +85,17 @@ func TestTokensExpireAndNewTokenInvalidatesPrevious(t *testing.T) {
 	if err := store.CreateToken(ctx, "reset", "new-token", "account-1", now.Add(time.Hour)); err != nil {
 		t.Fatalf("create new token: %v", err)
 	}
-	if _, ok := store.ConsumeToken(ctx, "reset", "old-token", now); ok {
-		t.Fatal("superseded token remained valid")
+	if _, ok, err := store.ConsumeToken(ctx, "reset", "old-token", now); ok || err != nil {
+		t.Fatalf("superseded token remained valid: ok=%v err=%v", ok, err)
 	}
-	if accountID, ok := store.ConsumeToken(ctx, "reset", "new-token", now); !ok || accountID != "account-1" {
-		t.Fatalf("new token was not valid: account=%q ok=%v", accountID, ok)
+	if accountID, ok, err := store.ConsumeToken(ctx, "reset", "new-token", now); !ok || err != nil || accountID != "account-1" {
+		t.Fatalf("new token was not valid: account=%q ok=%v err=%v", accountID, ok, err)
 	}
 	if err := store.CreateToken(ctx, "verification", "expired", "account-1", now); err != nil {
 		t.Fatalf("create expired token: %v", err)
 	}
-	if _, ok := store.ConsumeToken(ctx, "verification", "expired", now); ok {
-		t.Fatal("expired token remained valid")
+	if _, ok, err := store.ConsumeToken(ctx, "verification", "expired", now); ok || err != nil {
+		t.Fatalf("expired token remained valid: ok=%v err=%v", ok, err)
 	}
 }
 

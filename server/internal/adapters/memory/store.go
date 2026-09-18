@@ -141,7 +141,7 @@ func (s *Store) CreateToken(_ context.Context, kind, token, accountID string, ex
 }
 
 // ConsumeToken atomically retrieves and deletes a one-time token.
-func (s *Store) ConsumeToken(_ context.Context, kind, token string, now time.Time) (string, bool) {
+func (s *Store) ConsumeToken(_ context.Context, kind, token string, now time.Time) (string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := tokenKey(token)
@@ -150,10 +150,10 @@ func (s *Store) ConsumeToken(_ context.Context, kind, token string, now time.Tim
 		if ok {
 			delete(s.tokens, key)
 		}
-		return "", false
+		return "", false, nil
 	}
 	delete(s.tokens, key)
-	return record.accountID, true
+	return record.accountID, true, nil
 }
 
 // RefreshSession extends an active session expiry.
@@ -178,15 +178,30 @@ func (s *Store) CreateSession(_ context.Context, sessionID string, session domai
 }
 
 // Session retrieves a non-expired login session.
-func (s *Store) Session(_ context.Context, sessionID string, now time.Time) (domain.Session, bool) {
+func (s *Store) Session(_ context.Context, sessionID string, now time.Time) (domain.Session, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session, ok := s.sessions[sessionID]
 	if !ok || !now.Before(session.ExpiresAt) {
 		delete(s.sessions, sessionID)
-		return domain.Session{}, false
+		return domain.Session{}, false, nil
 	}
-	return session, true
+	return session, true, nil
+}
+
+// GetAndRefreshSession retrieves a non-expired login session and slides its
+// expiry in the same lock acquisition.
+func (s *Store) GetAndRefreshSession(_ context.Context, sessionID string, now, newExpiresAt time.Time) (domain.Session, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[sessionID]
+	if !ok || !now.Before(session.ExpiresAt) {
+		delete(s.sessions, sessionID)
+		return domain.Session{}, false, nil
+	}
+	session.ExpiresAt = newExpiresAt
+	s.sessions[sessionID] = session
+	return session, true, nil
 }
 
 // DeleteSession removes one login session.

@@ -7,9 +7,14 @@ auth mới (session cookie + Redis + Google OAuth) thay cho đề xuất OTP/mag
 đầu trong `decision.md`.*
 
 Trạng thái triển khai hiện tại: **frontend đã implement UI + client API layer đúng
-theo tài liệu này, chạy qua mock server (MSW) — backend thật (kể cả Redis) CHƯA được
-xây dựng.** Mục tiêu của tài liệu là để backend dev triển khai đúng ngay từ đầu mà
-không phải đổi shape phía frontend.
+theo tài liệu này. Backend Go thật (bao gồm adapter Postgres + Redis) đã được xây
+dựng và implement gần như toàn bộ hợp đồng này** — xem `.docs/TONG-HOP-KY-THUAT.md`
+mục 2 để biết chi tiết trạng thái đã xong/còn thiếu. Hai gap còn lại so với hợp đồng:
+(1) `GET /auth/google/callback` ở mục 2.6 — hiện chỉ có `GET /auth/google/start` gọi
+thẳng 1 login demo/mock (`LoginGoogleDemo`, gate bằng `MOCK_AUTH_ENABLED`), CHƯA có
+flow đổi `code` lấy Google profile thật; (2) chưa gửi email thật cho verify-email/
+password reset. Mục tiêu của tài liệu vẫn là để backend dev triển khai đúng ngay từ
+đầu mà không phải đổi shape phía frontend — sửa tài liệu này trước khi đổi shape.
 
 ## 1. Auth model
 
@@ -82,12 +87,13 @@ Backend đổi `code` lấy Google profile, tạo account nếu email Google ch�
 redirect về frontend (vd `/v/{lastVehicleId}/home` hoặc `/onboarding/add-vehicle`
 nếu account mới chưa có xe nào).
 
-> **Ghi chú triển khai hiện tại:** vì chưa có backend thật, MSW mock nút "Continue
-> with Google" bằng cách gọi thẳng 1 endpoint dev-only trả session ngay lập tức cho
-> 1 tài khoản Google giả cố định — đây KHÔNG phải hành vi production, chỉ để có thể
-> click-test luồng UI. Endpoint POST `/auth/google/mock-signin` KHÔNG được liệt kê
-> trong bản hợp đồng thật (không có trong bản build production, chỉ tồn tại trong
-> `client/src/mocks/handlers/auth.ts`).
+> **Ghi chú triển khai hiện tại:** callback thật ở mục 2.6 CHƯA được build. Cả MSW
+> (dev, `client/src/mocks/handlers/auth.ts`) và backend Go thật
+> (`server/internal/adapters/httpapi`, gate bằng `MOCK_AUTH_ENABLED`) hiện chỉ có 1
+> đường tắt: `GET /auth/google/start` set-cookie session ngay cho 1 tài khoản Google
+> giả cố định, không đổi `code` lấy Google profile thật — đây KHÔNG phải hành vi
+> production, chỉ để click-test luồng UI. Khi build callback thật, giữ đúng shape ở
+> mục 2.5/2.6 và bỏ nhánh mock đi.
 
 ### 2.7. `POST /auth/password/forgot`
 ```json

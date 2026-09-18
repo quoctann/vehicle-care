@@ -2,8 +2,10 @@ import { useParams } from "react-router-dom";
 import { HistoryTimeline } from "@/components/history/HistoryTimeline";
 import { useHistoryEntries } from "@/hooks/useHistory";
 import { useSessionStore } from "@/stores/useSessionStore";
+import { useTranslation } from "react-i18next";
 
 export function HistoryPage() {
+  const { t } = useTranslation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const account = useSessionStore((state) => state.account);
   const timezone = account?.timezone ?? "UTC";
@@ -16,10 +18,10 @@ export function HistoryPage() {
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-4">
           <p className="text-xs font-semibold tracking-[0.08em] text-primary uppercase">
-            Maintenance record
+            {t('history.eyebrow')}
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">
-            History
+            {t('history.title')}
           </h1>
         </header>
         <HistoryTimeline entries={entries} timezone={timezone} />

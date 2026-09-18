@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Plus, Settings } from 'lucide-react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet'
 import { useVehicle, useVehicles } from '@/hooks/useVehicles'
 import { getLastVehicleId, setLastVehicleId } from '@/lib/lastVehicle'
@@ -11,6 +12,7 @@ import { SyncStatusBadge } from './SyncStatusBadge'
 import { VehicleSwitcher } from './VehicleSwitcher'
 
 export function AppShell() {
+  const { t } = useTranslation()
   const location = useLocation()
   const accountId = useSessionStore((state) => state.account?.id)
   const vehicles = useVehicles(accountId)
@@ -28,7 +30,7 @@ export function AppShell() {
   }, [accountId, routeVehicleId, vehicle])
 
   if (vehicles === undefined || routeVehicleQuery.queryKey !== routeVehicleKey) {
-    return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">Loading your garage...</div>
+    return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">{t('navigation.loadingGarage')}</div>
   }
 
   if (routeVehicleId && !vehicle) {
@@ -51,26 +53,24 @@ export function AppShell() {
         {vehicleId ? (
           <Link
             to={`/v/${vehicleId}/log-entry`}
-            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-[10px] bg-gradient-to-b from-[#2c2c2c] to-[#141414] font-display text-[13.5px] font-medium text-white transition active:translate-y-px"
+            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-[10px] bg-primary font-display text-[13.5px] font-medium text-primary-foreground transition hover:bg-primary/90 active:translate-y-px"
           >
             <Plus className="size-[17px]" />
-            Log service
+            {t('navigation.logService')}
           </Link>
         ) : null}
         <SidebarNav vehicleId={vehicleId} />
         <div className="flex-1" />
-        <div className="[&>button]:static [&>button]:h-9 [&>button]:w-full [&>button]:max-w-none [&>button]:justify-start [&>button]:border-0 [&>button]:bg-transparent [&>button]:px-2.5 [&>button]:shadow-none">
-          <SyncStatusBadge />
-        </div>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {isHome ? (
           <header className="mx-auto flex w-full max-w-[600px] shrink-0 items-center gap-2.5 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] lg:hidden">
             <VehicleSwitcher vehicle={vehicle} variant="header" />
+            <SyncStatusBadge />
             <Link
               to="/settings"
-              aria-label="Settings"
+              aria-label={t('navigation.settings')}
               className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border bg-card shadow-[0_1px_1px_rgba(44,54,53,.025)] transition hover:border-foreground"
             >
               <Settings className="size-[19px]" />

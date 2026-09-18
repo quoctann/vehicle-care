@@ -3,6 +3,7 @@ import { CostOverview } from "@/components/costs/CostOverview";
 import { readUnitsPreference } from "@/components/settings/preferences";
 import { useCostPerKm, useMonthlyCosts } from "@/hooks/useCosts";
 import { useSessionStore } from "@/stores/useSessionStore";
+import { useTranslation } from "react-i18next";
 
 function currentMonthInTimezone(timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -20,6 +21,7 @@ function currentMonthInTimezone(timezone: string): string {
 }
 
 export function CostsPage() {
+  const { t } = useTranslation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const account = useSessionStore((state) => state.account);
   const timezone = account?.timezone ?? "UTC";
@@ -34,9 +36,9 @@ export function CostsPage() {
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-4">
           <p className="text-xs font-semibold tracking-[0.08em] text-primary uppercase">
-            Running spend
+            {t('costs.eyebrow')}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">Costs</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">{t('costs.title')}</h1>
         </header>
         <CostOverview
           monthlyCosts={monthlyCosts}

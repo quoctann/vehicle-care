@@ -10,6 +10,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { resolvePartTypeDisplay, type PartTypeIconKey } from '@/domain/partType'
 import type { PartType } from '@/domain/types'
 
@@ -34,14 +35,15 @@ const icons: Record<PartTypeIconKey, LucideIcon> = {
 }
 
 export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelectorProps) {
+  const { t } = useTranslation()
   return (
     <fieldset>
       <legend className="mb-2 px-0.5 text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-        Part serviced
+        {t('logEntry.partServiced')}
       </legend>
       {partTypes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-5 text-center text-sm text-muted-foreground">
-          No active service types are available.
+          {t('logEntry.noPartTypes')}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -58,7 +60,7 @@ export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelecto
                 onClick={() => onChange(partType.id)}
                 className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none ${
                   selected
-                    ? 'border-foreground shadow-sm ring-2 ring-white'
+                    ? 'border-foreground shadow-sm ring-2 ring-background'
                     : 'border-border-subtle text-muted-foreground hover:border-border hover:text-foreground'
                 }`}
               >

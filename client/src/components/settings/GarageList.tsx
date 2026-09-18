@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Archive, Car, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Vehicle } from "@/domain/types";
@@ -24,6 +25,7 @@ export function GarageList({
   onRestore: (vehicle: Vehicle) => Promise<void>;
   onDelete: (vehicle: Vehicle) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [pending, setPending] = useState<PendingAction>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -56,19 +58,19 @@ export function GarageList({
     <section>
       <div className="mb-2 flex items-center justify-between px-0.5">
         <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-          Garage
+          {t('settings.garage')}
         </h2>
         <Button variant="ghost" size="xs" onClick={onAdd}>
-          <Plus /> Add vehicle
+          <Plus /> {t('vehicle.add')}
         </Button>
       </div>
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
         {vehicles.length === 0 ? (
           <div className="flex flex-col items-center px-5 py-8 text-center">
             <Car className="mb-3 size-6 text-muted-foreground" />
-            <p className="text-sm font-semibold">Your garage is empty</p>
+            <p className="text-sm font-semibold">{t('settings.emptyGarage')}</p>
             <Button className="mt-4" size="sm" onClick={onAdd}>
-              Add a vehicle
+              {t('vehicle.addTitle')}
             </Button>
           </div>
         ) : (
@@ -98,7 +100,7 @@ export function GarageList({
                       </span>
                       {isActive && (
                         <Badge variant="secondary" className="h-5">
-                          Active
+                          {t('common.active')}
                         </Badge>
                       )}
                       {archived && (
@@ -106,12 +108,12 @@ export function GarageList({
                           variant="outline"
                           className="h-5 text-muted-foreground"
                         >
-                          Archived
+                          {t('settings.archived')}
                         </Badge>
                       )}
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {vehicle.plateNumber || "No plate number"}
+                      {vehicle.plateNumber || t('common.noPlate')}
                     </span>
                   </span>
                 </button>
@@ -123,7 +125,7 @@ export function GarageList({
                       disabled={busyId === vehicle.id}
                       onClick={() => void restore(vehicle)}
                     >
-                      <RotateCcw /> Restore
+                      <RotateCcw /> {t('settings.restore')}
                     </Button>
                   ) : (
                     <Button
@@ -132,14 +134,14 @@ export function GarageList({
                       disabled={busyId === vehicle.id}
                       onClick={() => setPending({ kind: "archive", vehicle })}
                     >
-                      <Archive /> Archive
+                      <Archive /> {t('settings.archive')}
                     </Button>
                   )}
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     className="text-destructive hover:text-destructive"
-                    aria-label={`Delete ${vehicle.name}`}
+                    aria-label={t('settings.deleteVehicleLabel', { name: vehicle.name })}
                     disabled={busyId === vehicle.id}
                     onClick={() => setPending({ kind: "delete", vehicle })}
                   >
@@ -156,16 +158,16 @@ export function GarageList({
         open={pending != null}
         title={
           pending?.kind === "delete"
-            ? `Delete ${pending.vehicle.name}?`
-            : `Archive ${pending?.vehicle.name ?? "vehicle"}?`
+            ? t('settings.deleteVehicleTitle', { name: pending.vehicle.name })
+            : t('settings.archiveVehicleTitle', { name: pending?.vehicle.name ?? '' })
         }
         description={
           pending?.kind === "delete"
-            ? "This removes the vehicle from your garage on every synced device. Its append-only history is not edited."
-            : "Archived vehicles are hidden from normal navigation. You can restore this vehicle later from the garage."
+            ? t('settings.deleteVehicleDescription')
+            : t('settings.archiveVehicleDescription')
         }
         confirmLabel={
-          pending?.kind === "delete" ? "Delete vehicle" : "Archive vehicle"
+          pending?.kind === "delete" ? t('settings.deleteVehicle') : t('settings.archiveVehicle')
         }
         destructive={pending?.kind === "delete"}
         busy={pending != null && busyId === pending.vehicle.id}

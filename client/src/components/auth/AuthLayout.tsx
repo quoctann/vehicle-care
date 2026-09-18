@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Layout dùng chung mọi màn auth (không có trong design.html — tự thiết kế theo
@@ -15,14 +16,15 @@ export function AuthLayout({
   children: ReactNode
   footer?: ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="w-full max-w-[400px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-b from-[#2C2C2C] to-[#141414] text-[13px] font-bold tracking-tight text-white">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-[13px] font-bold tracking-tight text-primary-foreground">
             VC
           </div>
-          <span className="text-[15px] font-semibold tracking-tight">Nhắc bảo dưỡng xe</span>
+          <span className="text-[15px] font-semibold tracking-tight">{t('auth.appName')}</span>
         </div>
 
         <div className="rounded-2xl border border-border-subtle bg-card p-6 shadow-[0_1px_1px_rgba(44,54,53,.025)]">

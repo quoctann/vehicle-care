@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CarFront, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +10,7 @@ import { getLastVehicleId, setLastVehicleId } from '@/lib/lastVehicle'
 import { useSessionStore } from '@/stores/useSessionStore'
 
 export function AddVehiclePage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const accountId = useSessionStore((state) => state.account?.id)
   const [name, setName] = useState('')
@@ -21,11 +23,11 @@ export function AddVehiclePage() {
     event.preventDefault()
     const vehicleName = name.trim()
     if (!vehicleName) {
-      setError('Enter a name for your vehicle.')
+      setError(t('vehicle.nameRequired'))
       return
     }
     if (!accountId) {
-      setError('Your account is not available. Sign in again and retry.')
+      setError(t('vehicle.accountUnavailable'))
       return
     }
 
@@ -39,8 +41,8 @@ export function AddVehiclePage() {
       })
       setLastVehicleId(accountId, vehicle.id)
       navigate(`/v/${vehicle.id}/home`, { replace: true })
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Could not add this vehicle.')
+    } catch {
+      setError(t('vehicle.addFailed'))
       setSaving(false)
     }
   }
@@ -55,21 +57,21 @@ export function AddVehiclePage() {
             className="mb-8 flex h-9 items-center gap-1 rounded-lg pr-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground sm:absolute sm:left-6 sm:top-6"
           >
             <ChevronLeft className="size-4" />
-            Back
+            {t('common.back')}
           </button>
         ) : null}
 
         <div className="flex size-12 items-center justify-center rounded-2xl border border-warn-border bg-warn-bg text-warn-fg shadow-[0_1px_1px_rgba(44,54,53,.025)]">
           <CarFront className="size-6" />
         </div>
-        <h1 className="mt-6 text-[28px] font-bold leading-tight tracking-[-0.035em]">Add a vehicle</h1>
+        <h1 className="mt-6 text-[28px] font-bold leading-tight tracking-[-0.035em]">{t('vehicle.addTitle')}</h1>
         <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          Give it a recognizable name. You can add the plate now or leave it blank.
+          {t('vehicle.addDescription')}
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 rounded-2xl border border-border-subtle bg-card p-5 shadow-[0_1px_2px_rgba(2,6,23,.05),inset_0_0_0_2px_#fff]">
+        <form onSubmit={handleSubmit} className="mt-8 rounded-2xl border border-border-subtle bg-card p-5 shadow-sm">
           <div className="space-y-2">
-            <Label htmlFor="vehicle-name">Vehicle name</Label>
+            <Label htmlFor="vehicle-name">{t('vehicle.name')}</Label>
             <Input
               id="vehicle-name"
               value={name}
@@ -80,14 +82,14 @@ export function AddVehiclePage() {
               autoComplete="off"
               autoFocus
               maxLength={80}
-              placeholder="e.g. Honda City 2021"
+              placeholder={t('vehicle.namePlaceholder')}
               className="h-11 px-3"
             />
           </div>
 
           <div className="mt-5 space-y-2">
             <Label htmlFor="plate-number">
-              Plate number <span className="font-normal text-muted-foreground">(optional)</span>
+              {t('vehicle.plate')} <span className="font-normal text-muted-foreground">({t('common.optional')})</span>
             </Label>
             <Input
               id="plate-number"
@@ -95,7 +97,7 @@ export function AddVehiclePage() {
               onChange={(event) => setPlateNumber(event.target.value)}
               autoComplete="off"
               maxLength={24}
-              placeholder="e.g. 51H-482.19"
+              placeholder={t('vehicle.platePlaceholder')}
               className="h-11 px-3 uppercase"
             />
           </div>
@@ -109,14 +111,14 @@ export function AddVehiclePage() {
           <Button
             type="submit"
             disabled={saving}
-            className="mt-6 h-12 w-full rounded-xl bg-gradient-to-b from-[#2c2c2c] to-[#141414] font-display text-sm text-white hover:opacity-90"
+            className="mt-6 h-12 w-full rounded-xl bg-primary font-display text-sm text-primary-foreground hover:bg-primary/90"
           >
-            {saving ? 'Adding vehicle...' : 'Add vehicle'}
+            {saving ? t('vehicle.adding') : t('vehicle.add')}
           </Button>
         </form>
 
         <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-          The vehicle is saved on this device first and queued for sync.
+          {t('vehicle.savedLocally')}
         </p>
       </div>
     </main>

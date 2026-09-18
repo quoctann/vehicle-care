@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogClose,
@@ -28,6 +29,7 @@ export function ConfirmActionDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -38,7 +40,7 @@ export function ConfirmActionDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={busy}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </DialogClose>
           <Button
@@ -46,7 +48,7 @@ export function ConfirmActionDialog({
             disabled={busy}
             onClick={onConfirm}
           >
-            {busy ? "Working..." : confirmLabel}
+            {busy ? t('common.working') : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

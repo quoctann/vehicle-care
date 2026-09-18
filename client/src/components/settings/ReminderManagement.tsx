@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import {
   BellRing,
   CalendarDays,
@@ -21,14 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { ReminderWithStatus } from "@/data/queries/reminderQueries";
+import { formatNumber } from "@/lib/formatters";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
-
-const STATUS_LABELS = {
-  insufficient_data: "Needs data",
-  not_due: "On track",
-  due_soon: "Due soon",
-  overdue: "Overdue",
-} as const;
 
 function optionalPositiveNumber(value: string): number | null {
   if (value.trim() === "") return null;
@@ -57,6 +52,13 @@ export function ReminderManagement({
   onToggle,
   onAdd,
 }: ReminderManagementProps) {
+  const { t } = useTranslation();
+  const statusLabels = {
+    insufficient_data: t('reminder.needsData'),
+    not_due: t('reminder.onTrack'),
+    due_soon: t('reminder.dueSoon'),
+    overdue: t('reminder.overdue'),
+  } as const;
   const [editing, setEditing] = useState<ReminderWithStatus | null>(null);
   const [deleting, setDeleting] = useState<ReminderWithStatus | null>(null);
   const [intervalKm, setIntervalKm] = useState("");
@@ -76,7 +78,7 @@ export function ReminderManagement({
     const km = optionalPositiveNumber(intervalKm);
     const days = optionalPositiveNumber(intervalDays);
     if (km == null && days == null) {
-      setError("Enter a positive distance or day interval.");
+      setError(t('reminder.positiveInterval'));
       return;
     }
     setBusy(true);
@@ -84,10 +86,8 @@ export function ReminderManagement({
     try {
       await onUpdate(editing.config.id, km, days);
       setEditing(null);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not update reminder.",
-      );
+    } catch {
+      setError(t('reminder.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -99,10 +99,8 @@ export function ReminderManagement({
     try {
       await onDelete(deleting.config.id);
       setDeleting(null);
-    } catch (cause) {
-      toast.error(
-        cause instanceof Error ? cause.message : "Could not delete reminder.",
-      );
+    } catch {
+      toast.error(t('reminder.deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -113,13 +111,13 @@ export function ReminderManagement({
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div>
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Vehicle reminders
+            {t('reminder.title')}
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{vehicleName}</p>
         </div>
         {onAdd && (
           <Button variant="ghost" size="xs" onClick={onAdd}>
-            <Plus /> Add reminder
+            <Plus /> {t('reminder.add')}
           </Button>
         )}
       </div>
@@ -127,14 +125,13 @@ export function ReminderManagement({
         {reminders.length === 0 ? (
           <div className="flex flex-col items-center px-5 py-8 text-center">
             <BellRing className="mb-3 size-6 text-muted-foreground" />
-            <p className="text-sm font-semibold">No active reminders</p>
+            <p className="text-sm font-semibold">{t('reminder.empty')}</p>
             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-              Configured maintenance reminders for this vehicle will appear
-              here.
+              {t('reminder.emptyDescription')}
             </p>
             {onAdd && (
               <Button className="mt-4" size="sm" onClick={onAdd}>
-                Add reminder
+                {t('reminder.add')}
               </Button>
             )}
           </div>
@@ -155,33 +152,31 @@ export function ReminderManagement({
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reminder.result.status === "overdue" ? "bg-destructive/10 text-destructive" : reminder.result.status === "due_soon" ? "bg-warn-bg text-warn-fg" : "bg-muted text-muted-foreground"}`}
                   >
-                    {reminder.config.enabled ? STATUS_LABELS[reminder.result.status] : "Paused"}
+                    {reminder.config.enabled ? statusLabels[reminder.result.status] : t('reminder.paused')}
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {reminder.config.intervalKm != null && (
                     <span className="flex items-center gap-1">
-                      <Gauge className="size-3" /> Every{" "}
-                      {reminder.config.intervalKm.toLocaleString()} km
+                      <Gauge className="size-3" /> {t('reminder.everyKm', { value: formatNumber(reminder.config.intervalKm) })}
                     </span>
                   )}
                   {reminder.config.intervalDays != null && (
                     <span className="flex items-center gap-1">
-                      <CalendarDays className="size-3" /> Every{" "}
-                      {reminder.config.intervalDays} days
+                      <CalendarDays className="size-3" /> {t('reminder.everyDays', { value: formatNumber(reminder.config.intervalDays) })}
                     </span>
                   )}
                 </div>
               </div>
               <Switch
                 checked={reminder.config.enabled}
-                aria-label={`${reminder.config.enabled ? "Pause" : "Enable"} ${reminder.partType.displayName} reminder`}
+                aria-label={t(reminder.config.enabled ? 'reminder.pauseAria' : 'reminder.enableAria', { part: reminder.partType.displayName })}
                 onCheckedChange={(enabled) => void onToggle(reminder.config.id, enabled)}
               />
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Edit ${reminder.partType.displayName} reminder`}
+                aria-label={t('reminder.editAria', { part: reminder.partType.displayName })}
                 onClick={() => startEditing(reminder)}
               >
                 <Pencil />
@@ -190,7 +185,7 @@ export function ReminderManagement({
                 variant="ghost"
                 size="icon-sm"
                 className="text-destructive hover:text-destructive"
-                aria-label={`Delete ${reminder.partType.displayName} reminder`}
+                aria-label={t('reminder.deleteAria', { part: reminder.partType.displayName })}
                 onClick={() => setDeleting(reminder)}
               >
                 <Trash2 />
@@ -206,15 +201,14 @@ export function ReminderManagement({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit {editing?.partType.displayName}</DialogTitle>
+            <DialogTitle>{t('reminder.editTitle', { part: editing?.partType.displayName ?? '' })}</DialogTitle>
             <DialogDescription>
-              Set a distance interval, a time interval, or both. The reminder is
-              due when either interval is reached.
+              {t('reminder.intervalDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="reminder-km">Every kilometres</Label>
+              <Label htmlFor="reminder-km">{t('reminder.distanceInterval')}</Label>
               <Input
                 id="reminder-km"
                 inputMode="numeric"
@@ -222,11 +216,11 @@ export function ReminderManagement({
                 min="1"
                 value={intervalKm}
                 onChange={(event) => setIntervalKm(event.target.value)}
-                placeholder="e.g. 5000"
+                placeholder="VD: 5000"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reminder-days">Every days</Label>
+              <Label htmlFor="reminder-days">{t('reminder.dayInterval')}</Label>
               <Input
                 id="reminder-days"
                 inputMode="numeric"
@@ -234,7 +228,7 @@ export function ReminderManagement({
                 min="1"
                 value={intervalDays}
                 onChange={(event) => setIntervalDays(event.target.value)}
-                placeholder="e.g. 180"
+                placeholder="VD: 180"
               />
             </div>
           </div>
@@ -249,10 +243,10 @@ export function ReminderManagement({
               onClick={() => setEditing(null)}
               disabled={busy}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={() => void save()} disabled={busy}>
-              {busy ? "Saving..." : "Save changes"}
+              {busy ? t('common.saving') : t('reminder.saveChanges')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -260,9 +254,9 @@ export function ReminderManagement({
 
       <ConfirmActionDialog
         open={deleting != null}
-        title={`Delete ${deleting?.partType.displayName ?? ""} reminder?`}
-        description="This stops future due calculations for this reminder. Existing service history stays unchanged."
-        confirmLabel="Delete reminder"
+        title={t('reminder.deleteTitle', { part: deleting?.partType.displayName ?? '' })}
+        description={t('reminder.deleteDescription')}
+        confirmLabel={t('reminder.delete')}
         destructive
         busy={busy}
         onOpenChange={(open) => !open && setDeleting(null)}

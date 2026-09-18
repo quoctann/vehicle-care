@@ -1,20 +1,22 @@
-import { ChartNoAxesColumnIncreasing, History, Home, UserRound } from 'lucide-react'
+import { BellRing, History, Home, UserRound } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 type SidebarNavProps = {
   vehicleId?: string
 }
 
 export function SidebarNav({ vehicleId }: SidebarNavProps) {
+  const { t } = useTranslation()
   const items = [
-    { label: 'Home', icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
-    { label: 'History', icon: History, to: vehicleId ? `/v/${vehicleId}/history` : '/' },
-    { label: 'Costs', icon: ChartNoAxesColumnIncreasing, to: vehicleId ? `/v/${vehicleId}/costs` : '/' },
-    { label: 'You', icon: UserRound, to: '/settings' },
+    { label: t('navigation.home'), icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
+    { label: t('navigation.reminders'), icon: BellRing, to: vehicleId ? `/v/${vehicleId}/reminders` : '/' },
+    { label: t('navigation.history'), icon: History, to: vehicleId ? `/v/${vehicleId}/history` : '/' },
+    { label: t('navigation.account'), icon: UserRound, to: '/settings' },
   ]
 
   return (
-    <nav aria-label="Primary" className="mt-[18px] flex flex-col gap-0.5">
+    <nav aria-label={t('navigation.primary')} className="mt-[18px] flex flex-col gap-0.5">
       {items.map(({ label, icon: Icon, to }) => (
         <NavLink
           key={label}

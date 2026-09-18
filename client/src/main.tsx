@@ -1,7 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ENABLE_MSW } from '@/api/config'
+import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import App from './App.tsx'
+import './i18n'
 import './index.css'
 
 async function enableMocking() {
@@ -15,7 +17,9 @@ async function enableMocking() {
 enableMocking().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange storageKey="vehicle.preferences.theme">
+        <App />
+      </ThemeProvider>
     </StrictMode>,
   )
 })

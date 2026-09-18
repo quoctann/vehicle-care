@@ -1,9 +1,9 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import * as api from '@/api/client'
 import { ENABLE_MSW } from '@/api/config'
 import { googleMockSignIn } from '@/api/devGoogleMock'
-import { ApiError } from '@/api/errors'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { GoogleButton } from '@/components/auth/GoogleButton'
 import { PasswordInput } from '@/components/auth/PasswordInput'
@@ -11,10 +11,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore'
+import { getUserError } from '@/lib/userError'
 
 const MIN_PASSWORD_LENGTH = 8
 
 export function SignUpPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
   const [name, setName] = useState('')
@@ -29,11 +31,11 @@ export function SignUpPage() {
     setError(null)
 
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`)
+      setError(t('auth.passwordMin', { count: MIN_PASSWORD_LENGTH }))
       return
     }
     if (password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.')
+      setError(t('auth.passwordMismatch'))
       return
     }
 
@@ -45,7 +47,7 @@ export function SignUpPage() {
       await useSessionStore.getState().hydrate()
       navigate('/sign-up/check-email', { state: { email } })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Đã có lỗi xảy ra, thử lại sau.')
+      setError(getUserError(err, t))
       setSubmitting(false)
     }
   }
@@ -62,30 +64,30 @@ export function SignUpPage() {
       setAuthenticated(mapAccountDto(account))
       navigate('/', { replace: true })
     } catch {
-      setError('Đăng ký qua Google thất bại, thử lại sau.')
+      setError(t('auth.googleSignUpFailed'))
       setSubmitting(false)
     }
   }
 
   return (
     <AuthLayout
-      title="Create your account"
+      title={t('auth.createAccount')}
       footer={
         <>
-          Already have an account?{' '}
+          {t('auth.hasAccount')}{' '}
           <Link to="/sign-in" className="font-medium text-primary hover:underline">
-            Sign in
+            {t('auth.signIn')}
           </Link>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="name">Name</Label>
+          <Label htmlFor="name">{t('auth.name')}</Label>
           <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('common.email')}</Label>
           <Input
             id="email"
             type="email"
@@ -96,7 +98,7 @@ export function SignUpPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t('common.password')}</Label>
           <PasswordInput
             id="password"
             autoComplete="new-password"
@@ -107,7 +109,7 @@ export function SignUpPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="confirm-password">Confirm password</Label>
+          <Label htmlFor="confirm-password">{t('auth.confirmPassword')}</Label>
           <PasswordInput
             id="confirm-password"
             autoComplete="new-password"
@@ -118,17 +120,17 @@ export function SignUpPage() {
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={submitting} className="mt-1">
-          Create account
+          {submitting ? t('auth.creatingAccount') : t('auth.createAccount')}
         </Button>
       </form>
 
       <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
-        or
+        {t('auth.or')}
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <GoogleButton onClick={handleGoogle} loading={submitting} label="Sign up with Google" />
+      <GoogleButton onClick={handleGoogle} loading={submitting} label={t('auth.signUpGoogle')} />
     </AuthLayout>
   )
 }

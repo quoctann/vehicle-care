@@ -1,16 +1,21 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev dev-fe dev-be test test-fe test-be lint lint-fe lint-be build build-fe build-be
+.PHONY: help install dev dev-fe dev-be test test-fe test-be lint lint-fe lint-be build build-fe build-be \
+	dev-infra dev-infra-down dev-infra-logs migrate-up migrate-down migrate-status migrate-seed
 
 help:
 	@printf '%s\n' \
-		'make install  Install frontend and backend dependencies' \
-		'make dev      Run frontend and backend together' \
-		'make dev-fe   Run Vite without MSW on http://localhost:5173' \
-		'make dev-be   Run the Go API on http://localhost:8080' \
-		'make test     Run all tests' \
-		'make lint     Run frontend lint and Go vet' \
-		'make build    Build frontend and backend'
+		'make install        Install frontend and backend dependencies' \
+		'make dev            Run frontend and backend together' \
+		'make dev-fe         Run Vite without MSW on http://localhost:5173' \
+		'make dev-be         Run the Go API on http://localhost:8080' \
+		'make dev-infra      Start Postgres + Redis for STORE_DRIVER=live' \
+		'make dev-infra-down Stop Postgres + Redis' \
+		'make migrate-up     Apply database migrations (needs DATABASE_URL)' \
+		'make migrate-seed   Seed the part_types catalog (needs DATABASE_URL)' \
+		'make test           Run all tests' \
+		'make lint           Run frontend lint and Go vet' \
+		'make build          Build frontend and backend'
 
 install:
 	npm ci --prefix client
@@ -28,6 +33,27 @@ dev-fe:
 
 dev-be:
 	cd server && go run ./cmd/api
+
+dev-infra:
+	docker compose -f server/docker-compose.yml up -d
+
+dev-infra-down:
+	docker compose -f server/docker-compose.yml down
+
+dev-infra-logs:
+	docker compose -f server/docker-compose.yml logs -f
+
+migrate-up:
+	cd server && go run ./cmd/migrate up
+
+migrate-down:
+	cd server && go run ./cmd/migrate down
+
+migrate-status:
+	cd server && go run ./cmd/migrate status
+
+migrate-seed:
+	cd server && go run ./cmd/migrate seed
 
 test: test-fe test-be
 

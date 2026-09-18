@@ -1,16 +1,14 @@
 import type { CSSProperties } from 'react'
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
-/**
- * Bản rút gọn từ shadcn/ui gốc (bỏ `next-themes` — app này không dùng Next.js và
- * MVP chỉ có light theme, xem plan). Muốn thêm dark mode sau này thì đổi `theme` ở
- * đây thành state thật thay vì hardcode 'light'.
- */
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolvedTheme } = useTheme()
+
   return (
     <Sonner
-      theme="light"
+      theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { SessionAccount } from "@/stores/useSessionStore";
@@ -21,6 +22,7 @@ export function AccountCard({
   signingOut: boolean;
   onSignOut: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-card p-4 shadow-sm">
       <Avatar size="lg" className="size-11">
@@ -43,7 +45,7 @@ export function AccountCard({
         disabled={signingOut}
       >
         <LogOut data-icon="inline-start" />
-        {signingOut ? "Signing out" : "Sign out"}
+        {signingOut ? t('settings.signingOut') : t('settings.signOut')}
       </Button>
     </section>
   );

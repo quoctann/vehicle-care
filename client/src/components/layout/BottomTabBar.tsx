@@ -1,21 +1,23 @@
-import { ChartNoAxesColumnIncreasing, History, Home, UserRound } from 'lucide-react'
+import { BellRing, History, Home, UserRound } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 type BottomTabBarProps = {
   vehicleId?: string
 }
 
 export function BottomTabBar({ vehicleId }: BottomTabBarProps) {
+  const { t } = useTranslation()
   const items = [
-    { label: 'Home', icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
-    { label: 'History', icon: History, to: vehicleId ? `/v/${vehicleId}/history` : '/' },
-    { label: 'Costs', icon: ChartNoAxesColumnIncreasing, to: vehicleId ? `/v/${vehicleId}/costs` : '/' },
-    { label: 'You', icon: UserRound, to: '/settings' },
+    { label: t('navigation.home'), icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
+    { label: t('navigation.reminders'), icon: BellRing, to: vehicleId ? `/v/${vehicleId}/reminders` : '/' },
+    { label: t('navigation.history'), icon: History, to: vehicleId ? `/v/${vehicleId}/history` : '/' },
+    { label: t('navigation.account'), icon: UserRound, to: '/settings' },
   ]
 
   return (
     <nav
-      aria-label="Primary"
+      aria-label={t('navigation.primary')}
       className="grid h-auto shrink-0 grid-cols-4 border-t bg-card px-2 pt-2 lg:hidden"
       style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
     >

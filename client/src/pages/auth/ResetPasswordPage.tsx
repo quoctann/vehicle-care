@@ -1,16 +1,18 @@
 import { type FormEvent, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as api from '@/api/client'
-import { ApiError } from '@/api/errors'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { PasswordInput } from '@/components/auth/PasswordInput'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { getUserError } from '@/lib/userError'
 
 const MIN_PASSWORD_LENGTH = 8
 
 export function ResetPasswordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
@@ -24,41 +26,41 @@ export function ResetPasswordPage() {
     setError(null)
 
     if (!token) {
-      setError('Liên kết đặt lại mật khẩu không hợp lệ.')
+      setError(t('auth.invalidResetLink'))
       return
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Mật khẩu phải có ít nhất ${MIN_PASSWORD_LENGTH} ký tự.`)
+      setError(t('auth.passwordMin', { count: MIN_PASSWORD_LENGTH }))
       return
     }
     if (password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.')
+      setError(t('auth.passwordMismatch'))
       return
     }
 
     setSubmitting(true)
     try {
       await api.resetPassword({ token, new_password: password })
-      toast.success('Đặt lại mật khẩu thành công. Đăng nhập bằng mật khẩu mới.')
+      toast.success(t('auth.resetSuccess'))
       navigate('/sign-in', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Liên kết đã hết hạn hoặc không hợp lệ.')
+      setError(getUserError(err, t, 'auth.invalidResetLink'))
       setSubmitting(false)
     }
   }
 
   return (
     <AuthLayout
-      title="Reset password"
+      title={t('auth.resetPassword')}
       footer={
         <Link to="/sign-in" className="font-medium text-primary hover:underline">
-          Back to sign in
+          {t('auth.backToSignIn')}
         </Link>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="password">New password</Label>
+          <Label htmlFor="password">{t('auth.newPassword')}</Label>
           <PasswordInput
             id="password"
             autoComplete="new-password"
@@ -69,7 +71,7 @@ export function ResetPasswordPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="confirm-password">Confirm new password</Label>
+          <Label htmlFor="confirm-password">{t('auth.confirmNewPassword')}</Label>
           <PasswordInput
             id="confirm-password"
             autoComplete="new-password"
@@ -80,7 +82,7 @@ export function ResetPasswordPage() {
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={submitting} className="mt-1">
-          Reset password
+          {submitting ? t('auth.resetting') : t('auth.resetPassword')}
         </Button>
       </form>
     </AuthLayout>
