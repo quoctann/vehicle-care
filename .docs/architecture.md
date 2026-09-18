@@ -9,17 +9,15 @@ internal/domain                 transport-independent data model
 internal/application            authentication, device, and sync use cases
 internal/ports                  persistence capabilities required by use cases (Store)
 internal/adapters/httpapi       Gin transport, cookies, CSRF, CORS
-internal/adapters/memory        process-local persistence (STORE_DRIVER=memory, default for dev/test)
-internal/adapters/postgres      sqlc-generated queries + sqlx transaction orchestration (STORE_DRIVER=live)
-internal/adapters/redis         session/token store (STORE_DRIVER=live)
+internal/adapters/postgres      sqlc-generated queries + sqlx transaction orchestration
+internal/adapters/redis         session/token store
 internal/platform               configuration and logging
 db/migrations/, db/queries/, sqlc.yaml
 ```
 
-Both the `memory` and `postgres` adapters implement the same `Store` port and must
-preserve the same invariant: sequence allocation, entity update, changefeed append,
-and processed-mutation recording happen atomically (one lock for `memory`, one
-database transaction for `postgres`).
+The `postgres` adapter implements the `Store` port's account/sync methods and must
+preserve the invariant: sequence allocation, entity update, changefeed append, and
+processed-mutation recording happen atomically inside one database transaction.
 
 ## Persistence layout (implemented)
 

@@ -62,10 +62,10 @@ func (s *Service) SeedDemoAccount(ctx context.Context) error {
 func (s *Service) Signup(ctx context.Context, email, password string, name *string) (domain.Account, string, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !validEmail(email) || !validPassword(password) {
-		return domain.Account{}, "", "", "", validation("Email hoặc mật khẩu không hợp lệ (mật khẩu từ 8 đến 72 byte).")
+		return domain.Account{}, "", "", "", validation("Invalid email or password (password must be 8 to 72 bytes).")
 	}
 	if _, found := s.store.AccountByEmail(ctx, email); found {
-		return domain.Account{}, "", "", "", &Error{Code: "conflict", Message: "Email đã được đăng ký."}
+		return domain.Account{}, "", "", "", &Error{Code: "conflict", Message: "Email is already registered."}
 	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 	account := domain.Account{ID: uuid.NewString(), Email: email, Name: name, Timezone: "Asia/Ho_Chi_Minh", PasswordHash: passwordHash}
 	if err := s.store.CreateAccount(ctx, account); err != nil {
 		if errors.Is(err, ports.ErrAccountExists) {
-			return domain.Account{}, "", "", "", &Error{Code: "conflict", Message: "Email đã được đăng ký."}
+			return domain.Account{}, "", "", "", &Error{Code: "conflict", Message: "Email is already registered."}
 		}
 		return domain.Account{}, "", "", "", err
 	}
@@ -90,7 +90,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 func (s *Service) Login(ctx context.Context, email, password string) (domain.Account, string, string, error) {
 	account, found := s.store.AccountByEmail(ctx, strings.TrimSpace(email))
 	if !found || bcrypt.CompareHashAndPassword(account.PasswordHash, []byte(password)) != nil {
-		return domain.Account{}, "", "", &Error{Code: "auth_invalid", Message: "Email hoặc mật khẩu không đúng."}
+		return domain.Account{}, "", "", &Error{Code: "auth_invalid", Message: "Invalid email or password."}
 	}
 	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
 	return account, sessionID, csrfToken, err
@@ -118,7 +118,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 		return &Error{Code: "internal_error", Message: "Token store is unavailable."}
 	}
 	if !ok {
-		return validation("Token xác thực không hợp lệ hoặc đã hết hạn.")
+		return validation("Verification token is invalid or expired.")
 	}
 	return s.store.SetEmailVerified(ctx, accountID)
 }
@@ -146,7 +146,7 @@ func (s *Service) CreateResetToken(ctx context.Context, email string) (string, b
 // ResetPassword consumes a token, changes the password, and revokes all sessions.
 func (s *Service) ResetPassword(ctx context.Context, token, password string) error {
 	if !validPassword(password) {
-		return validation("Mật khẩu phải có từ 8 đến 72 byte.")
+		return validation("Password must be 8 to 72 bytes.")
 	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -157,7 +157,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return &Error{Code: "internal_error", Message: "Token store is unavailable."}
 	}
 	if !ok {
-		return validation("Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.")
+		return validation("Password reset token is invalid or expired.")
 	}
 	if err := s.store.SetPassword(ctx, accountID, passwordHash); err != nil {
 		return err
@@ -247,145 +247,9 @@ func validEmail(value string) bool {
 
 func validPassword(value string) bool { return len(value) >= 8 && len(value) <= maxPasswordBytes }
 
-func (s *Service) validateMutation(ctx context.Context, accountID string, mutation domain.Mutation) (string, string) {
-	if mutation.MutationID == "" || mutation.EntityID == "" || len(mutation.MutationID) > 200 || len(mutation.EntityID) > 200 || mutation.Payload == nil {
-		return "validation_failed", "Mutation identifiers and payload are required and must not exceed 200 characters."
-	}
-	validTypes := map[string]bool{"vehicle": true, "reminder_config": true, "odometer_log": true, "fuel_log": true, "service_log": true}
-	if !validTypes[mutation.EntityType] || (mutation.Operation != "create" && mutation.Operation != "update") {
-		return "validation_failed", "Mutation entity_type or operation is invalid."
-	}
-	if !isMutable(mutation.EntityType) && mutation.Operation != "create" {
-		return "validation_failed", "Append-only entities only support create."
-	}
-	if message := validatePayload(mutation.EntityType, mutation.Payload); message != "" {
-		return "validation_failed", message
-	}
-	if mutation.EntityType != "vehicle" {
-		vehicleID, _ := mutation.Payload["vehicle_id"].(string)
-		if !s.store.EntityExists(ctx, accountID, "vehicle", vehicleID) {
-			return "ownership_invalid", "Vehicle does not belong to this account."
-		}
-	}
-	return "", ""
-}
-
 func rejected(mutationID, code, message string) domain.MutationResult {
 	retryable := false
 	return domain.MutationResult{MutationID: mutationID, Status: "rejected", ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
-}
-
-func isMutable(entityType string) bool {
-	return entityType == "vehicle" || entityType == "reminder_config"
-}
-
-func validatePayload(entityType string, payload map[string]any) string {
-	switch entityType {
-	case "vehicle":
-		if !requiredString(payload, "name") || !nullableString(payload, "plate_number") || !nullableTime(payload, "archived_at") || !nullableTime(payload, "deleted_at") {
-			return "Vehicle payload is invalid."
-		}
-	case "reminder_config":
-		intervalKM, validKM := nullablePositiveNumber(payload, "interval_km")
-		intervalDays, validDays := nullablePositiveNumber(payload, "interval_days")
-		if !requiredString(payload, "vehicle_id") || !requiredString(payload, "part_type_id") || !validKM || !validDays || (intervalKM == nil && intervalDays == nil) || !nullableNumber(payload, "baseline_odometer_km", false) || !nullableDate(payload, "baseline_date") || !requiredBool(payload, "enabled") || !nullableTime(payload, "deleted_at") {
-			return "Reminder config payload is invalid."
-		}
-	case "odometer_log":
-		source, _ := payload["source"].(string)
-		if !requiredString(payload, "vehicle_id") || !requiredNumber(payload, "odometer_km", false) || !requiredTime(payload, "recorded_at") || !nullableString(payload, "note") || (source != "manual" && source != "fuel") {
-			return "Odometer log payload is invalid."
-		}
-	case "fuel_log":
-		if !requiredString(payload, "vehicle_id") || !requiredTime(payload, "recorded_at") || !nullableNumber(payload, "liters", true) || !nullableNumber(payload, "cost_vnd", false) || !nullableString(payload, "shop") || !nullableString(payload, "note") || !nullableString(payload, "odometer_log_id") || !requiredBool(payload, "is_full_tank") {
-			return "Fuel log payload is invalid."
-		}
-	case "service_log":
-		if !requiredString(payload, "vehicle_id") || !requiredString(payload, "part_type_id") || !requiredTime(payload, "serviced_at") || !nullableNumber(payload, "odometer_km_snapshot", false) || !nullableNumber(payload, "cost_vnd", false) || !nullableString(payload, "note") {
-			return "Service log payload is invalid."
-		}
-	}
-	return ""
-}
-
-func requiredString(payload map[string]any, key string) bool {
-	value, ok := payload[key].(string)
-	return ok && value != "" && len(value) <= 500
-}
-
-func nullableString(payload map[string]any, key string) bool {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return true
-	}
-	text, ok := value.(string)
-	return ok && len(text) <= 2000
-}
-
-func requiredBool(payload map[string]any, key string) bool {
-	_, ok := payload[key].(bool)
-	return ok
-}
-
-func requiredNumber(payload map[string]any, key string, positive bool) bool {
-	value, ok := payload[key].(float64)
-	return ok && value >= 0 && (!positive || value > 0)
-}
-
-func nullableNumber(payload map[string]any, key string, positive bool) bool {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return true
-	}
-	number, ok := value.(float64)
-	return ok && number >= 0 && (!positive || number > 0)
-}
-
-func nullablePositiveNumber(payload map[string]any, key string) (*float64, bool) {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return nil, true
-	}
-	number, ok := value.(float64)
-	if !ok || number <= 0 {
-		return nil, false
-	}
-	return &number, true
-}
-
-func requiredTime(payload map[string]any, key string) bool {
-	value, ok := payload[key].(string)
-	if !ok {
-		return false
-	}
-	_, err := time.Parse(time.RFC3339, value)
-	return err == nil
-}
-
-func nullableTime(payload map[string]any, key string) bool {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return true
-	}
-	text, ok := value.(string)
-	if !ok {
-		return false
-	}
-	_, err := time.Parse(time.RFC3339, text)
-	return err == nil
-}
-
-func nullableDate(payload map[string]any, key string) bool {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return true
-	}
-	text, ok := value.(string)
-	if !ok {
-		return false
-	}
-	_, err := time.Parse("2006-01-02", text)
-	return err == nil
 }
 
 func validation(message string) error {

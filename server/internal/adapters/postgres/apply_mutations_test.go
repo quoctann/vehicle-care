@@ -11,10 +11,9 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// TestApplyMutationsDeduplicatesAndDetectsConflict ports the equivalent
-// memory.Store test (internal/adapters/memory/store_test.go) 1:1 in
-// behavior, adapted only to use a real vehicle-typed uuid entity id (the
-// memory store has no foreign keys, so it could use a literal string id).
+// TestApplyMutationsDeduplicatesAndDetectsConflict asserts dedupe-by-mutation
+// and LWW-conflict detection. It uses a real vehicle-typed uuid entity id
+// since the vehicles table enforces a uuid primary key.
 func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
@@ -75,11 +74,10 @@ func TestAppendOnlyDuplicateReturnsOriginalAcknowledgment(t *testing.T) {
 	}
 }
 
-// TestReminderScopeIsUniqueAcrossConcurrentDevices ports the equivalent
-// memory.Store test 1:1 in intent, but exercises the real PostgreSQL race:
-// two goroutines each open their own transaction (via the shared Store's
-// connection pool) and race to create the first active reminder for the
-// same (vehicle_id, part_type_id) scope.
+// TestReminderScopeIsUniqueAcrossConcurrentDevices exercises the real
+// PostgreSQL race: two goroutines each open their own transaction (via the
+// shared Store's connection pool) and race to create the first active
+// reminder for the same (vehicle_id, part_type_id) scope.
 func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	t.Parallel()
 	store, dsn := newTestStore(t)

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/httpapi"
-	"github.com/quoctann/vehicle-care/server/internal/adapters/memory"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	redisadapter "github.com/quoctann/vehicle-care/server/internal/adapters/redis"
 	"github.com/quoctann/vehicle-care/server/internal/application"
@@ -85,15 +84,10 @@ func main() {
 	}
 }
 
-// buildStore constructs the persistence backend selected by cfg.StoreDriver.
-// It returns the store, the set of dependencies /health/ready should ping,
-// and a cleanup func that releases any connections opened here.
+// buildStore constructs the PostgreSQL + Redis backing store. It returns the
+// store, the set of dependencies /health/ready should ping, and a cleanup
+// func that releases any connections opened here.
 func buildStore(ctx context.Context, cfg config.Config) (ports.Store, []httpapi.Pinger, func(), error) {
-	if cfg.StoreDriver == "memory" {
-		store := memory.NewStore()
-		return store, nil, func() {}, nil
-	}
-
 	pgStore, err := postgres.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, nil, nil, err

@@ -13,24 +13,27 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// ErrUnsupportedBatchSize is a programmer error: this adapter only supports
-// exactly one mutation per ApplyMutations call. The only real caller,
-// application.Service.Push, always calls it that way (see service.go,
-// which loops one mutation at a time). Generalizing to N>1 would require
-// per-mutation SAVEPOINTs; nothing in the codebase needs that today (see
-// the architecture plan's "Batch nhiều mutation" decision), so violating
-// this assumption fails loud instead of silently misbehaving.
+// ErrUnsupportedBatchSize is a caller-contract violation: this adapter only
+// supports exactly one mutation per ApplyMutations call. The only real
+// caller, application.Service.Push, always calls it that way (see
+// service.go, which loops one mutation at a time). Generalizing to N>1
+// would require per-mutation SAVEPOINTs; nothing in the codebase needs that
+// today (see the architecture plan's "Batch nhiều mutation" decision), so
+// violating this assumption is reported back as a retryable error per
+// mutation instead of applying anything.
 var ErrUnsupportedBatchSize = errors.New("postgres: ApplyMutations only supports exactly one mutation per call")
 
 // ApplyMutations applies exactly one mutation inside a single READ
 // COMMITTED transaction: dedupe check, entity lock/seq allocation, table
-// upsert/insert, change_feed append, and processed_mutations record. It
-// mirrors memory.Store.ApplyMutations's semantics (see
-// internal/adapters/memory/store.go) using real row locks and constraints
-// instead of an in-process mutex.
+// upsert/insert, change_feed append, and processed_mutations record. It uses
+// real row locks and constraints instead of an in-process mutex.
 func (s *Store) ApplyMutations(ctx context.Context, accountID, deviceID string, mutations []domain.Mutation, now time.Time) []domain.MutationResult {
 	if len(mutations) != 1 {
-		panic(ErrUnsupportedBatchSize)
+		results := make([]domain.MutationResult, len(mutations))
+		for i, mutation := range mutations {
+			results[i] = retryableErrorResult(mutation.MutationID, ErrUnsupportedBatchSize.Error())
+		}
+		return results
 	}
 	mutation := mutations[0]
 

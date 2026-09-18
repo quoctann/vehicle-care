@@ -10,12 +10,10 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// TestPullKeepsStableWatermark ports the equivalent memory.Store test
-// (internal/adapters/memory/store_test.go) 1:1 in behavior. It is adapted
-// only for the vehicle_id foreign key: odometer_logs must reference a real
-// vehicle row, so a vehicle-create mutation runs first and consumes
-// server_seq 1; every literal sequence number below is shifted by that +1
-// relative to the memory test.
+// TestPullKeepsStableWatermark asserts the same stable-watermark pagination
+// behavior as the ApplyMutations/Pull contract. odometer_logs must reference
+// a real vehicle row, so a vehicle-create mutation runs first and consumes
+// server_seq 1; every literal sequence number below is shifted by that +1.
 func TestPullKeepsStableWatermark(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
@@ -61,7 +59,7 @@ func TestPullKeepsStableWatermark(t *testing.T) {
 }
 
 // TestPullWatermarkExpires asserts that a watermark past its 15 minute TTL
-// is rejected, matching memory.Store.Pull's cleanup-then-validate order.
+// is rejected.
 func TestPullWatermarkExpires(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)

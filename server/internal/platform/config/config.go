@@ -24,10 +24,6 @@ type Config struct {
 	SyncMaxPageSize     int
 	MockAuthEnabled     bool
 
-	// StoreDriver selects the persistence backend: "memory" (process-local,
-	// dev-only) or "live" (PostgreSQL + Redis).
-	StoreDriver string
-
 	DatabaseURL string
 
 	RedisAddr         string
@@ -49,7 +45,6 @@ func Load() (Config, error) {
 		Environment: env("APP_ENV", "development"), HTTPHost: env("HTTP_HOST", "0.0.0.0"), HTTPPort: env("HTTP_PORT", "8080"),
 		FrontendOrigin: env("FRONTEND_ORIGIN", "http://localhost:5173"), FrontendRedirectURL: env("FRONTEND_REDIRECT_URL", "http://localhost:5173"),
 		CookieDomain:  os.Getenv("COOKIE_DOMAIN"),
-		StoreDriver:   env("STORE_DRIVER", "memory"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
@@ -94,14 +89,8 @@ func Load() (Config, error) {
 	if cfg.RedisMaxRetries, err = intEnv("REDIS_MAX_RETRIES", 3); err != nil {
 		return Config{}, err
 	}
-	if cfg.StoreDriver != "memory" && cfg.StoreDriver != "live" {
-		return Config{}, fmt.Errorf("STORE_DRIVER must be \"memory\" or \"live\", got %q", cfg.StoreDriver)
-	}
-	if cfg.StoreDriver == "live" && cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required when STORE_DRIVER=live")
-	}
-	if cfg.Environment == "production" && cfg.StoreDriver != "live" {
-		return Config{}, fmt.Errorf("APP_ENV=production requires STORE_DRIVER=live; the in-memory backend is dev-only")
+	if cfg.DatabaseURL == "" {
+		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 	return cfg, nil
 }

@@ -9,7 +9,7 @@ help:
 		'make dev            Run frontend and backend together' \
 		'make dev-fe         Run Vite without MSW on http://localhost:5173' \
 		'make dev-be         Run the Go API on http://localhost:8080' \
-		'make dev-infra      Start Postgres + Redis for STORE_DRIVER=live' \
+		'make dev-infra      Start Postgres + Redis (required by the API)' \
 		'make dev-infra-down Stop Postgres + Redis' \
 		'make migrate-up     Apply database migrations (needs DATABASE_URL)' \
 		'make migrate-seed   Seed the part_types catalog (needs DATABASE_URL)' \
