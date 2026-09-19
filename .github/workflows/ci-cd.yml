@@ -120,4 +120,5 @@ jobs:
         run: |
           gh workflow run deploy-vehicle-care.yml \
             --repo quoctann/pisces-infra \
+            --ref main \
             --raw-field image_tag="${{ github.sha }}"
