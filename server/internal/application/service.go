@@ -42,22 +42,6 @@ func NewService(store ports.Store, sessionTTL time.Duration, batchLimit, pageLim
 	return &Service{store: store, sessionTTL: sessionTTL, batchLimit: batchLimit, pageLimit: pageLimit, now: time.Now}
 }
 
-// SeedDemoAccount creates the documented local demo account if it is absent.
-func (s *Service) SeedDemoAccount(ctx context.Context) error {
-	if _, found := s.store.AccountByEmail(ctx, "demo@vehicle.app"); found {
-		return nil
-	}
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte("demo12345"), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	name := "Demo User"
-	return s.store.CreateAccount(ctx, domain.Account{
-		ID: uuid.NewString(), Email: "demo@vehicle.app", Name: &name,
-		Timezone: "Asia/Ho_Chi_Minh", EmailVerified: true, PasswordHash: passwordHash,
-	})
-}
-
 // Signup creates an account, verification token, and immediate login session.
 func (s *Service) Signup(ctx context.Context, email, password string, name *string) (domain.Account, string, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -94,21 +78,6 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Acc
 	}
 	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
 	return account, sessionID, csrfToken, err
-}
-
-// LoginGoogleDemo creates or logs in the fixed local Google demo account.
-func (s *Service) LoginGoogleDemo(ctx context.Context) (string, string, error) {
-	const email = "demo.google@gmail.com"
-	account, found := s.store.AccountByEmail(ctx, email)
-	if !found {
-		name := "Google Demo"
-		account = domain.Account{ID: uuid.NewString(), Email: email, Name: &name, Timezone: "Asia/Ho_Chi_Minh", EmailVerified: true}
-		if err := s.store.CreateAccount(ctx, account); err != nil && !errors.Is(err, ports.ErrAccountExists) {
-			return "", "", err
-		}
-		account, _ = s.store.AccountByEmail(ctx, email)
-	}
-	return s.createSession(ctx, account.ID)
 }
 
 // VerifyEmail consumes a verification token and marks its account verified.

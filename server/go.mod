@@ -3,6 +3,7 @@ module github.com/quoctann/vehicle-care/server
 go 1.25.11
 
 require (
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0

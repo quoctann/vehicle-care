@@ -7,12 +7,12 @@ help:
 	@printf '%s\n' \
 		'make install        Install frontend and backend dependencies' \
 		'make dev            Run frontend and backend together' \
-		'make dev-fe         Run Vite without MSW on http://localhost:5173' \
+		'make dev-fe         Run Vite on http://localhost:5173 (talks to the real backend)' \
 		'make dev-be         Run the Go API on http://localhost:8080' \
 		'make dev-infra      Start Postgres + Redis (required by the API)' \
 		'make dev-infra-down Stop Postgres + Redis' \
-		'make migrate-up     Apply database migrations (needs DATABASE_URL)' \
-		'make migrate-seed   Seed the part_types catalog (needs DATABASE_URL)' \
+		'make migrate-up     Apply database migrations (needs DB_HOST/DB_USER/DB_PASSWORD/DB_NAME)' \
+		'make migrate-seed   Seed the part_types catalog (needs DB_HOST/DB_USER/DB_PASSWORD/DB_NAME)' \
 		'make migrate-create name=<name>  Scaffold a new timestamp-prefixed migration pair' \
 		'make test           Run all tests' \
 		'make lint           Run frontend lint and Go vet' \
@@ -30,7 +30,7 @@ dev:
 	wait -n $$BE_PID $$FE_PID
 
 dev-fe:
-	VITE_ENABLE_MSW=false VITE_API_BASE_URL=http://localhost:8080 npm run dev --prefix client
+	VITE_API_BASE_URL=http://localhost:8080 npm run dev --prefix client
 
 dev-be:
 	cd server && go run ./cmd/api

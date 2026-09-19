@@ -1,5 +1,10 @@
 # Tổng hợp kỹ thuật — App Nhắc bảo dưỡng xe máy
 
+> **⚠️ Đã lỗi thời:** tài liệu này chụp lại trạng thái code tại 2026-09-18, TRƯỚC khi
+> commit `24b801b` xóa `server/internal/adapters/memory` (mem store) và `STORE_DRIVER`.
+> Các đoạn nhắc tới `adapters/memory`, mock store, hay `STORE_DRIVER=memory/live` bên
+> dưới không còn đúng — xem `.docs/architecture.md` để biết kiến trúc hiện tại.
+
 *Tài liệu này ĐÚC KẾT lại các quyết định/kế hoạch đang nằm rải rác trong `.docs/*` và
 README, đối chiếu với code thực tế tại thời điểm viết (2026-09-18), để có 1 điểm vào
 duy nhất trả lời "hiện tại hệ thống thế nào, còn thiếu gì". Tài liệu này KHÔNG thay thế

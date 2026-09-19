@@ -14,7 +14,7 @@
 ```bash
 make install
 make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
-make migrate-up   # áp dụng schema (đọc DATABASE_URL)
+make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
 make migrate-seed # seed danh mục part_types
 make dev
 ```
@@ -26,16 +26,9 @@ Các địa chỉ mặc định:
 - Liveness: http://localhost:8080/health/live
 - Readiness: http://localhost:8080/health/ready
 
-`make dev` tự tắt MSW và cấu hình frontend gọi backend Go. Nhấn `Ctrl+C` để dừng cả hai process.
+`make dev` cấu hình frontend gọi backend Go thật. Nhấn `Ctrl+C` để dừng cả hai process.
 
-Tài khoản demo:
-
-```text
-Email: demo@vehicle.app
-Password: demo12345
-```
-
-Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
+Tạo tài khoản mới qua màn hình đăng ký (không còn tài khoản demo dựng sẵn). Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
 
 ## Chạy riêng
 
@@ -45,13 +38,13 @@ Backend:
 make dev-be
 ```
 
-Frontend kết nối backend thật thay cho MSW:
+Frontend (kết nối backend thật):
 
 ```bash
 make dev-fe
 ```
 
-Frontend dùng MSW như trước:
+hoặc chạy trực tiếp Vite (cần backend đã chạy sẵn, hoặc set `VITE_API_BASE_URL` trỏ backend khác):
 
 ```bash
 npm run dev --prefix client
@@ -72,7 +65,7 @@ make build
 ## API mock hiện tại
 
 - Auth: signup, verify/resend email, login, session, logout, forgot/reset password.
-- Google: `GET /auth/google/start` tạo tài khoản demo và redirect về frontend khi `MOCK_AUTH_ENABLED=true`.
+- Google: `GET /auth/google/start` hiện luôn trả lỗi 400 `validation_failed` ("not implemented yet") — OAuth thật chưa được build.
 - Device: `POST /devices/register`.
 - Sync: `POST /sync/push` và `GET /sync/pull`.
 - Session dùng cookie `sid`; request ghi đã xác thực cần cookie và header `X-CSRF-Token`.
@@ -85,11 +78,11 @@ Backend luôn dùng PostgreSQL (account + sync data) và Redis (session/token) t
 
 ```bash
 make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
-make migrate-up   # áp dụng schema (đọc DATABASE_URL)
+make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
 make migrate-seed # seed danh mục part_types
 ```
 
-Biến môi trường liên quan xem `.env.example` (`DATABASE_URL`, `REDIS_*`). `/health/ready` ping cả Postgres và Redis, trả 503 nếu 1 trong 2 không sẵn sàng.
+Biến môi trường liên quan xem `.env.example` (`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSLMODE`, `REDIS_*`). `/health/ready` ping cả Postgres và Redis, trả 503 nếu 1 trong 2 không sẵn sàng.
 
 ## Giới hạn phase này
 

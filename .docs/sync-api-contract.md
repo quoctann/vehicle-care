@@ -10,9 +10,9 @@ Trạng thái triển khai hiện tại: **frontend đã implement UI + client A
 theo tài liệu này. Backend Go thật (bao gồm adapter Postgres + Redis) đã được xây
 dựng và implement gần như toàn bộ hợp đồng này** — xem `.docs/TONG-HOP-KY-THUAT.md`
 mục 2 để biết chi tiết trạng thái đã xong/còn thiếu. Hai gap còn lại so với hợp đồng:
-(1) `GET /auth/google/callback` ở mục 2.6 — hiện chỉ có `GET /auth/google/start` gọi
-thẳng 1 login demo/mock (`LoginGoogleDemo`, gate bằng `MOCK_AUTH_ENABLED`), CHƯA có
-flow đổi `code` lấy Google profile thật; (2) chưa gửi email thật cho verify-email/
+(1) `GET /auth/google/callback` ở mục 2.6 — hiện `GET /auth/google/start` chỉ trả lỗi
+400 `validation_failed` ("not implemented yet"), CHƯA có flow đổi `code` lấy Google
+profile thật; (2) chưa gửi email thật cho verify-email/
 password reset. Mục tiêu của tài liệu vẫn là để backend dev triển khai đúng ngay từ
 đầu mà không phải đổi shape phía frontend — sửa tài liệu này trước khi đổi shape.
 
@@ -87,13 +87,13 @@ Backend đổi `code` lấy Google profile, tạo account nếu email Google ch�
 redirect về frontend (vd `/v/{lastVehicleId}/home` hoặc `/onboarding/add-vehicle`
 nếu account mới chưa có xe nào).
 
-> **Ghi chú triển khai hiện tại:** callback thật ở mục 2.6 CHƯA được build. Cả MSW
-> (dev, `client/src/mocks/handlers/auth.ts`) và backend Go thật
-> (`server/internal/adapters/httpapi`, gate bằng `MOCK_AUTH_ENABLED`) hiện chỉ có 1
-> đường tắt: `GET /auth/google/start` set-cookie session ngay cho 1 tài khoản Google
-> giả cố định, không đổi `code` lấy Google profile thật — đây KHÔNG phải hành vi
-> production, chỉ để click-test luồng UI. Khi build callback thật, giữ đúng shape ở
-> mục 2.5/2.6 và bỏ nhánh mock đi.
+> **Ghi chú triển khai hiện tại:** callback thật ở mục 2.6 CHƯA được build. Backend Go
+> (`server/internal/adapters/httpapi`) hiện chỉ có `GET /auth/google/start` trả lỗi
+> 400 `validation_failed` ("not implemented yet") — route được giữ nguyên vị trí
+> trong contract nhưng không set-cookie, không đổi `code` lấy Google profile thật.
+> Không còn nhánh mock/demo nào (đã xóa `LoginGoogleDemo`, `MOCK_AUTH_ENABLED`, và
+> đường tắt MSW ở frontend cùng toàn bộ `client/src/mocks/**`). Khi build callback
+> thật, giữ đúng shape ở mục 2.5/2.6 và thay handler hiện tại bằng flow OAuth thật.
 
 ### 2.7. `POST /auth/password/forgot`
 ```json

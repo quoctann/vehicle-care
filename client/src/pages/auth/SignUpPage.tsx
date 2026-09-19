@@ -2,15 +2,13 @@ import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import * as api from '@/api/client'
-import { ENABLE_MSW } from '@/api/config'
-import { googleMockSignIn } from '@/api/devGoogleMock'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { GoogleButton } from '@/components/auth/GoogleButton'
 import { PasswordInput } from '@/components/auth/PasswordInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore'
+import { useSessionStore } from '@/stores/useSessionStore'
 import { getUserError } from '@/lib/userError'
 
 const MIN_PASSWORD_LENGTH = 8
@@ -18,7 +16,6 @@ const MIN_PASSWORD_LENGTH = 8
 export function SignUpPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -52,21 +49,10 @@ export function SignUpPage() {
     }
   }
 
-  async function handleGoogle() {
+  function handleGoogle() {
     setError(null)
     setSubmitting(true)
-    if (!ENABLE_MSW) {
-      window.location.href = api.googleStartUrl()
-      return
-    }
-    try {
-      const { account } = await googleMockSignIn()
-      setAuthenticated(mapAccountDto(account))
-      navigate('/', { replace: true })
-    } catch {
-      setError(t('auth.googleSignUpFailed'))
-      setSubmitting(false)
-    }
+    window.location.href = api.googleStartUrl()
   }
 
   return (

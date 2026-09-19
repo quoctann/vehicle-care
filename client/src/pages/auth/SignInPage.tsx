@@ -2,8 +2,6 @@ import { type FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import * as api from '@/api/client'
-import { ENABLE_MSW } from '@/api/config'
-import { googleMockSignIn } from '@/api/devGoogleMock'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { GoogleButton } from '@/components/auth/GoogleButton'
 import { PasswordInput } from '@/components/auth/PasswordInput'
@@ -36,21 +34,10 @@ export function SignInPage() {
     }
   }
 
-  async function handleGoogle() {
+  function handleGoogle() {
     setError(null)
     setSubmitting(true)
-    if (!ENABLE_MSW) {
-      window.location.href = api.googleStartUrl()
-      return
-    }
-    try {
-      const { account } = await googleMockSignIn()
-      setAuthenticated(mapAccountDto(account))
-      navigate('/', { replace: true })
-    } catch {
-      setError(t('auth.googleSignInFailed'))
-      setSubmitting(false)
-    }
+    window.location.href = api.googleStartUrl()
   }
 
   return (

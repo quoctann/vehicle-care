@@ -3,152 +3,76 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
+	"net/url"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
 
-// Config contains runtime settings for the API process.
-type Config struct {
-	Environment         string
-	HTTPHost            string
-	HTTPPort            string
-	FrontendOrigin      string
-	FrontendRedirectURL string
-	CookieSecure        bool
-	CookieDomain        string
-	SessionTTL          time.Duration
-	SyncMaxBatchSize    int
-	SyncMaxPageSize     int
-	MockAuthEnabled     bool
-
-	DatabaseURL string
-
-	RedisAddr         string
-	RedisPassword     string
-	RedisDB           int
-	RedisTLSEnabled   bool
-	RedisDialTimeout  time.Duration
-	RedisReadTimeout  time.Duration
-	RedisWriteTimeout time.Duration
-	RedisPoolSize     int
-	RedisMinIdleConns int
-	RedisMaxRetries   int
+// Database holds PostgreSQL connection parameters. The connection string is
+// built from these fields (see DSN) instead of being read as a single
+// preassembled URL from the environment.
+type Database struct {
+	Host     string `env:"DB_HOST,required"`
+	Port     int    `env:"DB_PORT" envDefault:"5432"`
+	User     string `env:"DB_USER,required"`
+	Password string `env:"DB_PASSWORD,required"`
+	Name     string `env:"DB_NAME,required"`
+	SSLMode  string `env:"DB_SSLMODE" envDefault:"disable"`
 }
 
-// Load reads an optional local .env without overriding injected environment variables.
+// DSN builds the postgres:// connection string pgx/database-sql expects.
+func (d Database) DSN() string {
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(d.User, d.Password),
+		Host:   fmt.Sprintf("%s:%d", d.Host, d.Port),
+		Path:   "/" + d.Name,
+	}
+	q := u.Query()
+	q.Set("sslmode", d.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// Config contains runtime settings for the API process.
+type Config struct {
+	Environment         string        `env:"APP_ENV" envDefault:"development"`
+	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
+	HTTPPort            string        `env:"HTTP_PORT" envDefault:"8080"`
+	FrontendOrigin      string        `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
+	FrontendRedirectURL string        `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
+	CookieSecure        bool          `env:"COOKIE_SECURE" envDefault:"false"`
+	CookieDomain        string        `env:"COOKIE_DOMAIN"`
+	SessionTTL          time.Duration `env:"SESSION_TTL" envDefault:"720h"`
+	SyncMaxBatchSize    int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
+	SyncMaxPageSize     int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+
+	Database Database
+
+	RedisAddr         string        `env:"REDIS_ADDR" envDefault:"localhost:6379"`
+	RedisPassword     string        `env:"REDIS_PASSWORD"`
+	RedisDB           int           `env:"REDIS_DB" envDefault:"0"`
+	RedisTLSEnabled   bool          `env:"REDIS_TLS_ENABLED" envDefault:"false"`
+	RedisDialTimeout  time.Duration `env:"REDIS_DIAL_TIMEOUT" envDefault:"5s"`
+	RedisReadTimeout  time.Duration `env:"REDIS_READ_TIMEOUT" envDefault:"3s"`
+	RedisWriteTimeout time.Duration `env:"REDIS_WRITE_TIMEOUT" envDefault:"3s"`
+	RedisPoolSize     int           `env:"REDIS_POOL_SIZE" envDefault:"20"`
+	RedisMinIdleConns int           `env:"REDIS_MIN_IDLE_CONNS" envDefault:"5"`
+	RedisMaxRetries   int           `env:"REDIS_MAX_RETRIES" envDefault:"3"`
+}
+
+// Load reads an optional local .env without overriding injected environment
+// variables, then parses and validates the environment into Config.
 func Load() (Config, error) {
 	_ = godotenv.Load(".env", "../.env")
-	cfg := Config{
-		Environment: env("APP_ENV", "development"), HTTPHost: env("HTTP_HOST", "0.0.0.0"), HTTPPort: env("HTTP_PORT", "8080"),
-		FrontendOrigin: env("FRONTEND_ORIGIN", "http://localhost:5173"), FrontendRedirectURL: env("FRONTEND_REDIRECT_URL", "http://localhost:5173"),
-		CookieDomain:  os.Getenv("COOKIE_DOMAIN"),
-		DatabaseURL:   os.Getenv("DATABASE_URL"),
-		RedisAddr:     env("REDIS_ADDR", "localhost:6379"),
-		RedisPassword: os.Getenv("REDIS_PASSWORD"),
-	}
-	var err error
-	if cfg.CookieSecure, err = boolEnv("COOKIE_SECURE", false); err != nil {
+	var cfg Config
+	if err := env.Parse(&cfg); err != nil {
 		return Config{}, err
-	}
-	if cfg.MockAuthEnabled, err = boolEnv("MOCK_AUTH_ENABLED", true); err != nil {
-		return Config{}, err
-	}
-	if cfg.SessionTTL, err = durationEnv("SESSION_TTL", 30*24*time.Hour); err != nil {
-		return Config{}, err
-	}
-	if cfg.SyncMaxBatchSize, err = intEnv("SYNC_MAX_BATCH_SIZE", 100); err != nil {
-		return Config{}, err
-	}
-	if cfg.SyncMaxPageSize, err = intEnv("SYNC_MAX_PAGE_SIZE", 100); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisDB, err = intEnvAllowZero("REDIS_DB", 0); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisTLSEnabled, err = boolEnv("REDIS_TLS_ENABLED", false); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisDialTimeout, err = durationEnv("REDIS_DIAL_TIMEOUT", 5*time.Second); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisReadTimeout, err = durationEnv("REDIS_READ_TIMEOUT", 3*time.Second); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisWriteTimeout, err = durationEnv("REDIS_WRITE_TIMEOUT", 3*time.Second); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisPoolSize, err = intEnv("REDIS_POOL_SIZE", 20); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisMinIdleConns, err = intEnv("REDIS_MIN_IDLE_CONNS", 5); err != nil {
-		return Config{}, err
-	}
-	if cfg.RedisMaxRetries, err = intEnv("REDIS_MAX_RETRIES", 3); err != nil {
-		return Config{}, err
-	}
-	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 	return cfg, nil
 }
 
 // Address returns the configured listen address.
 func (c Config) Address() string { return c.HTTPHost + ":" + c.HTTPPort }
-
-func env(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func boolEnv(key string, fallback bool) (bool, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return false, fmt.Errorf("parse %s: %w", key, err)
-	}
-	return parsed, nil
-}
-
-func intEnv(key string, fallback int) (int, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 1 {
-		return 0, fmt.Errorf("%s must be a positive integer", key)
-	}
-	return parsed, nil
-}
-
-func intEnvAllowZero(key string, fallback int) (int, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("%s must be a non-negative integer", key)
-	}
-	return parsed, nil
-}
-
-func durationEnv(key string, fallback time.Duration) (time.Duration, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback, nil
-	}
-	parsed, err := time.ParseDuration(value)
-	if err != nil || parsed <= 0 {
-		return 0, fmt.Errorf("%s must be a positive duration", key)
-	}
-	return parsed, nil
-}

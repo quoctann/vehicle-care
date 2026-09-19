@@ -56,11 +56,6 @@ func main() {
 	defer closeStore()
 
 	service := application.NewService(store, cfg.SessionTTL, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize)
-	if cfg.MockAuthEnabled {
-		if err := service.SeedDemoAccount(context.Background()); err != nil {
-			logger.Fatal("seed demo account", zap.Error(err))
-		}
-	}
 	api := httpapi.New(service, cfg, logger, pingers...)
 	server := &http.Server{
 		Addr: cfg.Address(), Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second,
@@ -88,7 +83,7 @@ func main() {
 // store, the set of dependencies /health/ready should ping, and a cleanup
 // func that releases any connections opened here.
 func buildStore(ctx context.Context, cfg config.Config) (ports.Store, []httpapi.Pinger, func(), error) {
-	pgStore, err := postgres.New(ctx, cfg.DatabaseURL)
+	pgStore, err := postgres.New(ctx, cfg.Database.DSN())
 	if err != nil {
 		return nil, nil, nil, err
 	}

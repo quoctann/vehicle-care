@@ -102,17 +102,7 @@ func (s *Server) resetPassword(c *gin.Context) {
 }
 
 func (s *Server) googleStart(c *gin.Context) {
-	if !s.cfg.MockAuthEnabled {
-		s.writeAPIError(c, http.StatusNotFound, "validation_failed", "Mock Google authentication is disabled.", false)
-		return
-	}
-	sessionID, csrfToken, err := s.service.LoginGoogleDemo(c.Request.Context())
-	if err != nil {
-		s.writeError(c, err)
-		return
-	}
-	s.setAuthCookies(c, sessionID, csrfToken)
-	c.Redirect(http.StatusFound, s.cfg.FrontendRedirectURL)
+	s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "Google sign-in is not implemented yet.", false)
 }
 
 func (s *Server) getSession(c *gin.Context) {

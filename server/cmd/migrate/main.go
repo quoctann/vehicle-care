@@ -11,8 +11,8 @@
 //	go run ./cmd/migrate seed
 //	go run ./cmd/migrate create <name>
 //
-// DATABASE_URL must be set for up|down|status|seed. create does not touch the
-// database and works offline.
+// DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME must be set for up|down|status|
+// seed. create does not touch the database and works offline.
 package main
 
 import (
@@ -26,13 +26,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/joho/godotenv"
 
 	"github.com/quoctann/vehicle-care/server/db/migrations"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
+	"github.com/quoctann/vehicle-care/server/internal/platform/config"
 )
 
 func main() {
@@ -51,12 +54,13 @@ func run(args []string) error {
 		return runCreate(args[1:])
 	}
 
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		return errors.New("DATABASE_URL environment variable is required")
+	_ = godotenv.Load(".env", "../.env")
+	var dbCfg config.Database
+	if err := env.Parse(&dbCfg); err != nil {
+		return err
 	}
 
-	db, err := sql.Open("pgx", dsn)
+	db, err := sql.Open("pgx", dbCfg.DSN())
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
