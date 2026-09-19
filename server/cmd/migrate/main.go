@@ -38,6 +38,10 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/platform/config"
 )
 
+// migrationsDir is relative to the server module root, matching where
+// `go run ./cmd/migrate` is invoked from (see Makefile: `cd server && ...`).
+const migrationsDir = "db/migrations"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "migrate:", err)
@@ -89,14 +93,17 @@ func newMigrator(db *sql.DB) (*migrate.Migrate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load migration source: %w", err)
 	}
+
 	dbDriver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("create postgres driver: %w", err)
 	}
+
 	m, err := migrate.NewWithInstance("iofs", sourceDriver, "postgres", dbDriver)
 	if err != nil {
 		return nil, fmt.Errorf("create migrator: %w", err)
 	}
+
 	return m, nil
 }
 
@@ -105,9 +112,11 @@ func runUp(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrate up: %w", err)
 	}
+
 	fmt.Println("migrate: up to date")
 	return runStatus(db)
 }
@@ -117,6 +126,7 @@ func runDown(db *sql.DB, rest []string) error {
 	if err != nil {
 		return err
 	}
+
 	if len(rest) == 0 {
 		if err := m.Down(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 			return fmt.Errorf("migrate down: %w", err)
@@ -124,13 +134,16 @@ func runDown(db *sql.DB, rest []string) error {
 		fmt.Println("migrate: rolled back all migrations")
 		return nil
 	}
+
 	steps, err := strconv.Atoi(rest[0])
 	if err != nil || steps <= 0 {
 		return fmt.Errorf("invalid step count %q: must be a positive integer", rest[0])
 	}
+
 	if err := m.Steps(-steps); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrate down %d: %w", steps, err)
 	}
+
 	fmt.Printf("migrate: rolled back %d migration(s)\n", steps)
 	return runStatus(db)
 }
@@ -140,35 +153,37 @@ func runStatus(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+
 	version, dirty, err := m.Version()
 	if errors.Is(err, migrate.ErrNilVersion) {
 		fmt.Println("migrate: no migrations applied yet")
 		return nil
 	}
+
 	if err != nil {
 		return fmt.Errorf("read migration status: %w", err)
 	}
+
 	fmt.Printf("migrate: version=%d dirty=%t\n", version, dirty)
 	return nil
 }
 
 func runSeed(db *sql.DB) error {
 	ctx := context.Background()
+
 	if err := seed.Seed(ctx, db, seed.Manifest); err != nil {
 		return fmt.Errorf("seed part types: %w", err)
 	}
+
 	fmt.Printf("migrate: seeded %d part type(s)\n", len(seed.Manifest))
 	return nil
 }
-
-// migrationsDir is relative to the server module root, matching where
-// `go run ./cmd/migrate` is invoked from (see Makefile: `cd server && ...`).
-const migrationsDir = "db/migrations"
 
 func runCreate(args []string) error {
 	if len(args) == 0 || args[0] == "" {
 		return errors.New("usage: migrate create <name>")
 	}
+
 	name := sanitizeMigrationName(args[0])
 	if name == "" {
 		return fmt.Errorf("migration name %q has no usable characters after sanitizing to snake_case", args[0])
@@ -199,9 +214,11 @@ func writeIfAbsent(path, content string) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("stat %s: %w", path, err)
 	}
+
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
+
 	return nil
 }
 
@@ -209,9 +226,10 @@ func writeIfAbsent(path, content string) error {
 // collapsing spaces/dashes/other separators into single underscores so the
 // generated filename stays a valid, greppable snake_case identifier.
 func sanitizeMigrationName(raw string) string {
-	lower := strings.ToLower(raw)
 	var b strings.Builder
+	lower := strings.ToLower(raw)
 	lastUnderscore := false
+
 	for _, r := range lower {
 		switch {
 		case r >= 'a' && r <= 'z' || r >= '0' && r <= '9':
@@ -224,5 +242,6 @@ func sanitizeMigrationName(raw string) string {
 			}
 		}
 	}
+
 	return strings.Trim(b.String(), "_")
 }

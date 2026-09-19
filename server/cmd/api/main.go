@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// liveStore composes the PostgreSQL adapter (accounts, devices, sync
+// Store composes the PostgreSQL adapter (accounts, devices, sync
 // changefeed) and the Redis adapter (sessions, tokens) into the single
 // ports.Store the application layer depends on. Struct embedding promotes
 // each adapter's methods directly; the two adapters share no method names.
@@ -31,18 +31,19 @@ type (
 	sessionStore  = redisadapter.Store
 )
 
-type liveStore struct {
+type Store struct {
 	*postgresStore
 	*sessionStore
 }
 
-var _ ports.Store = (*liveStore)(nil)
+var _ ports.Store = (*Store)(nil)
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		panic(err)
 	}
+
 	logger, err := logging.New(cfg.Environment)
 	if err != nil {
 		panic(err)
@@ -99,10 +100,11 @@ func buildStore(ctx context.Context, cfg config.Config) (ports.Store, []httpapi.
 	}
 	redisStore := redisadapter.NewStore(redisClient)
 
-	store := &liveStore{postgresStore: pgStore, sessionStore: redisStore}
+	store := &Store{postgresStore: pgStore, sessionStore: redisStore}
 	closeStore := func() {
 		_ = pgStore.Close()
 		_ = redisClient.Close()
 	}
+
 	return store, []httpapi.Pinger{pgStore, redisStore}, closeStore, nil
 }

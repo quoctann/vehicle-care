@@ -1,0 +1,123 @@
+name: CI/CD
+
+# Builds and publishes both container images (backend + frontend), then hands
+# off to infra's own deploy-vehicle-care.yml workflow to bump both image tags in
+# one commit and let Argo CD (automated + selfHeal) reconcile the cluster.
+# Mirrors the employee-scheduler split: this repo only builds+publishes, infra
+# owns the actual GitOps commit.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "client/**"
+      - ".github/workflows/ci-cd.yml"
+  workflow_dispatch:
+
+env:
+  BACKEND_IMAGE: ghcr.io/quoctann/vehicle-care-backend
+  FRONTEND_IMAGE: ghcr.io/quoctann/vehicle-care-frontend
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+      - name: Vet
+        working-directory: server
+        run: go vet ./...
+      - name: Test
+        # testcontainers-go needs a Docker daemon, which is preinstalled and
+        # already running on GitHub-hosted ubuntu-latest runners.
+        working-directory: server
+        run: go test -race ./...
+
+  backend-build-and-push:
+    needs: backend-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - working-directory: client
+        run: npm ci
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+      - name: Build
+        # tsc -b in the build script is what actually catches type errors —
+        # there's no separate typecheck script in client/package.json.
+        working-directory: client
+        run: npm run build
+
+  frontend-build-and-push:
+    needs: frontend-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+
+  update-gitops:
+    needs: [backend-build-and-push, frontend-build-and-push]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch infra deploy workflow
+        # INFRA_DISPATCH_PAT must be a fine-grained PAT scoped to the infra repo
+        # with "Actions: Read and write" — the default GITHUB_TOKEN cannot
+        # trigger workflow_dispatch in another repo. Both images are built from
+        # the same commit, so they always move to the same tag together
+        # (deploy-vehicle-care.yml bumps every `images[].newTag` entry in one
+        # pass).
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_PAT }}
+        run: |
+          gh workflow run deploy-vehicle-care.yml \
+            --repo quoctann/pisces-infra \
+            --raw-field image_tag="${{ github.sha }}"
