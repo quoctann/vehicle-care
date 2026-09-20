@@ -37,6 +37,8 @@ export type Vehicle = {
   plateNumber: string | null
   archivedAt: IsoDateTime | null
   deletedAt: IsoDateTime | null
+  /** Ngưỡng "sắp đến hạn" riêng cho xe này, tỉ lệ (0,1] — null dùng mặc định hệ thống `DUE_SOON_REMAINING_RATIO`. */
+  dueSoonRatio: number | null
   createdAtClient: IsoDateTime
   /** Chỉ có giá trị sau khi đã sync — null nghĩa là chưa từng push lên server. */
   receivedAtServer: IsoDateTime | null
@@ -44,9 +46,11 @@ export type Vehicle = {
 }
 
 /**
- * PartType — danh mục tĩnh, seed cố định UUID (xem `data/seed.ts`), read-only từ client.
- * Client PHẢI xử lý được code chưa biết một cách graceful (xem `partType.ts`),
- * không hard-code enum đóng cứng.
+ * PartType — 10 dòng seed cố định UUID (xem `data/seed.ts`, `accountId: null`, không
+ * sửa/xoá được) CỘNG hạng mục tuỳ chỉnh do từng account tự tạo (`accountId` = account sở
+ * hữu — feedback Feature #2). Từ Stage 2, entity mutable thật (đi qua sync/push+pull như
+ * `Vehicle`), không còn read-only cache đơn thuần. Client PHẢI xử lý được code chưa biết
+ * một cách graceful (xem `partType.ts`), không hard-code enum đóng cứng.
  */
 export type PartType = {
   id: string
@@ -55,6 +59,10 @@ export type PartType = {
   displayOrder: number
   active: boolean
   seedVersion: number
+  accountId: string | null
+  createdAtClient: IsoDateTime
+  receivedAtServer: IsoDateTime | null
+  serverSeq: number | null
 }
 
 /**
@@ -108,6 +116,7 @@ export type FuelLog = {
   odometerLogId: string | null
   /** Giữ cho tương lai (fuel efficiency) — KHÔNG dùng để tính toán gì ở MVP này. */
   isFullTank: boolean
+  deletedAt: IsoDateTime | null
   createdAtClient: IsoDateTime
   receivedAtServer: IsoDateTime | null
   serverSeq: number | null
@@ -125,6 +134,7 @@ export type ServiceLog = {
   /** Không thuộc scope quyết định ở decision.md nhưng cần cho màn Costs — optional, không ảnh hưởng domain reminder logic. */
   costVnd: number | null
   note: string | null
+  deletedAt: IsoDateTime | null
   createdAtClient: IsoDateTime
   receivedAtServer: IsoDateTime | null
   serverSeq: number | null

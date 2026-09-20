@@ -15,6 +15,7 @@ export function vehicleToPayload(v: Vehicle): Record<string, unknown> {
     plate_number: v.plateNumber,
     archived_at: v.archivedAt,
     deleted_at: v.deletedAt,
+    due_soon_ratio: v.dueSoonRatio,
   }
 }
 
@@ -51,6 +52,7 @@ export function fuelLogToPayload(f: FuelLog): Record<string, unknown> {
     note: f.note,
     odometer_log_id: f.odometerLogId,
     is_full_tank: f.isFullTank,
+    deleted_at: f.deletedAt,
   }
 }
 
@@ -62,6 +64,7 @@ export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
     odometer_km_snapshot: s.odometerKmSnapshot,
     cost_vnd: s.costVnd,
     note: s.note,
+    deleted_at: s.deletedAt,
   }
 }
 
@@ -96,6 +99,16 @@ function nullableNumber(payload: Record<string, unknown>, field: string, minimum
   return value
 }
 
+/** Tỉ lệ trong (0,1] — dùng cho `vehicle.due_soon_ratio`. */
+function nullableRatio(payload: Record<string, unknown>, field: string): number | null {
+  const value = payload[field]
+  if (value == null) return null
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1) {
+    throw new Error(`Invalid sync payload field: ${field}`)
+  }
+  return value
+}
+
 function requiredNumber(payload: Record<string, unknown>, field: string, minimum = 0): number {
   const value = nullableNumber(payload, field, minimum)
   if (value == null) throw new Error(`Invalid sync payload field: ${field}`)
@@ -122,6 +135,7 @@ export function vehicleFieldsFromPayload(
     plateNumber: nullableString(payload, 'plate_number'),
     archivedAt: nullableIsoDateTime(payload, 'archived_at'),
     deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
+    dueSoonRatio: nullableRatio(payload, 'due_soon_ratio'),
   }
 }
 
@@ -171,6 +185,7 @@ export function fuelLogFieldsFromPayload(
     note: nullableString(payload, 'note'),
     odometerLogId: nullableString(payload, 'odometer_log_id'),
     isFullTank: typeof payload.is_full_tank === 'boolean' ? payload.is_full_tank : false,
+    deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
   }
 }
 
@@ -181,6 +196,16 @@ export function fuelLogFieldsFromPayload(
  * validate runtime lại. `seed_version` server là chuỗi (`"v1"`, `"v2"`, ...) còn domain
  * `PartType.seedVersion` là số — lấy phần số, mặc định 1 nếu không parse được.
  */
+/**
+ * Từ `GET /part-types` (bootstrap/full-refresh, KHÔNG phải pull change-feed) khi Dexie
+ * CHƯA có dòng này (xem `refreshPartTypesFromServer` — nếu đã có, chỉ merge field nghiệp
+ * vụ, giữ nguyên `serverSeq`/`receivedAtServer`/`createdAtClient` cũ). Response này không
+ * có `server_seq` nên dòng MỚI để `null` như 1 entity vừa tạo cục bộ; nếu user sửa ngay,
+ * mutation gửi `base_server_seq: null` → server vẫn áp dụng đúng (ON CONFLICT DO UPDATE
+ * không phụ thuộc field này), chỉ mất tín hiệu `conflict_resolved` cho lần sửa đầu tiên
+ * đó — đánh đổi chấp nhận được, tránh phải thêm server_seq vào REST response chỉ để phục
+ * vụ 1 edge case hiếm.
+ */
 export function partTypeFromDto(dto: PartTypeDto): PartType {
   const seedVersion = Number(dto.seed_version.replace(/^v/, ''))
   return {
@@ -190,6 +215,36 @@ export function partTypeFromDto(dto: PartTypeDto): PartType {
     displayOrder: dto.display_order,
     active: dto.active,
     seedVersion: Number.isFinite(seedVersion) ? seedVersion : 1,
+    accountId: dto.account_id,
+    createdAtClient: new Date().toISOString(),
+    receivedAtServer: null,
+    serverSeq: null,
+  }
+}
+
+export function partTypeToPayload(p: PartType): Record<string, unknown> {
+  return {
+    code: p.code,
+    name_vi: p.displayName,
+    display_order: p.displayOrder,
+    active: p.active,
+    seed_version: String(p.seedVersion),
+  }
+}
+
+export function partTypeFieldsFromPayload(
+  payload: Record<string, unknown>,
+): Omit<PartType, 'id' | 'accountId' | 'createdAtClient' | 'serverSeq' | 'receivedAtServer'> {
+  return {
+    code: requiredString(payload, 'code'),
+    displayName: requiredString(payload, 'name_vi'),
+    displayOrder: requiredNumber(payload, 'display_order'),
+    active: typeof payload.active === 'boolean' ? payload.active : (() => { throw new Error('Invalid sync payload field: active') })(),
+    seedVersion: (() => {
+      const value = requiredString(payload, 'seed_version')
+      const parsed = Number(value.replace(/^v/, ''))
+      return Number.isFinite(parsed) ? parsed : 1
+    })(),
   }
 }
 
@@ -203,5 +258,6 @@ export function serviceLogFieldsFromPayload(
     odometerKmSnapshot: nullableNumber(payload, 'odometer_km_snapshot'),
     costVnd: nullableNumber(payload, 'cost_vnd'),
     note: nullableString(payload, 'note'),
+    deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
   }
 }

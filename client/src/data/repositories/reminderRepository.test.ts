@@ -16,6 +16,7 @@ beforeEach(async () => {
     plateNumber: null,
     archivedAt: null,
     deletedAt: null,
+    dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
     receivedAtServer: null,
     serverSeq: null,
@@ -27,6 +28,10 @@ beforeEach(async () => {
     displayOrder: 1,
     active: true,
     seedVersion: 1,
+    accountId: null,
+    createdAtClient: '2026-01-01T00:00:00.000Z',
+    receivedAtServer: null,
+    serverSeq: null,
   })
 })
 

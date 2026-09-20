@@ -58,6 +58,7 @@ type FuelLog struct {
 	IsFullTank       bool           `json:"is_full_tank"`
 	ServerSeq        int64          `json:"server_seq"`
 	ReceivedAtServer time.Time      `json:"received_at_server"`
+	DeletedAt        sql.NullTime   `json:"deleted_at"`
 }
 
 type NotificationDelivery struct {
@@ -85,14 +86,17 @@ type OdometerLog struct {
 }
 
 type PartType struct {
-	ID           string    `json:"id"`
-	Code         string    `json:"code"`
-	NameVi       string    `json:"name_vi"`
-	DisplayOrder int32     `json:"display_order"`
-	Active       bool      `json:"active"`
-	SeedVersion  string    `json:"seed_version"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	Code             string    `json:"code"`
+	NameVi           string    `json:"name_vi"`
+	DisplayOrder     int32     `json:"display_order"`
+	Active           bool      `json:"active"`
+	SeedVersion      string    `json:"seed_version"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	AccountID        *string   `json:"account_id"`
+	ServerSeq        int64     `json:"server_seq"`
+	ReceivedAtServer time.Time `json:"received_at_server"`
 }
 
 type ProcessedMutation struct {
@@ -144,6 +148,7 @@ type ServiceLog struct {
 	Note               sql.NullString `json:"note"`
 	ServerSeq          int64          `json:"server_seq"`
 	ReceivedAtServer   time.Time      `json:"received_at_server"`
+	DeletedAt          sql.NullTime   `json:"deleted_at"`
 }
 
 type Vehicle struct {
@@ -155,4 +160,5 @@ type Vehicle struct {
 	DeletedAt        sql.NullTime   `json:"deleted_at"`
 	ServerSeq        int64          `json:"server_seq"`
 	ReceivedAtServer time.Time      `json:"received_at_server"`
+	DueSoonRatio     sql.NullString `json:"due_soon_ratio"`
 }

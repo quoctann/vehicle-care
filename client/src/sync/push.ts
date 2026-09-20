@@ -7,11 +7,13 @@ import { applyServerSnapshotToEntity } from './applyChange'
 import { assertActiveSyncAccount } from './sessionGuard'
 import { entityTable, isMutableEntityType, updateEntitySyncMeta } from './types'
 
+type MutableEntityType = 'vehicle' | 'reminder_config' | 'fuel_log' | 'service_log' | 'part_type'
+
 /** Đọc `serverSeq` hiện có trên entity Dexie tương ứng — "bản client biết gần nhất"
  * — TẠI THỜI ĐIỂM build request, để đính kèm `base_server_seq`. Chỉ áp dụng cho
- * entity mutable; log không cần field này. */
-async function readCurrentServerSeq(entityType: 'vehicle' | 'reminder_config', entityId: string): Promise<number | null> {
-  const row = entityType === 'vehicle' ? await db.vehicles.get(entityId) : await db.reminderConfigs.get(entityId)
+ * entity mutable; `odometer_log` không cần field này. */
+async function readCurrentServerSeq(entityType: MutableEntityType, entityId: string): Promise<number | null> {
+  const row = await entityTable(entityType).get(entityId)
   return row?.serverSeq ?? null
 }
 
@@ -109,7 +111,7 @@ async function applyMutationResult(item: OutboxItem, result: MutationResult, acc
       })
       return
     case 'conflict_resolved':
-      await db.transaction('rw', [db.outbox, db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs], async () => {
+      await db.transaction('rw', [db.outbox, db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
         await applyServerSnapshotToEntity(
           item.entityType,
           item.entityId,
@@ -168,7 +170,7 @@ export async function pushOutbox(deviceId: string, accountId: string): Promise<v
           payload: item.payload as Record<string, unknown>,
         }
         if (isMutableEntityType(item.entityType)) {
-          const baseServerSeq = await readCurrentServerSeq(item.entityType as 'vehicle' | 'reminder_config', item.entityId)
+          const baseServerSeq = await readCurrentServerSeq(item.entityType as MutableEntityType, item.entityId)
           mutation.base_server_seq = baseServerSeq
           // A local create may have newer update rows coalesced into this payload.
           // Without a server version yet, the effective operation is still create.

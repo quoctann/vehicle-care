@@ -24,6 +24,7 @@ describe('calculateReminderStatus — chỉ theo km', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('not_due')
     expect(result.km).toEqual({ baseline: 0, used: 899, remaining: 101, ratioUsed: 0.899 })
@@ -36,6 +37,7 @@ describe('calculateReminderStatus — chỉ theo km', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('due_soon')
   })
@@ -47,6 +49,7 @@ describe('calculateReminderStatus — chỉ theo km', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('overdue')
     expect(result.km?.remaining).toBe(0)
@@ -59,6 +62,7 @@ describe('calculateReminderStatus — chỉ theo km', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('insufficient_data')
     expect(result.km).toBeNull()
@@ -71,6 +75,7 @@ describe('calculateReminderStatus — chỉ theo km', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.km?.used).toBe(0)
     expect(result.status).toBe('not_due')
@@ -87,6 +92,7 @@ describe('calculateReminderStatus — chỉ theo ngày', () => {
       lastServiceLog: null,
       now: '2026-02-20T00:00:00.000Z', // 2026-01-01 -> 2026-02-20 = 50 ngày
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.days?.usedDays).toBe(50)
     expect(result.status).toBe('not_due')
@@ -99,6 +105,7 @@ describe('calculateReminderStatus — chỉ theo ngày', () => {
       lastServiceLog: null,
       now: '2026-04-11T00:00:00.000Z', // 100 ngày sau baseline theo lịch UTC/ICT cùng ngày giờ 00:00
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     // 2026-01-01 -> 2026-04-11 = 100 ngày, nhưng ta cần đúng mốc 90 ngày để test ratio=0.9
     expect(result.days?.usedDays).toBeGreaterThanOrEqual(90)
@@ -111,6 +118,7 @@ describe('calculateReminderStatus — chỉ theo ngày', () => {
       lastServiceLog: null,
       now: '2026-04-12T00:00:00.000Z', // 101 ngày sau baseline
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('overdue')
   })
@@ -122,6 +130,7 @@ describe('calculateReminderStatus — chỉ theo ngày', () => {
       lastServiceLog: null,
       now: '2026-06-01T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('insufficient_data')
   })
@@ -135,6 +144,7 @@ describe('calculateReminderStatus — chỉ theo ngày', () => {
       lastServiceLog: null,
       now: '2026-01-01T18:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.days?.usedDays).toBe(1)
   })
@@ -148,6 +158,7 @@ describe('calculateReminderStatus — cả km và ngày', () => {
       lastServiceLog: null,
       now: '2026-01-10T00:00:00.000Z', // chỉ 9 ngày trôi qua, ngày chưa đến hạn
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('overdue')
     expect(result.days?.usedDays).toBeLessThan(100)
@@ -160,6 +171,7 @@ describe('calculateReminderStatus — cả km và ngày', () => {
       lastServiceLog: null,
       now: '2026-01-10T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.status).toBe('due_soon')
   })
@@ -171,6 +183,7 @@ describe('calculateReminderStatus — cả km và ngày', () => {
       lastServiceLog: null,
       now: '2026-04-10T00:00:00.000Z', // 99 ngày => due_soon theo ngày
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.km).toBeNull()
     expect(result.status).toBe('due_soon')
@@ -185,6 +198,7 @@ describe('calculateReminderStatus — ServiceLog reset baseline', () => {
       lastServiceLog: { odometerKmSnapshot: 38000, servicedAt: '2026-01-01T00:00:00.000Z' },
       now: '2026-01-10T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.km).toEqual({ baseline: 38000, used: 500, remaining: 500, ratioUsed: 0.5 })
     expect(result.days?.baseline).toBe('2026-01-01')
@@ -198,6 +212,7 @@ describe('calculateReminderStatus — ServiceLog reset baseline', () => {
       lastServiceLog: { odometerKmSnapshot: null, servicedAt: '2026-01-01T00:00:00.000Z' },
       now: '2026-01-10T00:00:00.000Z',
       accountTimezone: TZ,
+      dueSoonRatio: 0.9,
     })
     expect(result.km?.baseline).toBe(100)
     expect(result.days?.baseline).toBe('2026-01-01')

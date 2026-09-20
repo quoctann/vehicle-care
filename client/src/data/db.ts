@@ -15,7 +15,7 @@ import type {
  * (đây là sổ sách nội bộ của client để biết mình cần push/pull gì).
  */
 
-export type OutboxEntityType = 'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log'
+export type OutboxEntityType = 'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log' | 'part_type'
 export type OutboxOperation = 'create' | 'update'
 export type OutboxStatus = 'pending' | 'sent' | 'applied' | 'rejected' | 'retryable_error'
 
@@ -87,6 +87,17 @@ class VehicleMaintenanceDb extends Dexie {
       outbox: 'mutationId, entityId, [status+createdAt]',
       syncMeta: 'accountId',
       accountCache: 'id',
+    })
+    // v2: fuel_log/service_log sửa/xoá được (feedback Feature #3) — thêm index
+    // deletedAt để lọc bỏ record đã tombstone khi query lịch sử.
+    this.version(2).stores({
+      fuelLogs: 'id, accountId, vehicleId, deletedAt',
+      serviceLogs: 'id, accountId, vehicleId, [vehicleId+partTypeId+servicedAt], deletedAt',
+    })
+    // v3: part_type thành entity mutable thật, có thể do account tự tạo
+    // (feedback Feature #2) — thêm index accountId để lọc "hạng mục của tôi".
+    this.version(3).stores({
+      partTypes: 'id, &code, active, accountId',
     })
   }
 }

@@ -200,11 +200,10 @@ func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, li
 	return page, nil
 }
 
-// ListPartTypes returns the fixed part-type catalog. It requires no
-// account-scoped filtering: part_types is static reference data shared by
-// every account.
-func (s *Service) ListPartTypes(ctx context.Context) ([]domain.PartType, error) {
-	return s.store.ListPartTypes(ctx)
+// ListPartTypes returns the global part-type catalog plus accountID's own
+// custom rows.
+func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error) {
+	return s.store.ListPartTypes(ctx, accountID)
 }
 
 func (s *Service) createSession(ctx context.Context, accountID string) (string, string, error) {

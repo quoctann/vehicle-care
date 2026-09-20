@@ -11,29 +11,6 @@ import (
 	"time"
 )
 
-const findFuelLog = `-- name: FindFuelLog :one
-SELECT server_seq, received_at_server FROM fuel_logs WHERE account_id = $1 AND id = $2
-`
-
-type FindFuelLogParams struct {
-	AccountID string `json:"account_id"`
-	ID        string `json:"id"`
-}
-
-type FindFuelLogRow struct {
-	ServerSeq        int64     `json:"server_seq"`
-	ReceivedAtServer time.Time `json:"received_at_server"`
-}
-
-// A sql.ErrNoRows result means this append-only log has not been applied
-// yet (not a duplicate).
-func (q *Queries) FindFuelLog(ctx context.Context, arg FindFuelLogParams) (FindFuelLogRow, error) {
-	row := q.db.QueryRowContext(ctx, findFuelLog, arg.AccountID, arg.ID)
-	var i FindFuelLogRow
-	err := row.Scan(&i.ServerSeq, &i.ReceivedAtServer)
-	return i, err
-}
-
 const fuelLogExists = `-- name: FuelLogExists :one
 SELECT EXISTS (
     SELECT 1 FROM fuel_logs WHERE account_id = $1 AND id = $2
@@ -52,12 +29,41 @@ func (q *Queries) FuelLogExists(ctx context.Context, arg FuelLogExistsParams) (b
 	return exists, err
 }
 
-const insertFuelLog = `-- name: InsertFuelLog :exec
-INSERT INTO fuel_logs (account_id, id, vehicle_id, recorded_at, liters, cost_vnd, shop, note, odometer_log_id, is_full_tank, server_seq, received_at_server)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+const lockFuelLogForUpdate = `-- name: LockFuelLogForUpdate :one
+SELECT server_seq FROM fuel_logs WHERE account_id = $1 AND id = $2 FOR UPDATE
 `
 
-type InsertFuelLogParams struct {
+type LockFuelLogForUpdateParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+// Row lock used to serialize concurrent mutations of the same fuel log. A
+// sql.ErrNoRows result means the log has no current snapshot yet.
+func (q *Queries) LockFuelLogForUpdate(ctx context.Context, arg LockFuelLogForUpdateParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, lockFuelLogForUpdate, arg.AccountID, arg.ID)
+	var server_seq int64
+	err := row.Scan(&server_seq)
+	return server_seq, err
+}
+
+const upsertFuelLog = `-- name: UpsertFuelLog :exec
+INSERT INTO fuel_logs (account_id, id, vehicle_id, recorded_at, liters, cost_vnd, shop, note, odometer_log_id, is_full_tank, deleted_at, server_seq, received_at_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+ON CONFLICT (account_id, id) DO UPDATE
+  SET recorded_at = EXCLUDED.recorded_at,
+      liters = EXCLUDED.liters,
+      cost_vnd = EXCLUDED.cost_vnd,
+      shop = EXCLUDED.shop,
+      note = EXCLUDED.note,
+      odometer_log_id = EXCLUDED.odometer_log_id,
+      is_full_tank = EXCLUDED.is_full_tank,
+      deleted_at = EXCLUDED.deleted_at,
+      server_seq = EXCLUDED.server_seq,
+      received_at_server = EXCLUDED.received_at_server
+`
+
+type UpsertFuelLogParams struct {
 	AccountID        string         `json:"account_id"`
 	ID               string         `json:"id"`
 	VehicleID        string         `json:"vehicle_id"`
@@ -68,12 +74,13 @@ type InsertFuelLogParams struct {
 	Note             sql.NullString `json:"note"`
 	OdometerLogID    *string        `json:"odometer_log_id"`
 	IsFullTank       bool           `json:"is_full_tank"`
+	DeletedAt        sql.NullTime   `json:"deleted_at"`
 	ServerSeq        int64          `json:"server_seq"`
 	ReceivedAtServer time.Time      `json:"received_at_server"`
 }
 
-func (q *Queries) InsertFuelLog(ctx context.Context, arg InsertFuelLogParams) error {
-	_, err := q.db.ExecContext(ctx, insertFuelLog,
+func (q *Queries) UpsertFuelLog(ctx context.Context, arg UpsertFuelLogParams) error {
+	_, err := q.db.ExecContext(ctx, upsertFuelLog,
 		arg.AccountID,
 		arg.ID,
 		arg.VehicleID,
@@ -84,6 +91,7 @@ func (q *Queries) InsertFuelLog(ctx context.Context, arg InsertFuelLogParams) er
 		arg.Note,
 		arg.OdometerLogID,
 		arg.IsFullTank,
+		arg.DeletedAt,
 		arg.ServerSeq,
 		arg.ReceivedAtServer,
 	)

@@ -48,7 +48,7 @@ func (s *Server) push(c *gin.Context) {
 // (see .docs/20260919-feedback.md #1 — the previous mismatch caused
 // reminder_configs/service_logs FK violations on sync push).
 func (s *Server) listPartTypes(c *gin.Context) {
-	partTypes, err := s.service.ListPartTypes(c.Request.Context())
+	partTypes, err := s.service.ListPartTypes(c.Request.Context(), mustAccount(c).ID)
 	if err != nil {
 		s.writeError(c, err)
 		return

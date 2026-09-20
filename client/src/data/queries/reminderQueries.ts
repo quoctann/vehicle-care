@@ -1,3 +1,4 @@
+import { DUE_SOON_REMAINING_RATIO } from '@/domain/constants'
 import { calculateReminderStatus } from '@/domain/reminder'
 import { deriveCurrentOdometer } from '@/domain/odometer'
 import type { IanaTimezone, IsoDateTime, PartType, ReminderCalculationResult, ReminderConfig } from '@/domain/types'
@@ -28,11 +29,13 @@ export async function listReminderStatusesForVehicle(
   now: IsoDateTime = new Date().toISOString(),
   includeDisabled = false,
 ): Promise<ReminderWithStatus[]> {
-  const [configs, partTypes, currentOdometerKm] = await Promise.all([
+  const [configs, partTypes, currentOdometerKm, vehicle] = await Promise.all([
     db.reminderConfigs.where('vehicleId').equals(vehicleId).and((config) => config.accountId === accountId).toArray(),
     db.partTypes.toArray(),
     getCurrentOdometer(accountId, vehicleId),
+    db.vehicles.get(vehicleId),
   ])
+  const dueSoonRatio = vehicle?.dueSoonRatio ?? DUE_SOON_REMAINING_RATIO
 
   const activeConfigs = configs.filter((c) => c.deletedAt == null && (includeDisabled || c.enabled))
   const partTypeById = new Map(partTypes.map((p) => [p.id, p]))
@@ -58,6 +61,7 @@ export async function listReminderStatusesForVehicle(
           : null,
         now,
         accountTimezone,
+        dueSoonRatio,
       })
       return { config, partType, result }
     }),

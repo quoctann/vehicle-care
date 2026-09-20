@@ -254,19 +254,27 @@ Client chỉ nâng `last_seen_seq` cục bộ = `next_cursor` SAU KHI đã lưu 
 // Response 200
 {
   "part_types": [
-    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1" }
+    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1", "account_id": null },
+    { "id": "b2f1...", "code": "b2f1...", "name_vi": "Phanh đĩa sau (độ)", "display_order": 999, "active": true, "seed_version": "custom", "account_id": "acc_1" }
   ]
 }
 ```
 
-Danh mục `part_type` cố định, dùng chung mọi account — KHÔNG phải entity trong change-feed
-(không có `server_seq`/`operation`, không qua `sync/push`/`sync/pull`). Đây là nguồn sự
-thật DUY NHẤT cho `part_type_id` mà client dùng khi tạo `reminder_config`/`service_log`
-— client KHÔNG được tự sinh/hardcode UUID riêng cho danh mục này (xem
-`.docs/20260919-feedback.md` mục 1: UUID lệch giữa 2 phía từng gây lỗi FK
-`reminder_configs_part_type_id_fkey` khi push). Client gọi endpoint này (best-effort,
-sau khi có session) rồi cache lại local; trả về TOÀN BỘ bản ghi kể cả `active=false` —
-client tự lọc theo `active` khi hiển thị picker tạo log/reminder mới.
+Danh mục `part_type` gồm 2 phần: (1) 10 dòng seed cố định dùng chung mọi account
+(`account_id: null`, KHÔNG sửa/xoá được — client không được tự sinh/hardcode UUID riêng
+cho các dòng này, xem `.docs/20260919-feedback.md` mục 1) và (2) hạng mục tuỳ chỉnh do
+từng account tự tạo (`account_id` = account sở hữu, mục 2 "Yêu cầu new feature" trong
+feedback doc). Endpoint này trả TOÀN BỘ 2 phần gộp lại (kể cả `active=false`) — client tự
+lọc theo `active` khi hiển thị picker. **Khác với Stage 1**: `part_type` giờ LÀ entity
+mutable thật trong change-feed (có `server_seq`, đi qua `sync/push`/`sync/pull` như
+`vehicle`) — endpoint `GET /part-types` vẫn là cách bootstrap/full-refresh, còn tạo/sửa/
+xoá (soft, qua `active`) hạng mục tuỳ chỉnh đi qua `POST /sync/push` với
+`entity_type: "part_type"`. Quy ước bắt buộc: `payload.code` PHẢI bằng chính `entity_id`
+của mutation (server từ chối `validation_failed` nếu sai) — đây là cách tránh đụng độ
+với ràng buộc `UNIQUE(code)` toàn cục mà không cần đổi sang composite/partial unique
+index (vì `entity_id` luôn là UUID mới). Dòng seed (`account_id: null`) không thể bị
+sửa/xoá qua mutation — server chỉ chấp nhận `update` khi `part_type` đó thuộc đúng
+account gửi request (`ownership_invalid` nếu không).
 
 ## 3. Error model (D6)
 

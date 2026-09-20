@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Fuel, History, SlidersHorizontal, Wrench } from "lucide-react";
+import { Fuel, History, Pencil, SlidersHorizontal, Trash2, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ConfirmActionDialog } from "@/components/settings/ConfirmActionDialog";
 import type { HistoryEntry } from "@/data/queries/historyQueries";
 import { formatDate, formatMonth, formatNumber } from "@/lib/formatters";
 import { formatVnd } from "@/lib/currency";
@@ -10,17 +11,36 @@ type EntryFilter = "all" | HistoryEntry["kind"];
 export function HistoryTimeline({
   entries,
   timezone,
+  onEdit,
+  onDelete,
 }: {
   entries: HistoryEntry[];
   timezone: string;
+  onEdit: (entry: HistoryEntry) => void;
+  onDelete: (entry: HistoryEntry) => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const [pending, setPending] = useState<HistoryEntry | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const filters: Array<{ value: EntryFilter; label: string }> = [
     { value: "all", label: t('history.all') },
     { value: "service", label: t('history.service') },
     { value: "fuel", label: t('history.fuel') },
   ];
   const [filter, setFilter] = useState<EntryFilter>("all");
+
+  async function confirmDelete() {
+    if (!pending) return;
+    setBusyId(pending.id);
+    try {
+      await onDelete(pending);
+      setPending(null);
+    } catch {
+      // Keep the confirmation open so the user can retry after the page reports the error.
+    } finally {
+      setBusyId(null);
+    }
+  }
   const visibleEntries =
     filter === "all"
       ? entries
@@ -132,6 +152,26 @@ export function HistoryTimeline({
                             {entry.note}
                           </p>
                         )}
+                        <div className="mt-2 flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            aria-label={t('history.editLabel')}
+                            disabled={busyId === entry.id}
+                            onClick={() => onEdit(entry)}
+                            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={t('history.deleteLabel')}
+                            disabled={busyId === entry.id}
+                            onClick={() => setPending(entry)}
+                            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
                       </div>
                     </article>
                   );
@@ -141,6 +181,17 @@ export function HistoryTimeline({
           ))}
         </div>
       )}
+
+      <ConfirmActionDialog
+        open={pending != null}
+        title={t('history.deleteTitle')}
+        description={t('history.deleteDescription')}
+        confirmLabel={t('history.deleteLabel')}
+        destructive
+        busy={pending != null && busyId === pending.id}
+        onOpenChange={(open) => !open && setPending(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }

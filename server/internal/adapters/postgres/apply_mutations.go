@@ -123,6 +123,12 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 		currentSeq, err = queries.LockVehicleForUpdate(ctx, sqlcgen.LockVehicleForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
 	case "reminder_config":
 		currentSeq, err = queries.LockReminderConfigForUpdate(ctx, sqlcgen.LockReminderConfigForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
+	case "fuel_log":
+		currentSeq, err = queries.LockFuelLogForUpdate(ctx, sqlcgen.LockFuelLogForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
+	case "service_log":
+		currentSeq, err = queries.LockServiceLogForUpdate(ctx, sqlcgen.LockServiceLogForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
+	case "part_type":
+		currentSeq, err = queries.LockPartTypeForUpdate(ctx, sqlcgen.LockPartTypeForUpdateParams{AccountID: &accountID, ID: mutation.EntityID})
 	}
 	switch {
 	case err == nil:
@@ -174,7 +180,7 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 		if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT reminder_upsert"); err != nil {
 			return domain.MutationResult{}, fmt.Errorf("release savepoint: %w", err)
 		}
-	} else {
+	} else if mutation.EntityType == "vehicle" {
 		params, buildErr := buildUpsertVehicleParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
 		if buildErr != nil {
 			return domain.MutationResult{}, buildErr
@@ -182,36 +188,46 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 		if err := queries.UpsertVehicle(ctx, params); err != nil {
 			return domain.MutationResult{}, fmt.Errorf("upsert vehicle: %w", err)
 		}
+	} else if mutation.EntityType == "fuel_log" {
+		params, buildErr := buildUpsertFuelLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
+		if buildErr != nil {
+			return domain.MutationResult{}, buildErr
+		}
+		if err := queries.UpsertFuelLog(ctx, params); err != nil {
+			return domain.MutationResult{}, fmt.Errorf("upsert fuel_log: %w", err)
+		}
+	} else if mutation.EntityType == "service_log" {
+		params, buildErr := buildUpsertServiceLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
+		if buildErr != nil {
+			return domain.MutationResult{}, buildErr
+		}
+		if err := queries.UpsertServiceLog(ctx, params); err != nil {
+			return domain.MutationResult{}, fmt.Errorf("upsert service_log: %w", err)
+		}
+	} else {
+		params, buildErr := buildUpsertPartTypeParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
+		if buildErr != nil {
+			return domain.MutationResult{}, buildErr
+		}
+		if err := queries.UpsertPartType(ctx, params); err != nil {
+			return domain.MutationResult{}, fmt.Errorf("upsert part_type: %w", err)
+		}
 	}
 
 	return s.finishApplied(ctx, queries, accountID, deviceID, mutation, status, newSeq, receivedAt, tx)
 }
 
-// applyAppendOnlyMutation handles "odometer_log", "fuel_log", and
-// "service_log": these entities are immutable once created, so a prior
-// snapshot by the same entity ID is always a duplicate, never a conflict.
+// applyAppendOnlyMutation handles "odometer_log": it is immutable once
+// created (editing/deleting a reading would shift baseline_odometer_km for
+// every reminder — see .docs/20260919-feedback.md Feature #3 scope), so a
+// prior snapshot by the same entity ID is always a duplicate, never a
+// conflict. fuel_log/service_log used to be handled here too but are now
+// mutable (applyMutableMutation) so users can edit/delete them.
 func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, now time.Time, tx *sqlx.Tx) (domain.MutationResult, error) {
-	var existingSeq int64
-	var existingReceivedAt time.Time
-	var hasCurrent bool
-	var err error
-	switch mutation.EntityType {
-	case "odometer_log":
-		var row sqlcgen.FindOdometerLogRow
-		row, err = queries.FindOdometerLog(ctx, sqlcgen.FindOdometerLogParams{AccountID: accountID, ID: mutation.EntityID})
-		existingSeq, existingReceivedAt = row.ServerSeq, row.ReceivedAtServer
-	case "fuel_log":
-		var row sqlcgen.FindFuelLogRow
-		row, err = queries.FindFuelLog(ctx, sqlcgen.FindFuelLogParams{AccountID: accountID, ID: mutation.EntityID})
-		existingSeq, existingReceivedAt = row.ServerSeq, row.ReceivedAtServer
-	case "service_log":
-		var row sqlcgen.FindServiceLogRow
-		row, err = queries.FindServiceLog(ctx, sqlcgen.FindServiceLogParams{AccountID: accountID, ID: mutation.EntityID})
-		existingSeq, existingReceivedAt = row.ServerSeq, row.ReceivedAtServer
-	}
+	existing, err := queries.FindOdometerLog(ctx, sqlcgen.FindOdometerLogParams{AccountID: accountID, ID: mutation.EntityID})
+	hasCurrent := true
 	switch {
 	case err == nil:
-		hasCurrent = true
 	case errors.Is(err, sql.ErrNoRows):
 		hasCurrent = false
 	default:
@@ -219,7 +235,7 @@ func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Qu
 	}
 
 	if hasCurrent {
-		result := domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate", ServerSeq: &existingSeq, ReceivedAtServer: &existingReceivedAt}
+		result := domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate", ServerSeq: &existing.ServerSeq, ReceivedAtServer: &existing.ReceivedAtServer}
 		if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
 			return domain.MutationResult{}, fmt.Errorf("record duplicate %s: %w", mutation.EntityType, err)
 		}
@@ -235,27 +251,11 @@ func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Qu
 	}
 	receivedAt := now.UTC()
 
-	switch mutation.EntityType {
-	case "odometer_log":
-		params, buildErr := buildInsertOdometerLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		err = queries.InsertOdometerLog(ctx, params)
-	case "fuel_log":
-		params, buildErr := buildInsertFuelLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		err = queries.InsertFuelLog(ctx, params)
-	case "service_log":
-		params, buildErr := buildInsertServiceLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		err = queries.InsertServiceLog(ctx, params)
+	params, buildErr := buildInsertOdometerLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
+	if buildErr != nil {
+		return domain.MutationResult{}, buildErr
 	}
-	if err != nil {
+	if err := queries.InsertOdometerLog(ctx, params); err != nil {
 		return domain.MutationResult{}, fmt.Errorf("insert %s: %w", mutation.EntityType, err)
 	}
 
@@ -291,7 +291,12 @@ func (s *Store) finishApplied(ctx context.Context, queries *sqlcgen.Queries, acc
 }
 
 func isMutableEntity(entityType string) bool {
-	return entityType == "vehicle" || entityType == "reminder_config"
+	switch entityType {
+	case "vehicle", "reminder_config", "fuel_log", "service_log", "part_type":
+		return true
+	default:
+		return false
+	}
 }
 
 func cloneMap(input map[string]any) map[string]any {

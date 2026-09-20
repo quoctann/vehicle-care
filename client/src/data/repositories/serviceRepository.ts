@@ -38,6 +38,7 @@ export async function addServiceLog(input: {
     odometerKmSnapshot: input.odometerKmSnapshot,
     costVnd: input.costVnd ?? null,
     note: input.note ?? null,
+    deletedAt: null,
     createdAtClient: now,
     receivedAtServer: null,
     serverSeq: null,
@@ -54,4 +55,38 @@ export async function addServiceLog(input: {
     })
   })
   return log
+}
+
+async function writeServiceLogPatch(accountId: string, id: string, patch: Partial<ServiceLog>): Promise<void> {
+  await db.transaction('rw', db.serviceLogs, db.outbox, async () => {
+    const current = await db.serviceLogs.get(id)
+    if (!current || current.accountId !== accountId) throw new Error(`Service log not found: ${id}`)
+    const updated: ServiceLog = { ...current, ...patch }
+    await db.serviceLogs.put(updated)
+    await enqueueMutation({
+      entityType: 'service_log',
+      operation: 'update',
+      entityId: id,
+      payload: serviceLogToPayload(updated),
+    })
+  })
+}
+
+/** Sửa 1 lần bảo dưỡng đã ghi (feedback Feature #3) — không cho đổi `vehicleId`. */
+export function updateServiceLog(
+  accountId: string,
+  id: string,
+  patch: Partial<Pick<ServiceLog, 'partTypeId' | 'servicedAt' | 'odometerKmSnapshot' | 'costVnd' | 'note'>>,
+): Promise<void> {
+  if (patch.odometerKmSnapshot != null && (!Number.isFinite(patch.odometerKmSnapshot) || patch.odometerKmSnapshot < 0)) {
+    throw new Error('Service odometer cannot be negative.')
+  }
+  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Service cost cannot be negative.')
+  if (patch.servicedAt && Number.isNaN(Date.parse(patch.servicedAt))) throw new Error('Service time is invalid.')
+  return writeServiceLogPatch(accountId, id, patch)
+}
+
+/** Tombstone — không xóa vật lý (nhất quán với `vehicleRepository.deleteVehicle`). */
+export function deleteServiceLog(accountId: string, id: string): Promise<void> {
+  return writeServiceLogPatch(accountId, id, { deletedAt: new Date().toISOString() })
 }

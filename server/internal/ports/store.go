@@ -30,10 +30,10 @@ type SyncStore interface {
 	EntityExists(ctx context.Context, accountID, entityType, entityID string) bool
 	ApplyMutations(ctx context.Context, accountID, deviceID string, mutations []domain.Mutation, now time.Time) []domain.MutationResult
 	Pull(ctx context.Context, accountID string, afterSeq int64, limit int, watermark string, now time.Time) (domain.PullPage, error)
-	// ListPartTypes returns the fixed part-type catalog (server manifest),
-	// ordered by display_order. It is the single source of truth clients
-	// reconcile against instead of hardcoding their own UUIDs.
-	ListPartTypes(ctx context.Context) ([]domain.PartType, error)
+	// ListPartTypes returns the global part-type catalog plus accountID's own
+	// custom rows, ordered with globals first. It is the single source of
+	// truth clients reconcile against instead of hardcoding their own UUIDs.
+	ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error)
 }
 
 // SessionStore persists login sessions. It is owned by the Redis adapter.

@@ -15,6 +15,7 @@ beforeEach(async () => {
     plateNumber: null,
     archivedAt: null,
     deletedAt: null,
+    dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
     receivedAtServer: null,
     serverSeq: null,

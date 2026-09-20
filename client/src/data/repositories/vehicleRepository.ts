@@ -21,6 +21,7 @@ export async function createVehicle(input: {
     plateNumber,
     archivedAt: null,
     deletedAt: null,
+    dueSoonRatio: null,
     createdAtClient: now,
     receivedAtServer: null,
     serverSeq: null,
@@ -53,6 +54,15 @@ async function writeVehiclePatch(accountId: string, id: string, patch: Partial<V
 }
 
 export function updateVehicle(accountId: string, id: string, patch: Partial<Pick<Vehicle, 'name' | 'plateNumber'>>): Promise<void> {
+  return writeVehiclePatch(accountId, id, patch)
+}
+
+/** Sheet "Cài đặt xe" — sửa tên/biển số/ngưỡng cảnh báo cùng lúc (feedback Feature #1). */
+export function updateVehicleDetails(
+  accountId: string,
+  id: string,
+  patch: Partial<Pick<Vehicle, 'name' | 'plateNumber' | 'dueSoonRatio'>>,
+): Promise<void> {
   return writeVehiclePatch(accountId, id, patch)
 }
 

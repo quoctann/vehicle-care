@@ -1,5 +1,6 @@
 export * from './fuelRepository'
 export * from './odometerRepository'
+export * from './partTypeRepository'
 export * from './reminderRepository'
 export * from './serviceRepository'
 export * from './vehicleRepository'

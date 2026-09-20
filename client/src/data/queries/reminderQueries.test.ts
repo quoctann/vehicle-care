@@ -18,6 +18,7 @@ async function seedVehicle() {
     plateNumber: null,
     archivedAt: null,
     deletedAt: null,
+    dueSoonRatio: null,
     createdAtClient: '2026-01-01T00:00:00.000Z',
     receivedAtServer: null,
     serverSeq: null,
@@ -32,6 +33,10 @@ async function seedPartType() {
     displayOrder: 1,
     active: true,
     seedVersion: 1,
+    accountId: null,
+    createdAtClient: '2026-01-01T00:00:00.000Z',
+    receivedAtServer: null,
+    serverSeq: null,
   })
 }
 

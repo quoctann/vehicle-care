@@ -185,6 +185,27 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 		PlateNumber:      nullString(payload, "plate_number"),
 		ArchivedAt:       archivedAt,
 		DeletedAt:        deletedAt,
+		DueSoonRatio:     nullNumericString(payload, "due_soon_ratio"),
+		ServerSeq:        seq,
+		ReceivedAtServer: receivedAt,
+	}, nil
+}
+
+// buildUpsertPartTypeParams decodes a validated part_type payload into UPSERT
+// parameters. Unlike other entities, the payload IS the full snapshot the
+// client itself built (code == entityID, enforced in validateMutation) —
+// nothing here is server-derived, so change_feed replay to other devices
+// reconstructs the full row from the payload alone (see
+// .docs/20260919-feedback.md Feature #2).
+func buildUpsertPartTypeParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertPartTypeParams, error) {
+	return sqlcgen.UpsertPartTypeParams{
+		ID:               entityID,
+		AccountID:        &accountID,
+		Code:             stringValue(payload, "code"),
+		NameVi:           stringValue(payload, "name_vi"),
+		DisplayOrder:     int32(numberValue(payload, "display_order")),
+		Active:           boolValue(payload, "active"),
+		SeedVersion:      stringValue(payload, "seed_version"),
 		ServerSeq:        seq,
 		ReceivedAtServer: receivedAt,
 	}, nil
@@ -237,14 +258,18 @@ func buildInsertOdometerLogParams(accountID, entityID string, payload map[string
 	}, nil
 }
 
-// buildInsertFuelLogParams decodes a validated fuel_log payload into INSERT
+// buildUpsertFuelLogParams decodes a validated fuel_log payload into UPSERT
 // parameters.
-func buildInsertFuelLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.InsertFuelLogParams, error) {
+func buildUpsertFuelLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertFuelLogParams, error) {
 	recordedAt, err := requiredTime(payload, "recorded_at")
 	if err != nil {
-		return sqlcgen.InsertFuelLogParams{}, err
+		return sqlcgen.UpsertFuelLogParams{}, err
 	}
-	return sqlcgen.InsertFuelLogParams{
+	deletedAt, err := nullTime(payload, "deleted_at")
+	if err != nil {
+		return sqlcgen.UpsertFuelLogParams{}, err
+	}
+	return sqlcgen.UpsertFuelLogParams{
 		AccountID:        accountID,
 		ID:               entityID,
 		VehicleID:        stringValue(payload, "vehicle_id"),
@@ -255,19 +280,24 @@ func buildInsertFuelLogParams(accountID, entityID string, payload map[string]any
 		Note:             nullString(payload, "note"),
 		OdometerLogID:    nullStringPtr(payload, "odometer_log_id"),
 		IsFullTank:       boolValue(payload, "is_full_tank"),
+		DeletedAt:        deletedAt,
 		ServerSeq:        seq,
 		ReceivedAtServer: receivedAt,
 	}, nil
 }
 
-// buildInsertServiceLogParams decodes a validated service_log payload into
-// INSERT parameters.
-func buildInsertServiceLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.InsertServiceLogParams, error) {
+// buildUpsertServiceLogParams decodes a validated service_log payload into
+// UPSERT parameters.
+func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertServiceLogParams, error) {
 	servicedAt, err := requiredTime(payload, "serviced_at")
 	if err != nil {
-		return sqlcgen.InsertServiceLogParams{}, err
+		return sqlcgen.UpsertServiceLogParams{}, err
 	}
-	return sqlcgen.InsertServiceLogParams{
+	deletedAt, err := nullTime(payload, "deleted_at")
+	if err != nil {
+		return sqlcgen.UpsertServiceLogParams{}, err
+	}
+	return sqlcgen.UpsertServiceLogParams{
 		AccountID:          accountID,
 		ID:                 entityID,
 		VehicleID:          stringValue(payload, "vehicle_id"),
@@ -276,6 +306,7 @@ func buildInsertServiceLogParams(accountID, entityID string, payload map[string]
 		OdometerKmSnapshot: nullNumericString(payload, "odometer_km_snapshot"),
 		CostVnd:            nullInt64FromNumber(payload, "cost_vnd"),
 		Note:               nullString(payload, "note"),
+		DeletedAt:          deletedAt,
 		ServerSeq:          seq,
 		ReceivedAtServer:   receivedAt,
 	}, nil

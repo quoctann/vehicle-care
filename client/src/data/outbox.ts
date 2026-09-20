@@ -50,6 +50,8 @@ export async function countPendingOutboxForAccount(accountId: string): Promise<n
           return (await db.fuelLogs.get(item.entityId))?.accountId === accountId
         case 'service_log':
           return (await db.serviceLogs.get(item.entityId))?.accountId === accountId
+        case 'part_type':
+          return (await db.partTypes.get(item.entityId))?.accountId === accountId
       }
     }),
   )

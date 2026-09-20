@@ -11,61 +11,22 @@ import (
 	"time"
 )
 
-const findServiceLog = `-- name: FindServiceLog :one
-SELECT server_seq, received_at_server FROM service_logs WHERE account_id = $1 AND id = $2
+const lockServiceLogForUpdate = `-- name: LockServiceLogForUpdate :one
+SELECT server_seq FROM service_logs WHERE account_id = $1 AND id = $2 FOR UPDATE
 `
 
-type FindServiceLogParams struct {
+type LockServiceLogForUpdateParams struct {
 	AccountID string `json:"account_id"`
 	ID        string `json:"id"`
 }
 
-type FindServiceLogRow struct {
-	ServerSeq        int64     `json:"server_seq"`
-	ReceivedAtServer time.Time `json:"received_at_server"`
-}
-
-// A sql.ErrNoRows result means this append-only log has not been applied
-// yet (not a duplicate).
-func (q *Queries) FindServiceLog(ctx context.Context, arg FindServiceLogParams) (FindServiceLogRow, error) {
-	row := q.db.QueryRowContext(ctx, findServiceLog, arg.AccountID, arg.ID)
-	var i FindServiceLogRow
-	err := row.Scan(&i.ServerSeq, &i.ReceivedAtServer)
-	return i, err
-}
-
-const insertServiceLog = `-- name: InsertServiceLog :exec
-INSERT INTO service_logs (account_id, id, vehicle_id, part_type_id, serviced_at, odometer_km_snapshot, cost_vnd, note, server_seq, received_at_server)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-`
-
-type InsertServiceLogParams struct {
-	AccountID          string         `json:"account_id"`
-	ID                 string         `json:"id"`
-	VehicleID          string         `json:"vehicle_id"`
-	PartTypeID         string         `json:"part_type_id"`
-	ServicedAt         time.Time      `json:"serviced_at"`
-	OdometerKmSnapshot sql.NullString `json:"odometer_km_snapshot"`
-	CostVnd            sql.NullInt64  `json:"cost_vnd"`
-	Note               sql.NullString `json:"note"`
-	ServerSeq          int64          `json:"server_seq"`
-	ReceivedAtServer   time.Time      `json:"received_at_server"`
-}
-
-func (q *Queries) InsertServiceLog(ctx context.Context, arg InsertServiceLogParams) error {
-	_, err := q.db.ExecContext(ctx, insertServiceLog,
-		arg.AccountID,
-		arg.ID,
-		arg.VehicleID,
-		arg.PartTypeID,
-		arg.ServicedAt,
-		arg.OdometerKmSnapshot,
-		arg.CostVnd,
-		arg.Note,
-		arg.ServerSeq,
-		arg.ReceivedAtServer,
-	)
-	return err
+// Row lock used to serialize concurrent mutations of the same service log. A
+// sql.ErrNoRows result means the log has no current snapshot yet.
+func (q *Queries) LockServiceLogForUpdate(ctx context.Context, arg LockServiceLogForUpdateParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, lockServiceLogForUpdate, arg.AccountID, arg.ID)
+	var server_seq int64
+	err := row.Scan(&server_seq)
+	return server_seq, err
 }
 
 const serviceLogExists = `-- name: ServiceLogExists :one
@@ -84,4 +45,48 @@ func (q *Queries) ServiceLogExists(ctx context.Context, arg ServiceLogExistsPara
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const upsertServiceLog = `-- name: UpsertServiceLog :exec
+INSERT INTO service_logs (account_id, id, vehicle_id, part_type_id, serviced_at, odometer_km_snapshot, cost_vnd, note, deleted_at, server_seq, received_at_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (account_id, id) DO UPDATE
+  SET serviced_at = EXCLUDED.serviced_at,
+      odometer_km_snapshot = EXCLUDED.odometer_km_snapshot,
+      cost_vnd = EXCLUDED.cost_vnd,
+      note = EXCLUDED.note,
+      deleted_at = EXCLUDED.deleted_at,
+      server_seq = EXCLUDED.server_seq,
+      received_at_server = EXCLUDED.received_at_server
+`
+
+type UpsertServiceLogParams struct {
+	AccountID          string         `json:"account_id"`
+	ID                 string         `json:"id"`
+	VehicleID          string         `json:"vehicle_id"`
+	PartTypeID         string         `json:"part_type_id"`
+	ServicedAt         time.Time      `json:"serviced_at"`
+	OdometerKmSnapshot sql.NullString `json:"odometer_km_snapshot"`
+	CostVnd            sql.NullInt64  `json:"cost_vnd"`
+	Note               sql.NullString `json:"note"`
+	DeletedAt          sql.NullTime   `json:"deleted_at"`
+	ServerSeq          int64          `json:"server_seq"`
+	ReceivedAtServer   time.Time      `json:"received_at_server"`
+}
+
+func (q *Queries) UpsertServiceLog(ctx context.Context, arg UpsertServiceLogParams) error {
+	_, err := q.db.ExecContext(ctx, upsertServiceLog,
+		arg.AccountID,
+		arg.ID,
+		arg.VehicleID,
+		arg.PartTypeID,
+		arg.ServicedAt,
+		arg.OdometerKmSnapshot,
+		arg.CostVnd,
+		arg.Note,
+		arg.DeletedAt,
+		arg.ServerSeq,
+		arg.ReceivedAtServer,
+	)
+	return err
 }

@@ -1,5 +1,8 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { HistoryTimeline } from "@/components/history/HistoryTimeline";
+import type { HistoryEntry } from "@/data/queries/historyQueries";
+import { deleteFuelLog, deleteServiceLog } from "@/data/repositories";
 import { useHistoryEntries } from "@/hooks/useHistory";
 import { useSessionStore } from "@/stores/useSessionStore";
 import { useTranslation } from "react-i18next";
@@ -7,9 +10,26 @@ import { useTranslation } from "react-i18next";
 export function HistoryPage() {
   const { t } = useTranslation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
+  const navigate = useNavigate();
   const account = useSessionStore((state) => state.account);
   const timezone = account?.timezone ?? "UTC";
   const entries = useHistoryEntries(account?.id, vehicleId);
+
+  function handleEdit(entry: HistoryEntry) {
+    navigate(`/v/${vehicleId}/log-entry/${entry.kind}/${entry.id}`);
+  }
+
+  async function handleDelete(entry: HistoryEntry) {
+    if (!account) return;
+    try {
+      if (entry.kind === "fuel") await deleteFuelLog(account.id, entry.id);
+      else await deleteServiceLog(account.id, entry.id);
+      toast.success(t('history.deletedToast'));
+    } catch (error) {
+      toast.error(t('history.deleteFailed'));
+      throw error;
+    }
+  }
 
   return (
     // min-h-0 + overflow-y-auto: AppShell's <main> là overflow-hidden nên page phải
@@ -24,7 +44,7 @@ export function HistoryPage() {
             {t('history.title')}
           </h1>
         </header>
-        <HistoryTimeline entries={entries} timezone={timezone} />
+        <HistoryTimeline entries={entries} timezone={timezone} onEdit={handleEdit} onDelete={handleDelete} />
       </div>
     </main>
   );

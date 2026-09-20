@@ -11,6 +11,7 @@ import { HistoryPage } from '@/pages/HistoryPage'
 import { HomePage } from '@/pages/HomePage'
 import { LogEntryPage } from '@/pages/LogEntryPage'
 import { AddVehiclePage } from '@/pages/onboarding/AddVehiclePage'
+import { PartTypesPage } from '@/pages/PartTypesPage'
 import { RemindersPage } from '@/pages/RemindersPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequireAuth } from './RequireAuth'
@@ -34,7 +35,9 @@ export function AppRouter() {
           <Route path="/v/:vehicleId/history" element={<HistoryPage />} />
           <Route path="/v/:vehicleId/costs" element={<CostsPage />} />
           <Route path="/v/:vehicleId/log-entry" element={<LogEntryPage />} />
+          <Route path="/v/:vehicleId/log-entry/:kind/:entryId" element={<LogEntryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/part-types" element={<PartTypesPage />} />
           <Route path="/onboarding/add-vehicle" element={<AddVehiclePage />} />
         </Route>
       </Route>

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Archive, Car, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, Car, Plus, RotateCcw, Settings, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EditVehicleSheet } from "@/components/sheets/EditVehicleSheet";
 import type { Vehicle } from "@/domain/types";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 
@@ -11,6 +12,7 @@ type PendingAction = { kind: "archive" | "delete"; vehicle: Vehicle } | null;
 export function GarageList({
   vehicles,
   activeVehicleId,
+  accountId,
   onOpen,
   onAdd,
   onArchive,
@@ -19,6 +21,7 @@ export function GarageList({
 }: {
   vehicles: Vehicle[];
   activeVehicleId: string | null;
+  accountId: string;
   onOpen: (vehicle: Vehicle) => void;
   onAdd: () => void;
   onArchive: (vehicle: Vehicle) => Promise<void>;
@@ -28,6 +31,7 @@ export function GarageList({
   const { t } = useTranslation();
   const [pending, setPending] = useState<PendingAction>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
   async function restore(vehicle: Vehicle) {
     setBusyId(vehicle.id);
@@ -140,6 +144,15 @@ export function GarageList({
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={t('vehicle.settingsLabel', { name: vehicle.name })}
+                    disabled={busyId === vehicle.id}
+                    onClick={() => setEditingVehicle(vehicle)}
+                  >
+                    <Settings />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     className="text-destructive hover:text-destructive"
                     aria-label={t('settings.deleteVehicleLabel', { name: vehicle.name })}
                     disabled={busyId === vehicle.id}
@@ -173,6 +186,14 @@ export function GarageList({
         busy={pending != null && busyId === pending.vehicle.id}
         onOpenChange={(open) => !open && setPending(null)}
         onConfirm={() => void confirm()}
+      />
+
+      <EditVehicleSheet
+        key={editingVehicle?.id ?? "none"}
+        open={editingVehicle != null}
+        onOpenChange={(open) => !open && setEditingVehicle(null)}
+        accountId={accountId}
+        vehicle={editingVehicle}
       />
     </section>
   );

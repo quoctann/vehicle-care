@@ -30,13 +30,14 @@ func (q *Queries) LockVehicleForUpdate(ctx context.Context, arg LockVehicleForUp
 }
 
 const upsertVehicle = `-- name: UpsertVehicle :exec
-INSERT INTO vehicles (account_id, id, name, plate_number, archived_at, deleted_at, server_seq, received_at_server)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO vehicles (account_id, id, name, plate_number, archived_at, deleted_at, due_soon_ratio, server_seq, received_at_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (account_id, id) DO UPDATE
   SET name = EXCLUDED.name,
       plate_number = EXCLUDED.plate_number,
       archived_at = EXCLUDED.archived_at,
       deleted_at = EXCLUDED.deleted_at,
+      due_soon_ratio = EXCLUDED.due_soon_ratio,
       server_seq = EXCLUDED.server_seq,
       received_at_server = EXCLUDED.received_at_server
 `
@@ -48,6 +49,7 @@ type UpsertVehicleParams struct {
 	PlateNumber      sql.NullString `json:"plate_number"`
 	ArchivedAt       sql.NullTime   `json:"archived_at"`
 	DeletedAt        sql.NullTime   `json:"deleted_at"`
+	DueSoonRatio     sql.NullString `json:"due_soon_ratio"`
 	ServerSeq        int64          `json:"server_seq"`
 	ReceivedAtServer time.Time      `json:"received_at_server"`
 }
@@ -60,6 +62,7 @@ func (q *Queries) UpsertVehicle(ctx context.Context, arg UpsertVehicleParams) er
 		arg.PlateNumber,
 		arg.ArchivedAt,
 		arg.DeletedAt,
+		arg.DueSoonRatio,
 		arg.ServerSeq,
 		arg.ReceivedAtServer,
 	)

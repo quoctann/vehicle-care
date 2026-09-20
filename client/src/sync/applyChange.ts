@@ -3,6 +3,7 @@ import { db } from '@/data/db'
 import {
   fuelLogFieldsFromPayload,
   odometerLogFieldsFromPayload,
+  partTypeFieldsFromPayload,
   reminderConfigFieldsFromPayload,
   serviceLogFieldsFromPayload,
   vehicleFieldsFromPayload,
@@ -109,47 +110,73 @@ async function applyEntityChange(
     }
     case 'fuel_log': {
       const existing = await db.fuelLogs.get(entityId)
-      if (existing) {
-        if (existing.accountId !== accountId) throw new Error(`Fuel log ${entityId} belongs to another account`)
-        if (existing.serverSeq == null || existing.serverSeq < serverSeq) {
-          await db.fuelLogs.update(entityId, { serverSeq, receivedAtServer })
-        }
-        return
-      }
       const fields = fuelLogFieldsFromPayload(payload)
       await assertReferencedVehicle(accountId, fields.vehicleId)
-      await db.fuelLogs.put({
-        id: entityId,
-        accountId,
-        ...fields,
-        createdAtClient: receivedAtServer,
-        serverSeq,
-        receivedAtServer,
-      })
+      if (!existing) {
+        await db.fuelLogs.put({
+          id: entityId,
+          accountId,
+          ...fields,
+          createdAtClient: receivedAtServer,
+          serverSeq,
+          receivedAtServer,
+        })
+      } else {
+        if (existing.accountId !== accountId) throw new Error(`Fuel log ${entityId} belongs to another account`)
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        await db.fuelLogs.update(entityId, {
+          ...fields,
+          serverSeq,
+          receivedAtServer,
+        })
+      }
       return
     }
     case 'service_log': {
       const existing = await db.serviceLogs.get(entityId)
-      if (existing) {
-        if (existing.accountId !== accountId) throw new Error(`Service log ${entityId} belongs to another account`)
-        if (existing.serverSeq == null || existing.serverSeq < serverSeq) {
-          await db.serviceLogs.update(entityId, {
-            serverSeq,
-            receivedAtServer,
-          })
-        }
-        return
-      }
       const fields = serviceLogFieldsFromPayload(payload)
       await assertReferencedVehicle(accountId, fields.vehicleId)
-      await db.serviceLogs.put({
-        id: entityId,
-        accountId,
-        ...fields,
-        createdAtClient: receivedAtServer,
-        serverSeq,
-        receivedAtServer,
-      })
+      if (!existing) {
+        await db.serviceLogs.put({
+          id: entityId,
+          accountId,
+          ...fields,
+          createdAtClient: receivedAtServer,
+          serverSeq,
+          receivedAtServer,
+        })
+      } else {
+        if (existing.accountId !== accountId) throw new Error(`Service log ${entityId} belongs to another account`)
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        await db.serviceLogs.update(entityId, {
+          ...fields,
+          serverSeq,
+          receivedAtServer,
+        })
+      }
+      return
+    }
+    case 'part_type': {
+      const existing = await db.partTypes.get(entityId)
+      const fields = partTypeFieldsFromPayload(payload)
+      if (!existing) {
+        await db.partTypes.put({
+          id: entityId,
+          accountId,
+          ...fields,
+          createdAtClient: receivedAtServer,
+          serverSeq,
+          receivedAtServer,
+        })
+      } else {
+        if (existing.accountId != null && existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        await db.partTypes.update(entityId, {
+          ...fields,
+          serverSeq,
+          receivedAtServer,
+        })
+      }
       return
     }
   }
@@ -161,7 +188,7 @@ async function applyEntityChange(
  * cập nhật `syncMeta` cùng lúc — xem ghi chú trong `outbox.ts`).
  */
 export async function applyPulledChange(change: PullChange, accountId: string): Promise<void> {
-  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs], async () => {
+  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
     await applyEntityChange(accountId, change.entity_type, change.entity_id, change.payload, change.server_seq, change.received_at_server)
   })
 }
@@ -182,7 +209,7 @@ export async function applyServerSnapshotToEntity(
   receivedAtServer: string,
   accountId: string,
 ): Promise<void> {
-  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs], async () => {
+  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
     await applyEntityChange(accountId, entityType, entityId, snapshotPayload, serverSeq, receivedAtServer)
   })
 }

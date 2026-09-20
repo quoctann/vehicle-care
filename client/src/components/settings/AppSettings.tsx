@@ -1,6 +1,7 @@
-import { Gauge, Moon, Ruler, ShieldCheck, SunMoon } from "lucide-react";
+import { ChevronRight, Gauge, Moon, Ruler, ShieldCheck, SunMoon, Wrench } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -9,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { DUE_SOON_REMAINING_RATIO } from "@/domain/constants";
 import { PREFERENCE_KEYS, useLocalStoragePreference } from "./preferences";
 import { SyncStatusBadge } from "./SyncStatusBadge";
 
@@ -55,8 +55,6 @@ export function AppSettings() {
     PREFERENCE_KEYS.units,
     "km",
   );
-  const dueSoonPercent = Math.round(DUE_SOON_REMAINING_RATIO * 100);
-
   return (
     <div className="space-y-5">
       <section>
@@ -64,15 +62,11 @@ export function AppSettings() {
           {t('settings.reminders')}
         </h2>
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
-          <SettingsRow
-            icon={ShieldCheck}
-            title={t('settings.warnAhead')}
-            description={t('settings.warnAheadDescription')}
-          >
-            <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-              {t('settings.remainingPercent', { value: dueSoonPercent })}
-            </span>
-          </SettingsRow>
+          <Link to="/settings/part-types" className="block transition hover:bg-muted/50">
+            <SettingsRow icon={Wrench} title={t('partType.title')} description={t('partType.settingsRowDescription')}>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </SettingsRow>
+          </Link>
           <SettingsRow
             icon={Gauge}
             title={t('settings.askOdometer')}

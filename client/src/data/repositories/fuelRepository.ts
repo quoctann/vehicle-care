@@ -60,6 +60,7 @@ export async function addFuelLog(input: {
     note: input.note,
     odometerLogId: odometerLog?.id ?? null,
     isFullTank: input.isFullTank,
+    deletedAt: null,
     createdAtClient: now,
     receivedAtServer: null,
     serverSeq: null,
@@ -86,4 +87,36 @@ export async function addFuelLog(input: {
   })
 
   return { fuelLog, odometerLog }
+}
+
+async function writeFuelLogPatch(accountId: string, id: string, patch: Partial<FuelLog>): Promise<void> {
+  await db.transaction('rw', db.fuelLogs, db.outbox, async () => {
+    const current = await db.fuelLogs.get(id)
+    if (!current || current.accountId !== accountId) throw new Error(`Fuel log not found: ${id}`)
+    const updated: FuelLog = { ...current, ...patch }
+    await db.fuelLogs.put(updated)
+    await enqueueMutation({
+      entityType: 'fuel_log',
+      operation: 'update',
+      entityId: id,
+      payload: fuelLogToPayload(updated),
+    })
+  })
+}
+
+/** Sửa 1 lần đổ xăng đã ghi (feedback Feature #3) — không cho đổi `vehicleId`. */
+export function updateFuelLog(
+  accountId: string,
+  id: string,
+  patch: Partial<Pick<FuelLog, 'recordedAt' | 'liters' | 'costVnd' | 'shop' | 'note' | 'isFullTank'>>,
+): Promise<void> {
+  if (patch.liters != null && (!Number.isFinite(patch.liters) || patch.liters <= 0)) throw new Error('Fuel amount must be positive.')
+  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Fuel cost cannot be negative.')
+  if (patch.recordedAt && Number.isNaN(Date.parse(patch.recordedAt))) throw new Error('Recorded time is invalid.')
+  return writeFuelLogPatch(accountId, id, patch)
+}
+
+/** Tombstone — không xóa vật lý (nhất quán với `vehicleRepository.deleteVehicle`). */
+export function deleteFuelLog(accountId: string, id: string): Promise<void> {
+  return writeFuelLogPatch(accountId, id, { deletedAt: new Date().toISOString() })
 }

@@ -3,11 +3,19 @@ SELECT EXISTS (
     SELECT 1 FROM service_logs WHERE account_id = $1 AND id = $2
 );
 
--- name: FindServiceLog :one
--- A sql.ErrNoRows result means this append-only log has not been applied
--- yet (not a duplicate).
-SELECT server_seq, received_at_server FROM service_logs WHERE account_id = $1 AND id = $2;
+-- name: LockServiceLogForUpdate :one
+-- Row lock used to serialize concurrent mutations of the same service log. A
+-- sql.ErrNoRows result means the log has no current snapshot yet.
+SELECT server_seq FROM service_logs WHERE account_id = $1 AND id = $2 FOR UPDATE;
 
--- name: InsertServiceLog :exec
-INSERT INTO service_logs (account_id, id, vehicle_id, part_type_id, serviced_at, odometer_km_snapshot, cost_vnd, note, server_seq, received_at_server)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+-- name: UpsertServiceLog :exec
+INSERT INTO service_logs (account_id, id, vehicle_id, part_type_id, serviced_at, odometer_km_snapshot, cost_vnd, note, deleted_at, server_seq, received_at_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (account_id, id) DO UPDATE
+  SET serviced_at = EXCLUDED.serviced_at,
+      odometer_km_snapshot = EXCLUDED.odometer_km_snapshot,
+      cost_vnd = EXCLUDED.cost_vnd,
+      note = EXCLUDED.note,
+      deleted_at = EXCLUDED.deleted_at,
+      server_seq = EXCLUDED.server_seq,
+      received_at_server = EXCLUDED.received_at_server;

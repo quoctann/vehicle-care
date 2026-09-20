@@ -7,11 +7,10 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// ListPartTypes returns the fixed part-type catalog ordered by display_order.
-// It is a plain read with no transaction: part_types is static reference
-// data shared by all accounts, not per-account state.
-func (s *Store) ListPartTypes(ctx context.Context) ([]domain.PartType, error) {
-	rows, err := s.queries.ListPartTypes(ctx)
+// ListPartTypes returns the global part-type catalog plus accountID's own
+// custom rows. It is a plain read with no transaction.
+func (s *Store) ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error) {
+	rows, err := s.queries.ListPartTypes(ctx, &accountID)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list part types: %w", err)
 	}
@@ -24,6 +23,7 @@ func (s *Store) ListPartTypes(ctx context.Context) ([]domain.PartType, error) {
 			DisplayOrder: row.DisplayOrder,
 			Active:       row.Active,
 			SeedVersion:  row.SeedVersion,
+			AccountID:    row.AccountID,
 		})
 	}
 	return partTypes, nil

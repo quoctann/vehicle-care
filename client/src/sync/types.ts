@@ -8,10 +8,11 @@ import { db } from '@/data/db'
  * `entityType` -> Dexie table, và danh sách entity mutable (LWW).
  */
 
-/** 2 entity mutable cần `base_server_seq` khi push và có thể nhận `conflict_resolved`.
- * Log (odometer_log/fuel_log/service_log) append-only, không nằm trong danh sách này
- * (dedupe theo id, không bao giờ conflict — decision.md mục 3.4). */
-const MUTABLE_ENTITY_TYPES: ReadonlySet<SyncEntityType> = new Set(['vehicle', 'reminder_config'])
+/** Entity mutable cần `base_server_seq` khi push và có thể nhận `conflict_resolved`.
+ * `fuel_log`/`service_log` sửa/xoá được (feedback Feature #3) nên cũng mutable —
+ * chỉ `odometer_log` còn append-only thật (dedupe theo id, không bao giờ conflict —
+ * decision.md mục 3.4; sửa/xoá số km sẽ ảnh hưởng baseline_odometer_km của reminder). */
+const MUTABLE_ENTITY_TYPES: ReadonlySet<SyncEntityType> = new Set(['vehicle', 'reminder_config', 'fuel_log', 'service_log', 'part_type'])
 
 export function isMutableEntityType(entityType: SyncEntityType): boolean {
   return MUTABLE_ENTITY_TYPES.has(entityType)
@@ -30,6 +31,8 @@ export function entityTable(entityType: SyncEntityType) {
       return db.fuelLogs
     case 'service_log':
       return db.serviceLogs
+    case 'part_type':
+      return db.partTypes
   }
 }
 
@@ -59,6 +62,9 @@ export async function updateEntitySyncMeta(
       return
     case 'service_log':
       await db.serviceLogs.update(entityId, { serverSeq, receivedAtServer })
+      return
+    case 'part_type':
+      await db.partTypes.update(entityId, { serverSeq, receivedAtServer })
       return
   }
 }

@@ -53,7 +53,7 @@ export async function pullChanges(accountId: string): Promise<void> {
     validatePage(response, afterSeq, watermark)
     watermark ??= response.watermark
 
-    await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.syncMeta], async () => {
+    await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes, db.syncMeta], async () => {
       for (const change of response.changes) {
         await applyPulledChange(change, accountId)
       }

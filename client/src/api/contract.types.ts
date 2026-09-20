@@ -43,7 +43,7 @@ export type RegisterDeviceResponse = { device_id: string; registered_at: string 
 
 // ────────────────────────────── Sync (D2, D4) ──────────────────────────────
 
-export type SyncEntityType = 'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log'
+export type SyncEntityType = 'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log' | 'part_type'
 export type SyncOperation = 'create' | 'update'
 
 export type PushMutation = {
@@ -108,7 +108,7 @@ export type PullResponse = {
 
 // ────────────────────────── Part type catalog (2.14) ──────────────────────────
 
-/** KHÔNG phải sync entity (không qua push/pull) — danh mục tĩnh dùng chung mọi account. */
+/** Entity mutable thật (đi qua push/pull như vehicle) — null = danh mục global dùng chung. */
 export type PartTypeDto = {
   id: string
   code: string
@@ -116,6 +116,7 @@ export type PartTypeDto = {
   display_order: number
   active: boolean
   seed_version: string
+  account_id: string | null
 }
 
 export type PartTypesResponse = { part_types: PartTypeDto[] }

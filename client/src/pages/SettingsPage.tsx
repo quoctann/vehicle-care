@@ -141,6 +141,7 @@ export function SettingsPage() {
           <GarageList
             vehicles={vehicles}
             activeVehicleId={activeVehicleId}
+            accountId={account.id}
             onOpen={(vehicle) => {
               if (vehicle.archivedAt == null) {
                 selectVehicle(vehicle.id);

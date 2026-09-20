@@ -1,4 +1,3 @@
-import { DUE_SOON_REMAINING_RATIO } from './constants'
 import { daysBetweenCalendarDates, toCalendarDateInTimezone } from './datetime'
 import type {
   IanaTimezone,
@@ -27,6 +26,8 @@ export type CalculateReminderStatusInput = {
   lastServiceLog: LastServiceLogInput
   now: IsoDateTime
   accountTimezone: IanaTimezone
+  /** Ngưỡng "sắp đến hạn" — caller truyền `vehicle.dueSoonRatio ?? DUE_SOON_REMAINING_RATIO` (feedback #Feature-1, per-vehicle thay vì hardcode toàn hệ thống). */
+  dueSoonRatio: number
 }
 
 /**
@@ -40,7 +41,8 @@ export type CalculateReminderStatusInput = {
  *   khi odometer bị nhập lệch thứ tự hoặc thấp hơn baseline (D-01/D-02).
  * - `overdue` nếu MỘT TRONG HAI điều kiện (km/ngày) đã cấu hình vượt chu kỳ.
  * - `due_soon` nếu không overdue và MỘT TRONG HAI điều kiện còn lại ≤10% chu kỳ
- *   (hằng số hệ thống `DUE_SOON_REMAINING_RATIO`, KHÔNG cấu hình theo từng reminder — D-04).
+ *   (ngưỡng theo từng XE — `dueSoonRatio` ở input, fallback `DUE_SOON_REMAINING_RATIO`
+ *   nếu xe chưa tùy chỉnh; không cấu hình theo từng reminder riêng lẻ).
  * - `insufficient_data` CHỈ khi MỌI điều kiện đã cấu hình đều thiếu dữ liệu cần thiết
  *   — 1 điều kiện thiếu dữ liệu không chặn việc đánh giá điều kiện còn lại.
  * - `enabled=false` KHÔNG phải 1 giá trị của status này — đó là filter ở tầng
@@ -49,7 +51,7 @@ export type CalculateReminderStatusInput = {
 export function calculateReminderStatus(
   input: CalculateReminderStatusInput,
 ): ReminderCalculationResult {
-  const { config, currentOdometerKm, lastServiceLog, now, accountTimezone } = input
+  const { config, currentOdometerKm, lastServiceLog, now, accountTimezone, dueSoonRatio } = input
 
   const hasKmCondition = config.intervalKm != null && config.intervalKm > 0
   const hasDayCondition = config.intervalDays != null && config.intervalDays > 0
@@ -107,7 +109,7 @@ export function calculateReminderStatus(
       ? 'insufficient_data'
       : (km && km.remaining <= 0) || (days && days.remainingDays <= 0)
         ? 'overdue'
-        : (km && km.ratioUsed >= DUE_SOON_REMAINING_RATIO) || (days && days.ratioUsed >= DUE_SOON_REMAINING_RATIO)
+        : (km && km.ratioUsed >= dueSoonRatio) || (days && days.ratioUsed >= dueSoonRatio)
           ? 'due_soon'
           : 'not_due'
 
