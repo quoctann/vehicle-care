@@ -1,4 +1,5 @@
-import type { FuelLog, OdometerLog, ReminderConfig, ServiceLog, Vehicle } from '@/domain/types'
+import type { PartTypeDto } from '@/api/contract.types'
+import type { FuelLog, OdometerLog, PartType, ReminderConfig, ServiceLog, Vehicle } from '@/domain/types'
 
 /**
  * Domain object (camelCase, dùng nội bộ app/Dexie) → wire payload (snake_case,
@@ -170,6 +171,25 @@ export function fuelLogFieldsFromPayload(
     note: nullableString(payload, 'note'),
     odometerLogId: nullableString(payload, 'odometer_log_id'),
     isFullTank: typeof payload.is_full_tank === 'boolean' ? payload.is_full_tank : false,
+  }
+}
+
+/**
+ * `PartTypeDto` (wire, `GET /part-types` — xem `contract.types.ts` mục 2.14) →
+ * `PartType` (domain). Khác các hàm `*FieldsFromPayload` ở trên vì nguồn là response
+ * JSON đã typed (không phải `Record<string, unknown>` từ change-feed) nên không cần
+ * validate runtime lại. `seed_version` server là chuỗi (`"v1"`, `"v2"`, ...) còn domain
+ * `PartType.seedVersion` là số — lấy phần số, mặc định 1 nếu không parse được.
+ */
+export function partTypeFromDto(dto: PartTypeDto): PartType {
+  const seedVersion = Number(dto.seed_version.replace(/^v/, ''))
+  return {
+    id: dto.id,
+    code: dto.code,
+    displayName: dto.name_vi,
+    displayOrder: dto.display_order,
+    active: dto.active,
+    seedVersion: Number.isFinite(seedVersion) ? seedVersion : 1,
   }
 }
 

@@ -68,6 +68,7 @@ func (s *Server) routes() {
 	authenticated.Use(s.requireSession())
 	authenticated.GET("/auth/session", s.getSession)
 	authenticated.GET("/sync/pull", s.pull)
+	authenticated.GET("/part-types", s.listPartTypes)
 
 	protected := authenticated.Group("")
 	protected.Use(s.requireCSRF())

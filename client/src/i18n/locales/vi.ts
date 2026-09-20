@@ -16,6 +16,8 @@ export const vi = {
       yourEmail: 'email của bạn',
       comingSoon: 'Đang triển khai...',
       unknownError: 'Đã có lỗi xảy ra. Vui lòng thử lại.',
+      updateAvailable: 'Đã có bản cập nhật mới',
+      update: 'Cập nhật',
     },
     auth: {
       appName: 'Nhắc bảo dưỡng xe',

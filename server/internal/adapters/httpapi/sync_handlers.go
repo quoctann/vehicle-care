@@ -43,6 +43,19 @@ func (s *Server) push(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
+// listPartTypes returns the fixed part-type catalog. Clients use this as the
+// single source of truth for part_type IDs instead of hardcoding their own
+// (see .docs/20260919-feedback.md #1 — the previous mismatch caused
+// reminder_configs/service_logs FK violations on sync push).
+func (s *Server) listPartTypes(c *gin.Context) {
+	partTypes, err := s.service.ListPartTypes(c.Request.Context())
+	if err != nil {
+		s.writeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"part_types": partTypes})
+}
+
 func (s *Server) pull(c *gin.Context) {
 	afterSeq, err := strconv.ParseInt(c.DefaultQuery("after_seq", "0"), 10, 64)
 	if err != nil {

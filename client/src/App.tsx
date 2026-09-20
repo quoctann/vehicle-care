@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { ThemeColorSync } from '@/components/theme/ThemeColorSync'
 import { Toaster } from '@/components/ui/sonner'
-import { seedPartTypes } from '@/data/seed'
+import { refreshPartTypesFromServer, seedPartTypes } from '@/data/seed'
 import { AppRouter } from '@/routes/router'
 import { startAutoSync } from '@/sync/autoSync'
 import { useSessionStore } from '@/stores/useSessionStore'
@@ -15,6 +15,8 @@ export default function App() {
     hydrate()
     // Idempotent (bulkPut theo id cố định) — an toàn gọi lại mỗi lần app khởi động.
     seedPartTypes()
+    // Best-effort: đồng bộ lại từ server (nguồn sự thật duy nhất cho UUID part_type).
+    void refreshPartTypesFromServer()
   }, [hydrate])
 
   useEffect(() => startAutoSync(), [])

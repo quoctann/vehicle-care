@@ -59,3 +59,16 @@ type PullPage struct {
 	Watermark  string
 	HasMore    bool
 }
+
+// PartType is one entry of the fixed vehicle-part catalog. It is read-only
+// from the client: the server manifest is the single source of truth for
+// IDs, so the client always reconciles its local cache against this list
+// instead of hardcoding its own UUIDs (see .docs/20260919-feedback.md #1).
+type PartType struct {
+	ID           string `json:"id"`
+	Code         string `json:"code"`
+	NameVI       string `json:"name_vi"`
+	DisplayOrder int32  `json:"display_order"`
+	Active       bool   `json:"active"`
+	SeedVersion  string `json:"seed_version"`
+}

@@ -22,14 +22,18 @@ type AccountStore interface {
 	SetPassword(ctx context.Context, accountID string, passwordHash []byte) error
 }
 
-// SyncStore persists devices and the push/pull changefeed. It is owned by the
-// PostgreSQL adapter.
+// SyncStore persists devices and the push/pull changefeed, and serves the
+// read-only part type catalog. It is owned by the PostgreSQL adapter.
 type SyncStore interface {
 	RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error)
 	DeviceRegistered(ctx context.Context, accountID, deviceID string) bool
 	EntityExists(ctx context.Context, accountID, entityType, entityID string) bool
 	ApplyMutations(ctx context.Context, accountID, deviceID string, mutations []domain.Mutation, now time.Time) []domain.MutationResult
 	Pull(ctx context.Context, accountID string, afterSeq int64, limit int, watermark string, now time.Time) (domain.PullPage, error)
+	// ListPartTypes returns the fixed part-type catalog (server manifest),
+	// ordered by display_order. It is the single source of truth clients
+	// reconcile against instead of hardcoding their own UUIDs.
+	ListPartTypes(ctx context.Context) ([]domain.PartType, error)
 }
 
 // SessionStore persists login sessions. It is owned by the Redis adapter.

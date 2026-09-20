@@ -248,6 +248,26 @@ Client chỉ nâng `last_seen_seq` cục bộ = `next_cursor` SAU KHI đã lưu 
 `changes` của trang đó trong 1 local transaction — lỗi giữa chừng thì rollback,
 `last_seen_seq` giữ nguyên, lần pull sau tự động lấy lại từ chỗ cũ.
 
+### 2.14. `GET /part-types`
+
+```json
+// Response 200
+{
+  "part_types": [
+    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1" }
+  ]
+}
+```
+
+Danh mục `part_type` cố định, dùng chung mọi account — KHÔNG phải entity trong change-feed
+(không có `server_seq`/`operation`, không qua `sync/push`/`sync/pull`). Đây là nguồn sự
+thật DUY NHẤT cho `part_type_id` mà client dùng khi tạo `reminder_config`/`service_log`
+— client KHÔNG được tự sinh/hardcode UUID riêng cho danh mục này (xem
+`.docs/20260919-feedback.md` mục 1: UUID lệch giữa 2 phía từng gây lỗi FK
+`reminder_configs_part_type_id_fkey` khi push). Client gọi endpoint này (best-effort,
+sau khi có session) rồi cache lại local; trả về TOÀN BỘ bản ghi kể cả `active=false` —
+client tự lọc theo `active` khi hiển thị picker tạo log/reminder mới.
+
 ## 3. Error model (D6)
 
 Mọi lỗi 4xx/5xx trả cùng envelope:

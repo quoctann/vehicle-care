@@ -106,6 +106,20 @@ export type PullResponse = {
   server_time: string
 }
 
+// ────────────────────────── Part type catalog (2.14) ──────────────────────────
+
+/** KHÔNG phải sync entity (không qua push/pull) — danh mục tĩnh dùng chung mọi account. */
+export type PartTypeDto = {
+  id: string
+  code: string
+  name_vi: string
+  display_order: number
+  active: boolean
+  seed_version: string
+}
+
+export type PartTypesResponse = { part_types: PartTypeDto[] }
+
 // ──────────────────────────────── Errors (D6) ────────────────────────────────
 
 export type ApiErrorCode =

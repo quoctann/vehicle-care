@@ -4,6 +4,7 @@ import type {
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
+  PartTypesResponse,
   PullResponse,
   PushRequest,
   PushResponse,
@@ -77,6 +78,11 @@ export function resetPassword(req: ResetPasswordRequest): Promise<ResetPasswordR
 /** Gọi 1 lần lúc app khởi động để biết còn phiên hợp lệ hay không (ném ApiError 401 nếu không). */
 export function getSession(): Promise<SessionResponse> {
   return request('GET', '/auth/session')
+}
+
+/** Danh mục part_type — nguồn sự thật duy nhất cho UUID, xem `contract.types.ts` mục 2.14. */
+export function listPartTypes(): Promise<PartTypesResponse> {
+  return request('GET', '/part-types')
 }
 
 export function logout(): Promise<void> {
