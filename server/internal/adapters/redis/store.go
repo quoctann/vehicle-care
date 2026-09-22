@@ -6,11 +6,13 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
-	"github.com/quoctann/vehicle-care/server/internal/ports"
+	"github.com/quoctann/vehicle-care/server/internal/application/user"
 )
 
-// Store is the Redis-backed implementation of ports.SessionStore,
-// ports.TokenStore, and ports.OAuthStateStore.
+// Store is the Redis-backed implementation of user.SessionStore,
+// user.TokenStore, and httpapi.OAuthStateStore. It doesn't self-check the
+// last one: that would make this package import the httpapi adapter, so
+// the check lives at the composition root (cmd/api/main.go) instead.
 type Store struct {
 	client *goredis.Client
 }
@@ -29,7 +31,6 @@ func (s *Store) Ping(ctx context.Context) error {
 }
 
 var (
-	_ ports.SessionStore    = (*Store)(nil)
-	_ ports.TokenStore      = (*Store)(nil)
-	_ ports.OAuthStateStore = (*Store)(nil)
+	_ user.ISessionStore = (*Store)(nil)
+	_ user.ITokenStore   = (*Store)(nil)
 )

@@ -1,4 +1,4 @@
-package application
+package datasync
 
 import (
 	"context"
@@ -34,14 +34,14 @@ func (s *Service) validateMutation(ctx context.Context, accountID string, mutati
 		if code != mutation.EntityID {
 			return "validation_failed", "part_type code must equal its id for custom entries."
 		}
-		if mutation.Operation == "update" && !s.store.EntityExists(ctx, accountID, "part_type", mutation.EntityID) {
+		if mutation.Operation == "update" && !s.deps.EntityExists(ctx, accountID, "part_type", mutation.EntityID) {
 			return "ownership_invalid", "Part type does not belong to this account."
 		}
 		return "", ""
 	}
 	if mutation.EntityType != "vehicle" {
 		vehicleID, _ := mutation.Payload["vehicle_id"].(string)
-		if !s.store.EntityExists(ctx, accountID, "vehicle", vehicleID) {
+		if !s.deps.EntityExists(ctx, accountID, "vehicle", vehicleID) {
 			return "ownership_invalid", "Vehicle does not belong to this account."
 		}
 	}

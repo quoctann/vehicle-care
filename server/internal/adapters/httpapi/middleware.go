@@ -18,7 +18,7 @@ func (s *Server) requireSession() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		session, account, err := s.service.ResolveSession(c.Request.Context(), sessionID)
+		session, account, err := s.userService.ResolveSession(c.Request.Context(), sessionID)
 		if err != nil {
 			s.writeError(c, err)
 			c.Abort()

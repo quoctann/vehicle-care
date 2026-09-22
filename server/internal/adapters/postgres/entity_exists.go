@@ -7,10 +7,10 @@ import (
 )
 
 // EntityExists reports whether an entity snapshot belongs to an account. It
-// is used by application.Service to validate vehicle ownership before a
+// is used by datasync.Service to validate vehicle ownership before a
 // mutation is applied, so an unexpected database error is treated as "does
 // not exist" (fail closed) rather than surfaced, matching this method's
-// bool-only signature in ports.SyncStore.
+// bool-only signature.
 func (s *Store) EntityExists(ctx context.Context, accountID, entityType, entityID string) bool {
 	switch entityType {
 	case "vehicle":

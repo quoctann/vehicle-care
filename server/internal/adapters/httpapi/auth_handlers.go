@@ -15,7 +15,7 @@ func (s *Server) signup(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	account, sessionID, csrfToken, _, err := s.service.Signup(c.Request.Context(), request.Email, request.Password, request.Name)
+	account, sessionID, csrfToken, _, err := s.userService.Signup(c.Request.Context(), request.Email, request.Password, request.Name)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -32,7 +32,7 @@ func (s *Server) login(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	account, sessionID, csrfToken, err := s.service.Login(c.Request.Context(), request.Email, request.Password)
+	account, sessionID, csrfToken, err := s.userService.Login(c.Request.Context(), request.Email, request.Password)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -48,7 +48,7 @@ func (s *Server) verifyEmail(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	if err := s.service.VerifyEmail(c.Request.Context(), request.Token); err != nil {
+	if err := s.userService.VerifyEmail(c.Request.Context(), request.Token); err != nil {
 		s.writeError(c, err)
 		return
 	}
@@ -62,7 +62,7 @@ func (s *Server) resendVerification(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	_, _, err := s.service.CreateVerificationToken(c.Request.Context(), request.Email)
+	_, _, err := s.userService.CreateVerificationToken(c.Request.Context(), request.Email)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -77,7 +77,7 @@ func (s *Server) forgotPassword(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	_, _, err := s.service.CreateResetToken(c.Request.Context(), request.Email)
+	_, _, err := s.userService.CreateResetToken(c.Request.Context(), request.Email)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -93,7 +93,7 @@ func (s *Server) resetPassword(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	if err := s.service.ResetPassword(c.Request.Context(), request.Token, request.NewPassword); err != nil {
+	if err := s.userService.ResetPassword(c.Request.Context(), request.Token, request.NewPassword); err != nil {
 		s.writeError(c, err)
 		return
 	}
@@ -110,7 +110,7 @@ func (s *Server) getSession(c *gin.Context) {
 }
 
 func (s *Server) logout(c *gin.Context) {
-	if err := s.service.Logout(c.Request.Context(), c.GetString(sessionIDKey)); err != nil {
+	if err := s.userService.Logout(c.Request.Context(), c.GetString(sessionIDKey)); err != nil {
 		s.writeError(c, err)
 		return
 	}

@@ -8,7 +8,7 @@ import (
 
 // TestTokensExpireAndNewTokenInvalidatesPrevious ports
 // memory.TestTokensExpireAndNewTokenInvalidatesPrevious against the Redis
-// adapter, since ports.TokenStore contracts must behave identically
+// adapter, since the token store contract must behave identically
 // regardless of backing store.
 func TestTokensExpireAndNewTokenInvalidatesPrevious(t *testing.T) {
 	store := newTestStore(t)

@@ -143,7 +143,7 @@ func (s *Store) refreshSessionValue(ctx context.Context, sessionID string, newEx
 
 // GetAndRefreshSession atomically reads a session and slides its expiry to
 // newExpiresAt in a single round trip to Redis (via GetEx). now is part of
-// the ports.SessionStore contract but unused here: Redis's own key TTL is
+// the user.SessionStore contract but unused here: Redis's own key TTL is
 // the source of truth for expiration, so there is nothing left for a
 // separately-passed "now" to check.
 func (s *Store) GetAndRefreshSession(ctx context.Context, sessionID string, _ time.Time, newExpiresAt time.Time) (domain.Session, bool, error) {

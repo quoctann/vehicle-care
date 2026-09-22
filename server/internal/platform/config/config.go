@@ -10,9 +10,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Database holds PostgreSQL connection parameters. The connection string is
-// built from these fields (see DSN) instead of being read as a single
-// preassembled URL from the environment.
 type Database struct {
 	Host     string `env:"DB_HOST,required"`
 	Port     int    `env:"DB_PORT" envDefault:"5432"`
@@ -36,7 +33,6 @@ func (d Database) DSN() string {
 	return u.String()
 }
 
-// Config contains runtime settings for the API process.
 type Config struct {
 	Environment         string        `env:"APP_ENV" envDefault:"development"`
 	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`

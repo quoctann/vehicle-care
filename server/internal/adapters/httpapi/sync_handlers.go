@@ -18,7 +18,7 @@ func (s *Server) registerDevice(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	registeredAt, err := s.service.RegisterDevice(c.Request.Context(), mustAccount(c).ID, request.DeviceID)
+	registeredAt, err := s.userService.RegisterDevice(c.Request.Context(), mustAccount(c).ID, request.DeviceID)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -35,7 +35,7 @@ func (s *Server) push(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
-	results, err := s.service.Push(c.Request.Context(), mustAccount(c).ID, request.DeviceID, request.APIVersion, request.Mutations)
+	results, err := s.datasyncService.Push(c.Request.Context(), mustAccount(c).ID, request.DeviceID, request.APIVersion, request.Mutations)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -48,7 +48,7 @@ func (s *Server) push(c *gin.Context) {
 // (see .docs/20260919-feedback.md #1 — the previous mismatch caused
 // reminder_configs/service_logs FK violations on sync push).
 func (s *Server) listPartTypes(c *gin.Context) {
-	partTypes, err := s.service.ListPartTypes(c.Request.Context(), mustAccount(c).ID)
+	partTypes, err := s.datasyncService.ListPartTypes(c.Request.Context(), mustAccount(c).ID)
 	if err != nil {
 		s.writeError(c, err)
 		return
@@ -67,7 +67,7 @@ func (s *Server) pull(c *gin.Context) {
 		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "limit is invalid.", false)
 		return
 	}
-	page, err := s.service.Pull(c.Request.Context(), mustAccount(c).ID, afterSeq, limit, c.Query("watermark"))
+	page, err := s.datasyncService.Pull(c.Request.Context(), mustAccount(c).ID, afterSeq, limit, c.Query("watermark"))
 	if err != nil {
 		s.writeError(c, err)
 		return
