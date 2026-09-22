@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
+	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
-	"github.com/quoctann/vehicle-care/server/internal/ports"
 )
 
 const pgUniqueViolation = "23505"
@@ -36,7 +36,7 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 		PasswordHash:  account.PasswordHash,
 	}); err != nil {
 		if isUniqueViolation(err, "accounts_email_unique") {
-			return ports.ErrAccountExists
+			return user.ErrAccountExists
 		}
 		return fmt.Errorf("postgres: insert account: %w", err)
 	}
@@ -52,7 +52,7 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 // AccountByEmail looks up an account using citext's built-in
 // case-insensitive comparison.
 //
-// ports.AccountStore does not carry an error return here (the in-memory
+// This method's signature does not carry an error return (the in-memory
 // reference adapter never fails), so an unexpected database error is
 // reported the same way as "not found": callers cannot tell the two apart
 // through this method. That is an existing limitation of the interface,

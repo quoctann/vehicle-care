@@ -13,30 +13,26 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/adapters/httpapi"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	redisadapter "github.com/quoctann/vehicle-care/server/internal/adapters/redis"
-	"github.com/quoctann/vehicle-care/server/internal/application"
+	"github.com/quoctann/vehicle-care/server/internal/application/datasync"
+	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/platform/config"
 	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
-	"github.com/quoctann/vehicle-care/server/internal/ports"
 	"go.uber.org/zap"
 )
 
-// Store composes the PostgreSQL adapter (accounts, devices, sync
-// changefeed) and the Redis adapter (sessions, tokens) into the single
-// ports.Store the application layer depends on. Struct embedding promotes
-// each adapter's methods directly; the two adapters share no method names.
-// Both concrete types happen to be named "Store" in their own packages, so
-// each is embedded through a local alias to give it a distinct field name.
 type (
 	postgresStore = postgres.Store
 	sessionStore  = redisadapter.Store
 )
 
-type Store struct {
+type Datasource struct {
 	*postgresStore
 	*sessionStore
 }
 
-var _ ports.Store = (*Store)(nil)
+var _ user.IDependencies = (*Datasource)(nil)
+var _ datasync.IDependencies = (*Datasource)(nil)
+var _ httpapi.IOAuthStateStore = (*redisadapter.Store)(nil)
 
 func main() {
 	cfg, err := config.Load()
@@ -50,17 +46,25 @@ func main() {
 	}
 	defer func() { _ = logger.Sync() }()
 
-	store, pingers, closeStore, err := buildStore(context.Background(), cfg)
+	source, pingers, close, err := buildDatasource(context.Background(), cfg)
 	if err != nil {
-		logger.Fatal("build store", zap.Error(err))
+		logger.Fatal("init datasource", zap.Error(err))
 	}
-	defer closeStore()
+	defer close()
 
-	service := application.NewService(store, cfg.SessionTTL, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize)
-	api := httpapi.New(service, cfg, logger, pingers...)
+	svc := &httpapi.Service{
+		User:     user.NewService(source, cfg.SessionTTL),
+		DataSync: datasync.NewService(source, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize),
+	}
+	api := httpapi.New(svc, cfg, logger, pingers...)
 	server := &http.Server{
-		Addr: cfg.Address(), Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20,
+		Addr:              cfg.Address(),
+		Handler:           api.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {
@@ -80,19 +84,23 @@ func main() {
 	}
 }
 
-// buildStore constructs the PostgreSQL + Redis backing store. It returns the
-// store, the set of dependencies /health/ready should ping, and a cleanup
-// func that releases any connections opened here.
-func buildStore(ctx context.Context, cfg config.Config) (ports.Store, []httpapi.Pinger, func(), error) {
+func buildDatasource(ctx context.Context, cfg config.Config) (*Datasource, []httpapi.IPinger, func(), error) {
 	pgStore, err := postgres.New(ctx, cfg.Database.DSN())
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	redisClient, err := redisadapter.NewClient(redisadapter.Options{
-		Addr: cfg.RedisAddr, Password: cfg.RedisPassword, DB: cfg.RedisDB, TLSEnabled: cfg.RedisTLSEnabled,
-		DialTimeout: cfg.RedisDialTimeout, ReadTimeout: cfg.RedisReadTimeout, WriteTimeout: cfg.RedisWriteTimeout,
-		PoolSize: cfg.RedisPoolSize, MinIdleConns: cfg.RedisMinIdleConns, MaxRetries: cfg.RedisMaxRetries,
+		Addr:         cfg.RedisAddr,
+		Password:     cfg.RedisPassword,
+		DB:           cfg.RedisDB,
+		TLSEnabled:   cfg.RedisTLSEnabled,
+		DialTimeout:  cfg.RedisDialTimeout,
+		ReadTimeout:  cfg.RedisReadTimeout,
+		WriteTimeout: cfg.RedisWriteTimeout,
+		PoolSize:     cfg.RedisPoolSize,
+		MinIdleConns: cfg.RedisMinIdleConns,
+		MaxRetries:   cfg.RedisMaxRetries,
 	})
 	if err != nil {
 		_ = pgStore.Close()
@@ -100,11 +108,14 @@ func buildStore(ctx context.Context, cfg config.Config) (ports.Store, []httpapi.
 	}
 	redisStore := redisadapter.NewStore(redisClient)
 
-	store := &Store{postgresStore: pgStore, sessionStore: redisStore}
-	closeStore := func() {
+	datasource := &Datasource{
+		postgresStore: pgStore,
+		sessionStore:  redisStore,
+	}
+	closeFn := func() {
 		_ = pgStore.Close()
 		_ = redisClient.Close()
 	}
 
-	return store, []httpapi.Pinger{pgStore, redisStore}, closeStore, nil
+	return datasource, []httpapi.IPinger{pgStore, redisStore}, closeFn, nil
 }

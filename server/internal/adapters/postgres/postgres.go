@@ -1,5 +1,6 @@
-// Package postgres implements ports.AccountStore and ports.SyncStore on top
-// of PostgreSQL. sqlx owns connection setup and transaction orchestration;
+// Package postgres implements the account and sync storage ports (see
+// application/user.Dependencies and application/datasync.Dependencies) on
+// top of PostgreSQL. sqlx owns connection setup and transaction orchestration;
 // sqlc (internal/adapters/postgres/sqlcgen) owns typed, generated queries
 // that never cross this package boundary.
 package postgres
@@ -14,6 +15,8 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
+	"github.com/quoctann/vehicle-care/server/internal/application/datasync"
+	"github.com/quoctann/vehicle-care/server/internal/application/user"
 )
 
 // Pool tuning defaults. These are conservative values for a single API
@@ -26,11 +29,17 @@ const (
 	defaultConnMaxIdleTime = 5 * time.Minute
 )
 
-// Store implements ports.AccountStore and ports.SyncStore.
+// Store implements the account and sync storage ports consumed by the user
+// and datasync application services.
 type Store struct {
 	db      *sqlx.DB
 	queries *sqlcgen.Queries
 }
+
+var (
+	_ user.IAccountStore     = (*Store)(nil)
+	_ datasync.IDependencies = (*Store)(nil)
+)
 
 // New opens a PostgreSQL connection pool for dsn and verifies connectivity
 // with a ping before returning.

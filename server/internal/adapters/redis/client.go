@@ -1,5 +1,5 @@
 // Package redis provides the Redis-backed implementation of
-// ports.SessionStore, ports.TokenStore, and ports.OAuthStateStore.
+// user.SessionStore, user.TokenStore, and httpapi.OAuthStateStore.
 package redis
 
 import (

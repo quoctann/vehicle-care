@@ -45,7 +45,7 @@ func (s *Store) CreateToken(ctx context.Context, kind, token, accountID string, 
 // for that kind never existed), matching the memory store's explicit
 // kind-mismatch check. Redis's own TTL is the source of truth for
 // expiration, so now is unused here — it stays in the signature only to
-// satisfy ports.TokenStore.
+// satisfy user.TokenStore.
 func (s *Store) ConsumeToken(ctx context.Context, kind, token string, _ time.Time) (string, bool, error) {
 	key := tokenKey(kind, tokenHash(token))
 	accountID, err := s.client.GetDel(ctx, key).Result()
