@@ -200,7 +200,7 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 func buildUpsertPartTypeParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertPartTypeParams, error) {
 	return sqlcgen.UpsertPartTypeParams{
 		ID:               entityID,
-		AccountID:        &accountID,
+		AccountID:        accountID,
 		Code:             stringValue(payload, "code"),
 		NameVi:           stringValue(payload, "name_vi"),
 		DisplayOrder:     int32(numberValue(payload, "display_order")),

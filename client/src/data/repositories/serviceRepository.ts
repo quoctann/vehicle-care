@@ -45,7 +45,8 @@ export async function addServiceLog(input: {
   }
   await db.transaction('rw', db.vehicles, db.partTypes, db.serviceLogs, db.outbox, async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
-    if (!(await db.partTypes.get(input.partTypeId))) throw new Error('Unknown part type.')
+    const partType = await db.partTypes.get(input.partTypeId)
+    if (!partType || partType.accountId !== input.accountId || !partType.active) throw new Error('Unknown or inactive part type.')
     await db.serviceLogs.add(log)
     await enqueueMutation({
       entityType: 'service_log',
@@ -58,9 +59,13 @@ export async function addServiceLog(input: {
 }
 
 async function writeServiceLogPatch(accountId: string, id: string, patch: Partial<ServiceLog>): Promise<void> {
-  await db.transaction('rw', db.serviceLogs, db.outbox, async () => {
+  await db.transaction('rw', db.partTypes, db.serviceLogs, db.outbox, async () => {
     const current = await db.serviceLogs.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Service log not found: ${id}`)
+    if (patch.partTypeId && patch.partTypeId !== current.partTypeId) {
+      const partType = await db.partTypes.get(patch.partTypeId)
+      if (!partType || partType.accountId !== accountId || !partType.active) throw new Error('Unknown or inactive part type.')
+    }
     const updated: ServiceLog = { ...current, ...patch }
     await db.serviceLogs.put(updated)
     await enqueueMutation({

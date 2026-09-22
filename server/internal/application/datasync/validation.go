@@ -25,16 +25,25 @@ func (s *Service) validateMutation(ctx context.Context, accountID string, mutati
 	// is a single-column PK (unlike every other mutable entity's composite
 	// (account_id, id) PK), so ownership can't be inferred structurally —
 	// check it explicitly instead of falling into the generic vehicle_id
-	// check below. "code" doubling as the row's own id (enforced here) is
-	// what keeps the global UNIQUE(code) constraint collision-free for
-	// custom rows without a schema change (see .docs/20260919-feedback.md
-	// Feature #2).
+	// check below.
 	if mutation.EntityType == "part_type" {
-		code, _ := mutation.Payload["code"].(string)
-		if code != mutation.EntityID {
-			return "validation_failed", "part_type code must equal its id for custom entries."
+		if mutation.Operation == "create" {
+			// "code" doubling as the row's own id (enforced here, create only)
+			// is a cheap way to keep the UNIQUE(account_id, code) constraint
+			// collision-free for custom rows without an extra existence/
+			// uniqueness query: a fresh client-generated UUID as code can't
+			// collide with anything (see .docs/20260919-feedback.md
+			// Feature #2). Seeded rows (code like "engine_oil", id a random
+			// uuid) never go through create — only update — so this must not
+			// apply there, or renaming/toggling a seeded row would always
+			// fail validation.
+			code, _ := mutation.Payload["code"].(string)
+			if code != mutation.EntityID {
+				return "validation_failed", "part_type code must equal its id for custom entries."
+			}
+			return "", ""
 		}
-		if mutation.Operation == "update" && !s.deps.EntityExists(ctx, accountID, "part_type", mutation.EntityID) {
+		if !s.deps.EntityExists(ctx, accountID, "part_type", mutation.EntityID) {
 			return "ownership_invalid", "Part type does not belong to this account."
 		}
 		return "", ""
@@ -43,6 +52,17 @@ func (s *Service) validateMutation(ctx context.Context, accountID string, mutati
 		vehicleID, _ := mutation.Payload["vehicle_id"].(string)
 		if !s.deps.EntityExists(ctx, accountID, "vehicle", vehicleID) {
 			return "ownership_invalid", "Vehicle does not belong to this account."
+		}
+	}
+	if mutation.EntityType == "reminder_config" || mutation.EntityType == "service_log" {
+		partTypeID, _ := mutation.Payload["part_type_id"].(string)
+		if !s.deps.EntityExists(ctx, accountID, "part_type", partTypeID) {
+			return "ownership_invalid", "Part type does not belong to this account."
+		}
+		keepsExistingReference := mutation.Operation == "update" &&
+			s.deps.EntityReferencesPartType(ctx, accountID, mutation.EntityType, mutation.EntityID, partTypeID)
+		if !keepsExistingReference && !s.deps.PartTypeActive(ctx, accountID, partTypeID) {
+			return "validation_failed", "Part type is inactive."
 		}
 	}
 	return "", ""

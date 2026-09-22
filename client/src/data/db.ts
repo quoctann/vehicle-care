@@ -99,6 +99,27 @@ class VehicleMaintenanceDb extends Dexie {
     this.version(3).stores({
       partTypes: 'id, &code, active, accountId',
     })
+    // v4: bỏ tầng global seed dùng chung — mỗi account giờ có bộ part_types riêng,
+    // NHIỀU account có thể cùng `code` (vd "engine_oil"), nên `code` không còn unique
+    // toàn cục được nữa (server cũng đổi UNIQUE(code) -> UNIQUE(account_id, code), xem
+    // migration part_types_owned_by_account). Giữ &code unique sẽ làm ConstraintError
+    // khi ghi part_types của 1 account thứ 2 trùng code với account khác đã có sẵn
+    // trong Dexie, làm cả transaction bị abort và không ghi được gì.
+    this.version(4).stores({
+      partTypes: 'id, &[accountId+code], active, accountId',
+    })
+    // v5: remove the old account-less catalog. Those rows predate per-account
+    // part types and must never leak into an authenticated account's pickers.
+    this.version(5).stores({}).upgrade(async (transaction) => {
+      const partTypes = transaction.table<PartType, string>('partTypes')
+      const legacyIds = (await partTypes.toArray())
+        .filter((partType) => !partType.accountId)
+        .map((partType) => partType.id)
+      if (legacyIds.length === 0) return
+
+      await partTypes.bulkDelete(legacyIds)
+      await transaction.table<OutboxItem, string>('outbox').where('entityId').anyOf(legacyIds).delete()
+    })
   }
 }
 

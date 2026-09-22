@@ -131,4 +131,46 @@ describe('pushOutbox', () => {
     expect(await db.vehicles.get('vehicle-stale')).toMatchObject({ serverSeq: 10 })
     expect(await db.outbox.get('mutation-stale')).toMatchObject({ status: 'pending' })
   })
+
+  it('keeps a server-rejected mutation visible for user action', async () => {
+    await db.vehicles.put({
+      id: 'vehicle-rejected',
+      accountId: 'account-1',
+      name: 'Rejected',
+      plateNumber: null,
+      archivedAt: null,
+      deletedAt: null,
+      dueSoonRatio: null,
+      createdAtClient: '2026-09-17T09:00:00.000Z',
+      receivedAtServer: null,
+      serverSeq: null,
+    })
+    await db.outbox.add({
+      mutationId: 'mutation-rejected',
+      entityType: 'vehicle',
+      operation: 'create',
+      entityId: 'vehicle-rejected',
+      payload: { name: 'Rejected' },
+      status: 'pending',
+      retryCount: 0,
+      lastError: null,
+      createdAt: '2026-09-17T10:01:00.000Z',
+    })
+    vi.mocked(api.pushMutations).mockResolvedValue({
+      results: [{
+        mutation_id: 'mutation-rejected',
+        status: 'rejected',
+        error_code: 'validation_failed',
+        error_message: 'Invalid vehicle',
+        retryable: false,
+      }],
+    })
+
+    await pushOutbox('device-1', 'account-1')
+
+    expect(await db.outbox.get('mutation-rejected')).toMatchObject({
+      status: 'rejected',
+      lastError: 'Invalid vehicle',
+    })
+  })
 })

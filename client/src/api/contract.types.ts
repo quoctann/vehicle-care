@@ -108,7 +108,16 @@ export type PullResponse = {
 
 // ────────────────────────── Part type catalog (2.14) ──────────────────────────
 
-/** Entity mutable thật (đi qua push/pull như vehicle) — null = danh mục global dùng chung. */
+/**
+ * Entity mutable thật (đi qua push/pull như vehicle) — luôn thuộc về một account.
+ * `server_seq`/`received_at_server` BẮT BUỘC có ở đây (khác các REST bootstrap khác) —
+ * thiếu 2 field này khiến client coi mọi dòng bootstrap qua endpoint này là "chưa từng
+ * thấy từ server" (`serverSeq: null`), làm `push.ts` gửi lại MỌI lần sửa dưới dạng
+ * `operation: "create"` thay vì `"update"` — mà `create` bắt buộc `code === id`, điều
+ * không bao giờ đúng với hạng mục seed (`code` kiểu `"engine_oil"`, `id` là UUID) → mọi
+ * lần sửa hạng mục seed bị server từ chối vĩnh viễn. Đây là bug thật đã xảy ra, không phải
+ * giả định — xem `partTypeFromDto`.
+ */
 export type PartTypeDto = {
   id: string
   code: string
@@ -116,7 +125,9 @@ export type PartTypeDto = {
   display_order: number
   active: boolean
   seed_version: string
-  account_id: string | null
+  account_id: string
+  server_seq: number
+  received_at_server: string
 }
 
 export type PartTypesResponse = { part_types: PartTypeDto[] }

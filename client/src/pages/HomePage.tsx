@@ -26,8 +26,12 @@ export function HomePage() {
     return <div className="p-6 text-sm text-muted-foreground">{t('vehicle.chooseDashboard')}</div>
   }
 
-  const overdue = reminders.filter((reminder) => reminder.result.status === 'overdue')
-  const dueSoon = reminders.filter((reminder) => reminder.result.status === 'due_soon')
+  // Hạng mục đã tắt (partType.active === false) không còn được user theo dõi — không nhắc
+  // nữa dù ReminderConfig cũ vẫn còn (không auto-xoá/pause, xem setPartTypeActive), tránh
+  // nhắc nhở "ma" cho thứ user đã chủ động ẩn khỏi picker.
+  const activeReminders = reminders.filter((reminder) => reminder.partType.active)
+  const overdue = activeReminders.filter((reminder) => reminder.result.status === 'overdue')
+  const dueSoon = activeReminders.filter((reminder) => reminder.result.status === 'due_soon')
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

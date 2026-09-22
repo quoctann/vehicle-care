@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 /**
  * Layout dùng chung mọi màn auth (không có trong design.html — tự thiết kế theo
- * cùng ngôn ngữ thị giác: card trắng bo góc, border nhẹ, font Archivo).
+ * cùng ngôn ngữ thị giác: card trắng bo góc, border nhẹ).
  */
 export function AuthLayout({
   title,

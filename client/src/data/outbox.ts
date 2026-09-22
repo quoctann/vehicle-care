@@ -35,10 +35,10 @@ export function countPendingOutbox(): Promise<number> {
   return db.outbox.where('status').equals('pending' satisfies OutboxStatus).count()
 }
 
-export async function countPendingOutboxForAccount(accountId: string): Promise<number> {
-  const pending = await listPendingOutbox(Number.MAX_SAFE_INTEGER)
+async function countOutboxForAccount(accountId: string, statuses: OutboxStatus[]): Promise<number> {
+  const rows = (await Promise.all(statuses.map((status) => db.outbox.where('status').equals(status).toArray()))).flat()
   const ownership = await Promise.all(
-    pending.map(async (item) => {
+    rows.map(async (item) => {
       switch (item.entityType) {
         case 'vehicle':
           return (await db.vehicles.get(item.entityId))?.accountId === accountId
@@ -56,6 +56,14 @@ export async function countPendingOutboxForAccount(accountId: string): Promise<n
     }),
   )
   return ownership.filter(Boolean).length
+}
+
+export function countPendingOutboxForAccount(accountId: string): Promise<number> {
+  return countOutboxForAccount(accountId, ['pending'])
+}
+
+export function countUnresolvedOutboxForAccount(accountId: string): Promise<number> {
+  return countOutboxForAccount(accountId, ['pending', 'rejected', 'retryable_error'])
 }
 
 export async function markOutboxApplied(mutationId: string): Promise<void> {

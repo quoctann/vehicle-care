@@ -56,8 +56,7 @@ func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, li
 	return page, nil
 }
 
-// ListPartTypes returns the global part-type catalog plus accountID's own
-// custom rows.
+// ListPartTypes returns the catalog owned by accountID.
 func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error) {
 	return s.deps.ListPartTypes(ctx, accountID)
 }

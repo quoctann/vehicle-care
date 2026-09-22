@@ -75,6 +75,25 @@ func (q *Queries) ReminderConfigExists(ctx context.Context, arg ReminderConfigEx
 	return exists, err
 }
 
+const reminderConfigUsesPartType = `-- name: ReminderConfigUsesPartType :one
+SELECT EXISTS (
+    SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2 AND part_type_id = $3
+)
+`
+
+type ReminderConfigUsesPartTypeParams struct {
+	AccountID  string `json:"account_id"`
+	ID         string `json:"id"`
+	PartTypeID string `json:"part_type_id"`
+}
+
+func (q *Queries) ReminderConfigUsesPartType(ctx context.Context, arg ReminderConfigUsesPartTypeParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, reminderConfigUsesPartType, arg.AccountID, arg.ID, arg.PartTypeID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const upsertReminderConfig = `-- name: UpsertReminderConfig :exec
 INSERT INTO reminder_configs (
     account_id, id, vehicle_id, part_type_id, interval_km, interval_days,

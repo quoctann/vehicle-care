@@ -169,7 +169,7 @@ async function applyEntityChange(
           receivedAtServer,
         })
       } else {
-        if (existing.accountId != null && existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
+        if (existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
         if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
         await db.partTypes.update(entityId, {
           ...fields,

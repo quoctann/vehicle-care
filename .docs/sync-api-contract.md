@@ -254,27 +254,28 @@ Client chỉ nâng `last_seen_seq` cục bộ = `next_cursor` SAU KHI đã lưu 
 // Response 200
 {
   "part_types": [
-    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1", "account_id": null },
+    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1", "account_id": "acc_1" },
     { "id": "b2f1...", "code": "b2f1...", "name_vi": "Phanh đĩa sau (độ)", "display_order": 999, "active": true, "seed_version": "custom", "account_id": "acc_1" }
   ]
 }
 ```
 
-Danh mục `part_type` gồm 2 phần: (1) 10 dòng seed cố định dùng chung mọi account
-(`account_id: null`, KHÔNG sửa/xoá được — client không được tự sinh/hardcode UUID riêng
-cho các dòng này, xem `.docs/20260919-feedback.md` mục 1) và (2) hạng mục tuỳ chỉnh do
-từng account tự tạo (`account_id` = account sở hữu, mục 2 "Yêu cầu new feature" trong
-feedback doc). Endpoint này trả TOÀN BỘ 2 phần gộp lại (kể cả `active=false`) — client tự
-lọc theo `active` khi hiển thị picker. **Khác với Stage 1**: `part_type` giờ LÀ entity
-mutable thật trong change-feed (có `server_seq`, đi qua `sync/push`/`sync/pull` như
-`vehicle`) — endpoint `GET /part-types` vẫn là cách bootstrap/full-refresh, còn tạo/sửa/
-xoá (soft, qua `active`) hạng mục tuỳ chỉnh đi qua `POST /sync/push` với
-`entity_type: "part_type"`. Quy ước bắt buộc: `payload.code` PHẢI bằng chính `entity_id`
-của mutation (server từ chối `validation_failed` nếu sai) — đây là cách tránh đụng độ
-với ràng buộc `UNIQUE(code)` toàn cục mà không cần đổi sang composite/partial unique
-index (vì `entity_id` luôn là UUID mới). Dòng seed (`account_id: null`) không thể bị
-sửa/xoá qua mutation — server chỉ chấp nhận `update` khi `part_type` đó thuộc đúng
-account gửi request (`ownership_invalid` nếu không).
+Không còn khái niệm dòng global dùng chung mọi account. `part_type` LÀ entity mutable
+thật trong change-feed (có `server_seq`, đi qua `sync/push`/`sync/pull` như `vehicle`),
+luôn thuộc về đúng 1 account (`account_id` không bao giờ `null`) — kể cả 10 dòng "mặc
+định" cũng chỉ là dữ liệu được server tự copy vào account lúc signup (transaction cùng
+lúc tạo account), sửa/tắt được y hệt hạng mục tự thêm sau đó. Endpoint này trả TOÀN BỘ
+danh mục của account gọi request (kể cả `active=false`) — client tự lọc theo `active`
+khi hiển thị picker; đây vẫn là cách bootstrap/full-refresh, còn tạo/sửa/xoá (soft, qua
+`active`) đi qua `POST /sync/push` với `entity_type: "part_type"`. Quy ước bắt buộc CHỈ
+áp dụng cho `operation: "create"`: `payload.code` PHẢI bằng chính `entity_id` của mutation
+(server từ chối `validation_failed` nếu sai) — cách này tránh đụng độ với ràng buộc
+`UNIQUE(account_id, code)` mà không cần thêm 1 query kiểm tra riêng (vì `entity_id` luôn
+là UUID mới, không trùng ai). Ràng buộc này KHÔNG áp dụng cho `update` — hạng mục seed có
+`code` (vd `"engine_oil"`) khác hẳn `id` (UUID) và vẫn phải sửa/tắt được bình thường; quy
+tắc "code == entity_id" chỉ có ý nghĩa lúc tạo mới. `UpsertPartType` cũng không cho phép
+đổi `code` qua nhánh update (chỉ `name_vi`/`active` được ghi đè). Server chỉ chấp nhận `update` khi `part_type` đó thuộc
+đúng account gửi request (`ownership_invalid` nếu không).
 
 ## 3. Error model (D6)
 

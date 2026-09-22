@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, Plus, Power, PowerOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -7,24 +6,22 @@ import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PartTypeFormSheet } from '@/components/sheets/PartTypeFormSheet'
-import { db } from '@/data/db'
 import { setPartTypeActive } from '@/data/repositories/partTypeRepository'
 import type { PartType } from '@/domain/types'
+import { usePartTypes } from '@/hooks/usePartTypes'
 import { useSessionStore } from '@/stores/useSessionStore'
 
 export function PartTypesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const accountId = useSessionStore((state) => state.account?.id)
-  const allPartTypes = useLiveQuery(() => db.partTypes.toArray(), [], [])
+  const allPartTypes = usePartTypes(accountId)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingPartType, setEditingPartType] = useState<PartType | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const globalPartTypes = allPartTypes.filter((p) => p.accountId == null).sort((a, b) => a.displayOrder - b.displayOrder)
-  const customPartTypes = allPartTypes
-    .filter((p) => p.accountId === accountId)
-    .sort((a, b) => (a.createdAtClient < b.createdAtClient ? -1 : 1))
+  const partTypes = [...allPartTypes]
+    .sort((a, b) => a.displayOrder - b.displayOrder || (a.createdAtClient < b.createdAtClient ? -1 : 1))
 
   function openCreate() {
     setEditingPartType(null)
@@ -61,63 +58,46 @@ export function PartTypesPage() {
           </div>
         </header>
 
-        <section className="mb-5">
+        <section>
           <div className="mb-2 flex items-center justify-between px-0.5">
-            <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{t('partType.custom')}</h2>
+            <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{t('partType.listHeading')}</h2>
             <Button variant="ghost" size="xs" onClick={openCreate}>
               <Plus /> {t('partType.add')}
             </Button>
           </div>
           <div className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
-            {customPartTypes.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t('partType.emptyCustom')}</p>
-            ) : (
-              customPartTypes.map((partType, index) => (
-                <div
-                  key={partType.id}
-                  className={`flex items-center gap-3 p-4 ${index > 0 ? 'border-t border-border-subtle' : ''}`}
+            {partTypes.map((partType, index) => (
+              <div
+                key={partType.id}
+                className={`flex items-center gap-3 p-4 ${index > 0 ? 'border-t border-border-subtle' : ''}`}
+              >
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(partType)}>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-semibold">{partType.displayName}</span>
+                    {!partType.active ? (
+                      <Badge variant="outline" className="h-5 text-muted-foreground">
+                        {t('partType.disabled')}
+                      </Badge>
+                    ) : null}
+                  </span>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={busyId === partType.id}
+                  onClick={() => void toggleActive(partType)}
+                  className={partType.active ? 'text-destructive hover:text-destructive' : ''}
                 >
-                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openEdit(partType)}>
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-semibold">{partType.displayName}</span>
-                      {!partType.active ? (
-                        <Badge variant="outline" className="h-5 text-muted-foreground">
-                          {t('partType.disabled')}
-                        </Badge>
-                      ) : null}
-                    </span>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyId === partType.id}
-                    onClick={() => void toggleActive(partType)}
-                    className={partType.active ? 'text-destructive hover:text-destructive' : ''}
-                  >
-                    {partType.active ? (
-                      <>
-                        <PowerOff /> {t('partType.disable')}
-                      </>
-                    ) : (
-                      <>
-                        <Power /> {t('partType.enable')}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-2 px-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            {t('partType.default')}
-          </h2>
-          <div className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
-            {globalPartTypes.map((partType, index) => (
-              <div key={partType.id} className={`p-4 ${index > 0 ? 'border-t border-border-subtle' : ''}`}>
-                <span className="text-sm font-medium text-muted-foreground">{partType.displayName}</span>
+                  {partType.active ? (
+                    <>
+                      <PowerOff /> {t('partType.disable')}
+                    </>
+                  ) : (
+                    <>
+                      <Power /> {t('partType.enable')}
+                    </>
+                  )}
+                </Button>
               </div>
             ))}
           </div>

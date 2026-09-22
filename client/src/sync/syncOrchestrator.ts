@@ -1,4 +1,5 @@
 import { db } from '@/data/db'
+import { countUnresolvedOutboxForAccount } from '@/data/outbox'
 import { ApiError } from '@/api/errors'
 import { useSessionStore } from '@/stores/useSessionStore'
 import { useSyncStore } from '@/stores/useSyncStore'
@@ -23,6 +24,11 @@ async function performSync(account: NonNullable<ReturnType<typeof useSessionStor
     assertActiveSyncAccount(accountId)
     await pullChanges(accountId)
     assertActiveSyncAccount(accountId)
+
+    const unresolvedCount = await countUnresolvedOutboxForAccount(accountId)
+    if (unresolvedCount > 0) {
+      throw new Error(`${unresolvedCount} thay đổi chưa được đồng bộ. Hãy kiểm tra và thử lại.`)
+    }
 
     const syncedAt = new Date().toISOString()
     await db.syncMeta.update(accountId, {

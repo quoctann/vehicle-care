@@ -3,6 +3,11 @@ SELECT EXISTS (
     SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2
 );
 
+-- name: ReminderConfigUsesPartType :one
+SELECT EXISTS (
+    SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2 AND part_type_id = $3
+);
+
 -- name: LockReminderConfigForUpdate :one
 -- Row lock used to serialize concurrent mutations of the same reminder
 -- config. A sql.ErrNoRows result means it has no current snapshot yet.

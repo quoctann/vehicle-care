@@ -46,8 +46,8 @@ export function SyncStatusBadge() {
       className="max-w-[11rem] shrink-0"
       disabled={!online || status === 'syncing'}
       onClick={() => void runSync().catch(() => undefined)}
-      title={lastError ? t('sync.errorDetail') : label}
-      aria-label={lastError ? `${label}: ${t('sync.errorDetail')}` : label}
+      title={lastError ?? label}
+      aria-label={lastError ? `${label}: ${lastError}` : label}
       aria-live="polite"
     >
       {icon}

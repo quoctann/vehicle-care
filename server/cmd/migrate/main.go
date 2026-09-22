@@ -1,22 +1,21 @@
 // Command migrate applies, rolls back, and reports the status of PostgreSQL
-// schema migrations, seeds the fixed part_types catalog, and scaffolds new
-// migration files. It is a standalone tool: the API process never runs
-// migrations on startup.
+// schema migrations, and scaffolds new migration files. It is a standalone
+// tool: the API process never runs migrations on startup. part_types are no
+// longer seeded globally — each account gets its own copy at signup (see
+// internal/adapters/postgres/seed.SeedAccountPartTypes).
 //
 // Usage:
 //
 //	go run ./cmd/migrate up
 //	go run ./cmd/migrate down [N]
 //	go run ./cmd/migrate status
-//	go run ./cmd/migrate seed
 //	go run ./cmd/migrate create <name>
 //
-// DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME must be set for up|down|status|
-// seed. create does not touch the database and works offline.
+// DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME must be set for up|down|status.
+// create does not touch the database and works offline.
 package main
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -34,7 +33,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/quoctann/vehicle-care/server/db/migrations"
-	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
 	"github.com/quoctann/vehicle-care/server/internal/platform/config"
 )
 
@@ -51,7 +49,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: migrate up|down [N]|status|seed|create <name>")
+		return errors.New("usage: migrate up|down [N]|status|create <name>")
 	}
 
 	if args[0] == "create" {
@@ -81,10 +79,8 @@ func run(args []string) error {
 		return runDown(db, args[1:])
 	case "status":
 		return runStatus(db)
-	case "seed":
-		return runSeed(db)
 	default:
-		return fmt.Errorf("unknown subcommand %q (want up|down|status|seed|create)", args[0])
+		return fmt.Errorf("unknown subcommand %q (want up|down|status|create)", args[0])
 	}
 }
 
@@ -108,12 +104,7 @@ func newMigrator(db *sql.DB) (*migrate.Migrate, error) {
 }
 
 func runUp(db *sql.DB) error {
-	m, err := newMigrator(db)
-	if err != nil {
-		return err
-	}
-
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	if err := migrations.Up(db); err != nil {
 		return fmt.Errorf("migrate up: %w", err)
 	}
 
@@ -165,17 +156,6 @@ func runStatus(db *sql.DB) error {
 	}
 
 	fmt.Printf("migrate: version=%d dirty=%t\n", version, dirty)
-	return nil
-}
-
-func runSeed(db *sql.DB) error {
-	ctx := context.Background()
-
-	if err := seed.Seed(ctx, db, seed.Manifest); err != nil {
-		return fmt.Errorf("seed part types: %w", err)
-	}
-
-	fmt.Printf("migrate: seeded %d part type(s)\n", len(seed.Manifest))
 	return nil
 }
 

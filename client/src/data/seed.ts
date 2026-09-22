@@ -1,76 +1,68 @@
 import { listPartTypes } from '@/api/client'
-import type { PartType } from '@/domain/types'
-import { partTypeFromDto } from './mappers'
+import { partTypeFromDto, partTypeToPayload } from './mappers'
 import { db } from './db'
-
-/**
- * C2/C3 (implementation-plan-section-5.md): UUID + `code` CỐ ĐỊNH, không sinh lại
- * mỗi lần chạy seed, không đổi khi phát hành. Đây là danh mục MVP đã chốt ở
- * decision.md mục 6.3 — thêm PartType mới sau này thì thêm dòng mới với
- * `seedVersion` tăng lên, KHÔNG sửa dòng đã có.
- *
- * UUID PHẢI khớp CHÍNH XÁC với `server/internal/adapters/postgres/seed/manifest.go`
- * — đây chỉ là baseline bootstrap cho lần mở app đầu tiên khi CHƯA có mạng (trước khi
- * `refreshPartTypesFromServer()` chạy xong lần đầu); server manifest mới là nguồn sự
- * thật duy nhất (xem `.docs/20260919-feedback.md` mục 1 — trước đây 2 file này có
- * `code` giống nhau nhưng UUID lệch nhau, gây lỗi FK `reminder_configs_part_type_id_fkey`
- * khi push mutation).
- */
-export const SEED_VERSION = 1
-
-/** Cố định — KHÔNG dùng `new Date()` ở đây, seed phải idempotent (bulkPut lại y hệt mỗi lần khởi động, xem C3). */
-const SEED_CREATED_AT = '2026-01-01T00:00:00.000Z'
-
-export const PART_TYPE_SEED: PartType[] = [
-  { id: '649e41d9-00f8-4929-b343-407e4896060d', code: 'engine_oil', displayName: 'Dầu nhớt động cơ', displayOrder: 1, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: '33c46c84-d96c-4877-9328-a7975c971709', code: 'front_tire', displayName: 'Lốp trước', displayOrder: 2, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: '81c815e3-549f-4b20-91aa-d7545ad48b3d', code: 'rear_tire', displayName: 'Lốp sau', displayOrder: 3, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: 'c8d6ed6d-ad5b-4134-8e9b-4966d5ece47e', code: 'front_brake_pad', displayName: 'Má phanh trước', displayOrder: 4, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: 'e9d790b1-b366-45f1-9ba2-ff8420d35f6a', code: 'rear_brake_pad', displayName: 'Má phanh sau', displayOrder: 5, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: 'ba3b91a3-1fe5-48b9-b8fd-3ac489c1b59d', code: 'spark_plug', displayName: 'Bugi', displayOrder: 6, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: 'ff10d1fe-0757-4039-8ae2-ea8dae450a11', code: 'air_filter', displayName: 'Lọc gió', displayOrder: 7, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: '8e144e49-1dce-46ae-9bab-88435c25eb8d', code: 'drive_belt', displayName: 'Dây curoa', displayOrder: 8, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: 'e7e3ca4e-12aa-4e8c-94c2-cfc198e78035', code: 'chain_sprocket_set', displayName: 'Nhông, sên, đĩa', displayOrder: 9, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-  { id: '16efa96d-4cc8-4b95-bf05-05255e9c49a4', code: 'battery', displayName: 'Ắc quy', displayOrder: 10, active: true, seedVersion: 1, accountId: null, createdAtClient: SEED_CREATED_AT, receivedAtServer: null, serverSeq: null },
-]
-
-/** Idempotent: `bulkPut` theo `id` cố định, chạy lại bao nhiêu lần cũng không tạo trùng (C3). */
-export async function seedPartTypes(): Promise<void> {
-  await db.partTypes.bulkPut(PART_TYPE_SEED)
-}
+import { enqueueMutation, markOutboxApplied } from './outbox'
 
 /**
  * Đồng bộ lại `partTypes` local từ server (nguồn sự thật duy nhất, `GET /part-types`).
- * Best-effort: lỗi (chưa đăng nhập/offline) bị nuốt vì `seedPartTypes()` đã đảm bảo có
- * baseline đúng UUID sẵn — xem ghi chú ở `PART_TYPE_SEED`.
+ * Server tự tạo 10 dòng mặc định cho account ngay lúc signup (xem
+ * `postgres/seed.SeedAccountPartTypes`), nên không còn baseline cứng phía client — hàm
+ * này là cách DUY NHẤT để Dexie có dữ liệu `partTypes`. Gọi (và `await`) ngay sau khi
+ * xác thực thành công (signup/sign-in — xem `SignUpPage.tsx`/`SignInPage.tsx`) để picker
+ * part type không trống trước lần reload tiếp theo; cũng gọi best-effort lúc app khởi
+ * động (`App.tsx`) cho phiên đã đăng nhập sẵn.
  *
- * Merge (KHÔNG `bulkPut` đè thẳng): nếu Dexie đã có dòng này (kể cả do `sync/pull` ghi
- * trước đó), chỉ cập nhật field nghiệp vụ, GIỮ NGUYÊN `serverSeq`/`receivedAtServer`/
- * `createdAtClient` — nếu không, lần refresh nào cũng xoá mất `serverSeq` đã học được qua
- * sync thật, làm sai `base_server_seq` khi user sửa hạng mục ngay sau đó.
+ * Merge (KHÔNG `bulkPut` đè thẳng): GET /part-types cập nhật metadata server, nhưng
+ * giữ `displayName`/`active` nếu entity còn mutation local chưa xử lý. Mutation rejected
+ * do client cũ gửi nhầm seed row dưới dạng create được thay bằng một mutation update mới.
+ * (Trước đây DTO không có 2 field này, client tự set `null`, khiến `push.ts` coi MỌI hạng
+ * mục bootstrap qua đây là "chưa từng thấy từ server" và luôn gửi lại dưới dạng
+ * `operation: "create"` — sai, vì `create` bắt buộc `code === id`, không bao giờ đúng với
+ * hạng mục seed. Hệ quả: mọi lần sửa/tắt hạng mục seed bị server từ chối vĩnh viễn — bug
+ * thật đã xảy ra, không phải rủi ro lý thuyết.)
  */
 export async function refreshPartTypesFromServer(): Promise<void> {
-  try {
-    const { part_types } = await listPartTypes()
-    await db.transaction('rw', db.partTypes, async () => {
-      for (const dto of part_types) {
-        const existing = await db.partTypes.get(dto.id)
-        if (existing) {
-          const fresh = partTypeFromDto(dto)
-          await db.partTypes.update(dto.id, {
-            code: fresh.code,
-            displayName: fresh.displayName,
-            displayOrder: fresh.displayOrder,
-            active: fresh.active,
-            seedVersion: fresh.seedVersion,
-            accountId: fresh.accountId,
-          })
-        } else {
-          await db.partTypes.put(partTypeFromDto(dto))
-        }
+  const { part_types } = await listPartTypes()
+  await db.transaction('rw', [db.partTypes, db.outbox], async () => {
+    const unresolved = (await db.outbox.toArray()).filter(
+      (item) => item.entityType === 'part_type' && (item.status === 'pending' || item.status === 'retryable_error' || item.status === 'rejected'),
+    )
+    const unresolvedByEntity = new Map<string, typeof unresolved>()
+    for (const item of unresolved) {
+      const items = unresolvedByEntity.get(item.entityId) ?? []
+      items.push(item)
+      unresolvedByEntity.set(item.entityId, items)
+    }
+
+    for (const dto of part_types) {
+      const existing = await db.partTypes.get(dto.id)
+      const fresh = partTypeFromDto(dto)
+      const items = unresolvedByEntity.get(dto.id) ?? []
+      if (!existing || items.length === 0) {
+        await db.partTypes.put(existing ? { ...fresh, createdAtClient: existing.createdAtClient } : fresh)
+        continue
       }
-    })
-  } catch {
-    // Offline hoặc chưa có session — giữ nguyên baseline cục bộ, thử lại ở lần khởi động sau.
-  }
+
+      const merged = {
+        ...fresh,
+        displayName: existing.displayName,
+        active: existing.active,
+        createdAtClient: existing.createdAtClient,
+      }
+      await db.partTypes.put(merged)
+
+      const rejected = items.filter((item) => item.status === 'rejected')
+      if (rejected.length === 0) continue
+      await Promise.all(rejected.map((item) => markOutboxApplied(item.mutationId)))
+      const hasPending = items.some((item) => item.status === 'pending' || item.status === 'retryable_error')
+      if (!hasPending) {
+        await enqueueMutation({
+          entityType: 'part_type',
+          operation: 'update',
+          entityId: merged.id,
+          payload: partTypeToPayload(merged),
+        })
+      }
+    }
+  })
 }

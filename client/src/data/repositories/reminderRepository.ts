@@ -46,7 +46,8 @@ export async function createReminderConfig(input: {
 
   await db.transaction('rw', db.vehicles, db.partTypes, db.reminderConfigs, db.outbox, async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
-    if (!(await db.partTypes.get(input.partTypeId))) throw new Error('Unknown part type.')
+    const partType = await db.partTypes.get(input.partTypeId)
+    if (!partType || partType.accountId !== input.accountId || !partType.active) throw new Error('Unknown or inactive part type.')
     await assertNoActiveDuplicate(input.vehicleId, input.partTypeId)
     await db.reminderConfigs.add(reminder)
     await enqueueMutation({

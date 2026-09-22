@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
@@ -15,10 +17,13 @@ import (
 
 const pgUniqueViolation = "23505"
 
-// CreateAccount inserts the account and its account_sequences row (current
-// current_seq = 0) in one transaction. The two rows must always exist
+// CreateAccount inserts the account, its account_sequences row (current_seq
+// = 0), and its own copy of the default part_types catalog, all in one
+// transaction. The account and account_sequences rows must always exist
 // together: NextSeq (used by ApplyMutations) locks and updates the
-// account_sequences row and has nothing to lock if it is missing.
+// account_sequences row and has nothing to lock if it is missing. part_types
+// seeding is bundled into the same transaction so a brand-new account never
+// exists without its default catalog.
 func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -42,6 +47,9 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 	}
 	if err := queries.InsertAccountSequenceRow(ctx, account.ID); err != nil {
 		return fmt.Errorf("postgres: insert account sequence row: %w", err)
+	}
+	if err := seed.SeedAccountPartTypes(ctx, queries, account.ID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("postgres: seed account part types: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("postgres: commit create account: %w", err)

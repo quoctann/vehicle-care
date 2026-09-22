@@ -56,7 +56,7 @@ async function writePartTypePatch(accountId: string, id: string, patch: Partial<
   })
 }
 
-/** Chỉ đổi tên — danh mục mặc định (`accountId: null`) sẽ bị `writePartTypePatch` từ chối do không khớp `accountId`. */
+/** Chỉ đổi tên — `writePartTypePatch` tự từ chối nếu dòng không thuộc `accountId` này. */
 export function updatePartTypeName(accountId: string, id: string, displayName: string): Promise<void> {
   const name = displayName.trim()
   if (!name || name.length > 200) throw new Error('Part type name must contain 1 to 200 characters.')

@@ -29,8 +29,30 @@ func (s *Store) EntityExists(ctx context.Context, accountID, entityType, entityI
 		exists, err := s.queries.ServiceLogExists(ctx, sqlcgen.ServiceLogExistsParams{AccountID: accountID, ID: entityID})
 		return err == nil && exists
 	case "part_type":
-		exists, err := s.queries.PartTypeOwnedByAccount(ctx, sqlcgen.PartTypeOwnedByAccountParams{ID: entityID, AccountID: &accountID})
+		exists, err := s.queries.PartTypeOwnedByAccount(ctx, sqlcgen.PartTypeOwnedByAccountParams{ID: entityID, AccountID: accountID})
 		return err == nil && exists
+	default:
+		return false
+	}
+}
+
+func (s *Store) PartTypeActive(ctx context.Context, accountID, partTypeID string) bool {
+	active, err := s.queries.PartTypeActiveForAccount(ctx, sqlcgen.PartTypeActiveForAccountParams{ID: partTypeID, AccountID: accountID})
+	return err == nil && active
+}
+
+func (s *Store) EntityReferencesPartType(ctx context.Context, accountID, entityType, entityID, partTypeID string) bool {
+	switch entityType {
+	case "reminder_config":
+		references, err := s.queries.ReminderConfigUsesPartType(ctx, sqlcgen.ReminderConfigUsesPartTypeParams{
+			AccountID: accountID, ID: entityID, PartTypeID: partTypeID,
+		})
+		return err == nil && references
+	case "service_log":
+		references, err := s.queries.ServiceLogUsesPartType(ctx, sqlcgen.ServiceLogUsesPartTypeParams{
+			AccountID: accountID, ID: entityID, PartTypeID: partTypeID,
+		})
+		return err == nil && references
 	default:
 		return false
 	}

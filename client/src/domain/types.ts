@@ -46,11 +46,12 @@ export type Vehicle = {
 }
 
 /**
- * PartType — 10 dòng seed cố định UUID (xem `data/seed.ts`, `accountId: null`, không
- * sửa/xoá được) CỘNG hạng mục tuỳ chỉnh do từng account tự tạo (`accountId` = account sở
- * hữu — feedback Feature #2). Từ Stage 2, entity mutable thật (đi qua sync/push+pull như
- * `Vehicle`), không còn read-only cache đơn thuần. Client PHẢI xử lý được code chưa biết
- * một cách graceful (xem `partType.ts`), không hard-code enum đóng cứng.
+ * PartType — mỗi account có bộ dòng riêng của mình: 10 dòng được seed sẵn lúc tạo
+ * account (từ template server, xem `seed/manifest.go`) CỘNG hạng mục tự thêm sau đó
+ * (feedback Feature #2). Không còn tầng "mặc định dùng chung không sửa được" — mọi dòng
+ * đều thuộc sở hữu và sửa/xoá được bởi chính account, đi qua sync/push+pull như `Vehicle`.
+ * Client PHẢI xử lý được code chưa biết một cách graceful (xem `partType.ts`), không
+ * hard-code enum đóng cứng.
  */
 export type PartType = {
   id: string
@@ -59,7 +60,7 @@ export type PartType = {
   displayOrder: number
   active: boolean
   seedVersion: number
-  accountId: string | null
+  accountId: string
   createdAtClient: IsoDateTime
   receivedAtServer: IsoDateTime | null
   serverSeq: number | null

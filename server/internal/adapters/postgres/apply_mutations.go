@@ -128,7 +128,7 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 	case "service_log":
 		currentSeq, err = queries.LockServiceLogForUpdate(ctx, sqlcgen.LockServiceLogForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
 	case "part_type":
-		currentSeq, err = queries.LockPartTypeForUpdate(ctx, sqlcgen.LockPartTypeForUpdateParams{AccountID: &accountID, ID: mutation.EntityID})
+		currentSeq, err = queries.LockPartTypeForUpdate(ctx, sqlcgen.LockPartTypeForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
 	}
 	switch {
 	case err == nil:
@@ -209,8 +209,12 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 		if buildErr != nil {
 			return domain.MutationResult{}, buildErr
 		}
-		if err := queries.UpsertPartType(ctx, params); err != nil {
+		rowsAffected, err := queries.UpsertPartType(ctx, params)
+		if err != nil {
 			return domain.MutationResult{}, fmt.Errorf("upsert part_type: %w", err)
+		}
+		if rowsAffected != 1 {
+			return domain.MutationResult{}, errors.New("upsert part_type: entity id belongs to another account")
 		}
 	}
 

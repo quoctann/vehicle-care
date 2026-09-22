@@ -90,4 +90,42 @@ describe('runSync', () => {
     await expect(runSync()).rejects.toThrow('Expired')
     expect(useSessionStore.getState()).toMatchObject({ status: 'anonymous', account: null })
   })
+
+  it('does not report synced while an account mutation is unresolved', async () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      account: { id: 'account-1', email: 'rider@example.com', name: null, timezone: 'UTC', emailVerified: true },
+    })
+    await db.vehicles.put({
+      id: 'vehicle-1',
+      accountId: 'account-1',
+      name: 'Local vehicle',
+      plateNumber: null,
+      archivedAt: null,
+      deletedAt: null,
+      dueSoonRatio: null,
+      createdAtClient: '2026-09-17T09:00:00.000Z',
+      receivedAtServer: null,
+      serverSeq: null,
+    })
+    await db.outbox.put({
+      mutationId: 'mutation-rejected',
+      entityType: 'vehicle',
+      operation: 'create',
+      entityId: 'vehicle-1',
+      payload: { name: 'Local vehicle' },
+      status: 'rejected',
+      retryCount: 0,
+      lastError: 'Rejected by server',
+      createdAt: '2026-09-17T10:00:00.000Z',
+    })
+    vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' })
+    vi.mocked(pushOutbox).mockResolvedValue()
+    vi.mocked(pullChanges).mockResolvedValue()
+
+    await expect(runSync()).rejects.toThrow('1 thay đổi chưa được đồng bộ')
+
+    expect(useSyncStore.getState()).toMatchObject({ status: 'error' })
+    expect((await db.syncMeta.get('account-1'))?.lastSyncedAt ?? null).toBeNull()
+  })
 })

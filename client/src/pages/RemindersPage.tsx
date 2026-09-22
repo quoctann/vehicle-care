@@ -19,7 +19,7 @@ export function RemindersPage() {
     includeDisabled: true,
   });
   const currentOdometerKm = useCurrentOdometer(account?.id, vehicleId);
-  const partTypes = usePartTypes();
+  const partTypes = usePartTypes(account?.id);
   const [editorOpen, setEditorOpen] = useState(false);
 
   if (!account || !vehicleId) {

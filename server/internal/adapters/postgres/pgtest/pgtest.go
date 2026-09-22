@@ -10,13 +10,9 @@ package pgtest
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
@@ -65,7 +61,7 @@ func StartDSN(t *testing.T) string {
 	if err := waitForPing(db); err != nil {
 		t.Fatalf("pgtest: ping db: %v", err)
 	}
-	if err := migrateUp(db); err != nil {
+	if err := migrations.Up(db); err != nil {
 		t.Fatalf("pgtest: migrate up: %v", err)
 	}
 
@@ -105,23 +101,4 @@ func waitForPing(db *sql.DB) error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	return lastErr
-}
-
-func migrateUp(db *sql.DB) error {
-	sourceDriver, err := iofs.New(migrations.FS, ".")
-	if err != nil {
-		return fmt.Errorf("load migration source: %w", err)
-	}
-	dbDriver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return fmt.Errorf("create postgres driver: %w", err)
-	}
-	m, err := migrate.NewWithInstance("iofs", sourceDriver, "postgres", dbDriver)
-	if err != nil {
-		return fmt.Errorf("create migrator: %w", err)
-	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("apply migrations: %w", err)
-	}
-	return nil
 }

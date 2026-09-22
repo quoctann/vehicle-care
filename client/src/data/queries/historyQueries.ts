@@ -1,5 +1,6 @@
 import type { IsoDateTime } from '@/domain/types'
 import { db } from '../db'
+import { listPartTypes } from './partTypeQueries'
 
 export type HistoryEntry = {
   id: string
@@ -18,7 +19,7 @@ export async function listHistoryEntries(accountId: string, vehicleId: string): 
   const [fuelLogs, serviceLogs, partTypes] = await Promise.all([
     db.fuelLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
     db.serviceLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
-    db.partTypes.toArray(),
+    listPartTypes(accountId),
   ])
   const partTypeById = new Map(partTypes.map((p) => [p.id, p]))
 

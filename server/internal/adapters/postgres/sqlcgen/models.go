@@ -94,7 +94,7 @@ type PartType struct {
 	SeedVersion      string    `json:"seed_version"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
-	AccountID        *string   `json:"account_id"`
+	AccountID        string    `json:"account_id"`
 	ServerSeq        int64     `json:"server_seq"`
 	ReceivedAtServer time.Time `json:"received_at_server"`
 }

@@ -15,7 +15,6 @@
 make install
 make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
 make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
-make migrate-seed # seed danh mục part_types
 make dev
 ```
 
@@ -28,7 +27,7 @@ Các địa chỉ mặc định:
 
 `make dev` cấu hình frontend gọi backend Go thật. Nhấn `Ctrl+C` để dừng cả hai process.
 
-Tạo tài khoản mới qua màn hình đăng ký (không còn tài khoản demo dựng sẵn). Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
+Tạo tài khoản mới qua màn hình đăng ký (không còn tài khoản demo dựng sẵn). Signup tự seed sẵn 10 `part_types` mặc định cho account mới (sửa/tắt/thêm tự do sau đó, không phải danh mục đóng cứng). Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
 
 ## Chạy riêng
 
@@ -79,7 +78,6 @@ Backend luôn dùng PostgreSQL (account + sync data) và Redis (session/token) t
 ```bash
 make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
 make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
-make migrate-seed # seed danh mục part_types
 ```
 
 Biến môi trường liên quan xem `.env.example` (`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSLMODE`, `REDIS_*`). `/health/ready` ping cả Postgres và Redis, trả 503 nếu 1 trong 2 không sẵn sàng.
@@ -95,9 +93,11 @@ Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http:
 
 ## Hướng phát triển backend
 
-Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|seed|create <name>` (hoặc
-`make migrate-up`/`migrate-down`/`migrate-status`/`migrate-seed`/`migrate-create
-name=<name>`) — API process không tự chạy migration khi startup. File migration đặt
+Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|create <name>` (hoặc
+`make migrate-up`/`migrate-down`/`migrate-status`/`migrate-create
+name=<name>`) — API process không tự chạy migration khi startup. `part_types` không còn
+seed global qua migrate nữa — mỗi account tự có bộ 10 dòng mặc định riêng, được tạo
+trong transaction lúc signup (`postgres.Store.CreateAccount`, xem `internal/adapters/postgres/seed`). File migration đặt
 tên theo unix timestamp (`<unix_timestamp>_<name>.up.sql`/`.down.sql`, ví dụ
 `1789663949_create_accounts.up.sql`) để tránh xung đột số thứ tự khi nhiều người cùng
 thêm migration trên các branch khác nhau; `migrate create` tự sinh timestamp và tên đã
