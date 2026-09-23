@@ -65,21 +65,27 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 // reported the same way as "not found": callers cannot tell the two apart
 // through this method. That is an existing limitation of the interface,
 // not something introduced by this adapter.
-func (s *Store) AccountByEmail(ctx context.Context, email string) (domain.Account, bool) {
+func (s *Store) AccountByEmail(ctx context.Context, email string) (domain.Account, bool, error) {
 	row, err := s.queries.AccountByEmail(ctx, email)
 	if err != nil {
-		return domain.Account{}, false
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Account{}, false, nil
+		}
+		return domain.Account{}, false, fmt.Errorf("postgres: find account by email: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true
+	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
 }
 
 // AccountByID looks up an account by primary key.
-func (s *Store) AccountByID(ctx context.Context, id string) (domain.Account, bool) {
+func (s *Store) AccountByID(ctx context.Context, id string) (domain.Account, bool, error) {
 	row, err := s.queries.AccountByID(ctx, id)
 	if err != nil {
-		return domain.Account{}, false
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Account{}, false, nil
+		}
+		return domain.Account{}, false, fmt.Errorf("postgres: find account by id: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true
+	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
 }
 
 // SetEmailVerified marks an account email as verified.

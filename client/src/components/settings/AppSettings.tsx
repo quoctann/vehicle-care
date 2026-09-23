@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { PREFERENCE_KEYS, useLocalStoragePreference } from "./preferences";
-import { SyncStatusBadge } from "./SyncStatusBadge";
+import { SyncStatusBadge } from "@/components/layout/SyncStatusBadge";
 
 function SettingsRow({
   icon: Icon,

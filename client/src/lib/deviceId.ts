@@ -1,6 +1,7 @@
 import { generateId } from './uuid'
 
 const STORAGE_KEY = 'deviceId'
+let fallbackDeviceId: string | undefined
 
 /**
  * `device_id` bền vững qua `localStorage` — sinh 1 lần, dùng mãi cho thiết bị này
@@ -15,7 +16,8 @@ export function getOrCreateDeviceId(): string {
     localStorage.setItem(STORAGE_KEY, created)
     return created
   } catch {
-    // Safari private mode / storage quota — sinh id tạm cho phiên này, không persist được.
-    return generateId()
+    // IndexedDB syncMeta persists this value once a workspace is created.
+    // Keep a stable fallback even before that transaction commits.
+    return fallbackDeviceId ??= generateId()
   }
 }

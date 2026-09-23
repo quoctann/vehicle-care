@@ -3,13 +3,14 @@
 // PostgreSQL-only behavior (row locks, unique_violation, SAVEPOINT).
 //
 // Every test using this package requires a working Docker (or compatible)
-// daemon reachable from the test process. If Docker is unavailable, callers
-// should skip with t.Skipf rather than fail the whole suite.
+// daemon reachable from the test process. Local runs skip when unavailable;
+// REQUIRE_POSTGRES_TESTS=1 makes infrastructure failures fatal for CI/acceptance.
 package pgtest
 
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 	"time"
 
@@ -25,8 +26,8 @@ import (
 // connection pool (e.g. to construct a postgres.Store) should open it from
 // this DSN themselves.
 //
-// If Docker is not available in the current environment, the test is
-// skipped (not failed) with an explanation.
+// If Docker is not available, skip with an explanation unless the caller sets
+// REQUIRE_POSTGRES_TESTS=1 (make test-integration).
 func StartDSN(t *testing.T) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -40,6 +41,9 @@ func StartDSN(t *testing.T) string {
 		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
+		if os.Getenv("REQUIRE_POSTGRES_TESTS") == "1" {
+			t.Fatalf("pgtest: PostgreSQL integration tests are required, but Docker failed: %v", err)
+		}
 		t.Skipf("pgtest: docker unavailable, skipping PostgreSQL-backed test: %v", err)
 		return ""
 	}

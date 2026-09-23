@@ -59,11 +59,12 @@ Backend tự đọc `.env` ở `server/` hoặc repository root nếu file tồn
 make test
 make lint
 make build
+make test-integration # cần Docker; thiếu Docker sẽ fail thay vì skip
 ```
 
-`make test-be` chạy Go tests với race detector. HTTP contract tests bao phủ login, cookie, CSRF, device registration, push dedupe và pull.
+`make test-be` chạy Go tests với race detector. PostgreSQL adapter/seed tests dùng testcontainers và có thể skip khi Docker không sẵn sàng. Dùng `make test-integration` để bắt buộc chạy DB thật (không dùng kết quả test cache). Client sync-flow tests chạy repository/outbox/push/pull thật với HTTP mock; chưa thay thế browser E2E hay HTTP contract tests toàn hệ thống.
 
-## API mock hiện tại
+## API hiện tại
 
 - Auth: signup, verify/resend email, login, session, logout, forgot/reset password.
 - Google: `GET /auth/google/start` hiện luôn trả lỗi 400 `validation_failed` ("not implemented yet") — OAuth thật chưa được build.
@@ -95,9 +96,9 @@ Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http:
 
 ## Hướng phát triển backend
 
-Domain và application chỉ phụ thuộc các port trong `server/internal/ports` (`AccountStore`, `SyncStore`, `SessionStore`, `TokenStore`, gộp lại thành `Store`). PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|create <name>` (hoặc
+Application định nghĩa port tại `server/internal/application/user/port.go` và `server/internal/application/datasync/port.go`. PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|create <name>` (hoặc
 `make migrate-up`/`migrate-down`/`migrate-status`/`migrate-create
-name=<name>`) — API process không tự chạy migration khi startup. `part_types` không còn
+name=<name>`) — API chỉ tự chạy migration khi bật `AUTO_MIGRATE=true`. `part_types` không còn
 seed global qua migrate nữa — mỗi account tự có bộ 10 dòng mặc định riêng, được tạo
 trong transaction lúc signup (`postgres.Store.CreateAccount`, xem
 `internal/adapters/postgres/seed`). File migration đặt
@@ -106,10 +107,12 @@ tên theo unix timestamp (`<unix_timestamp>_<name>.up.sql`/`.down.sql`, ví dụ
 thêm migration trên các branch khác nhau; `migrate create` tự sinh timestamp và tên đã
 chuẩn hoá snake_case.
 
-Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/ARCHITECTURE.md`.
+Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/architecture.md`.
 
 ## Tài liệu hệ thống và review
 
 - [Hệ thống và luồng nghiệp vụ hiện tại](.docs/system-flow.md): kiến trúc, mô hình dữ liệu, nghiệp vụ và vòng đời push/pull theo implementation ngày 23/09/2026.
 - [Review structure, convention và giải pháp sync](.docs/structure-sync-review.md): phát hiện ưu tiên, các phương án đơn giản hóa và lộ trình breaking changes đề xuất.
 - [Plan incremental sync A](.docs/incremental-sync-plan.md): invariants, checklist nghiệm thu và runbook reset dev thủ công.
+
+> Schema PostgreSQL hiện được consolidate thành baseline `1790121600_baseline` dùng Unix timestamp, cùng convention với `migrate create`. Nếu database dev đã chạy bộ migration cũ (kể cả baseline thử nghiệm `20260923000000`), hãy dùng database mới hoặc chủ động reset database, Redis session và IndexedDB/PWA storage theo [runbook](.docs/incremental-sync-plan.md#manual-dev-reset-runbook) trước khi chạy `make migrate-up`. Project không tự drop schema hoặc xóa dữ liệu.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
@@ -39,9 +40,33 @@ func (s *Store) ApplyMutations(ctx context.Context, accountID, deviceID string, 
 
 	result, err := s.applyOneMutation(ctx, accountID, deviceID, mutation, now)
 	if err != nil {
-		return []domain.MutationResult{retryableErrorResult(mutation.MutationID, err.Error())}
+		if isTerminalMutationError(err) {
+			return []domain.MutationResult{rejectedResult(mutation.MutationID, "validation_failed", "Mutation violates a database constraint.")}
+		}
+		return []domain.MutationResult{retryableErrorResult(mutation.MutationID, "Temporary storage failure. Please retry.")}
 	}
 	return []domain.MutationResult{result}
+}
+
+// ApplyMutation is the single-item storage port. ApplyMutations is retained as
+// a compatibility shim for older adapter callers while the application uses
+// this unambiguous API.
+func (s *Store) ApplyMutation(ctx context.Context, accountID, deviceID string, mutation domain.Mutation, now time.Time) domain.MutationResult {
+	return s.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{mutation}, now)[0]
+}
+
+func isTerminalMutationError(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	// An idempotency-key collision is never evidence of an invalid payload.
+	// The account lock prevents this race for normal callers; retry if another
+	// writer bypassed that protocol so the next lookup returns its saved ACK.
+	if pgErr.Code == "23505" && pgErr.ConstraintName == "processed_mutations_pkey" {
+		return false
+	}
+	return len(pgErr.Code) >= 2 && pgErr.Code[:2] == "23"
 }
 
 func (s *Store) applyOneMutation(ctx context.Context, accountID, deviceID string, mutation domain.Mutation, now time.Time) (domain.MutationResult, error) {
@@ -51,6 +76,12 @@ func (s *Store) applyOneMutation(ctx context.Context, accountID, deviceID string
 	}
 	defer func() { _ = tx.Rollback() }()
 	queries := sqlcgen.New(tx)
+	// Serialize account writes before looking up the idempotency key. A row lock
+	// on a missing processed_mutations row cannot prevent concurrent retries.
+	var currentSeq int64
+	if err := tx.QueryRowContext(ctx, "SELECT current_seq FROM account_sequences WHERE account_id = $1 FOR UPDATE", accountID).Scan(&currentSeq); err != nil {
+		return domain.MutationResult{}, fmt.Errorf("lock account sequence: %w", err)
+	}
 
 	// Step 1: dedupe by (account_id, device_id, mutation_id). A prior
 	// applied write is presented as "duplicate" without
@@ -149,7 +180,9 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 	if err != nil {
 		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
 	}
-	receivedAt := now.UTC()
+	// PostgreSQL timestamptz stores microseconds. Return that same precision in
+	// the first ACK so a duplicate read from processed_mutations is identical.
+	receivedAt := now.UTC().Truncate(time.Microsecond)
 
 	status := "applied"
 
@@ -267,7 +300,7 @@ func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Qu
 	if err != nil {
 		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
 	}
-	receivedAt := now.UTC()
+	receivedAt := now.UTC().Truncate(time.Microsecond)
 
 	params, buildErr := buildInsertOdometerLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
 	if buildErr != nil {
@@ -323,27 +356,8 @@ func statefulRejection(ctx context.Context, queries *sqlcgen.Queries, accountID 
 			return reject("ownership_invalid", "Part type does not belong to this account.")
 		}
 
-		keepsExistingReference := false
-		if mutation.Operation == "update" {
-			switch mutation.EntityType {
-			case "reminder_config":
-				keepsExistingReference, err = queries.ReminderConfigUsesPartType(ctx, sqlcgen.ReminderConfigUsesPartTypeParams{AccountID: accountID, ID: mutation.EntityID, PartTypeID: partTypeID})
-			case "service_log":
-				keepsExistingReference, err = queries.ServiceLogUsesPartType(ctx, sqlcgen.ServiceLogUsesPartTypeParams{AccountID: accountID, ID: mutation.EntityID, PartTypeID: partTypeID})
-			}
-			if err != nil {
-				return domain.MutationResult{}, false, fmt.Errorf("check existing part type reference: %w", err)
-			}
-		}
-		if !keepsExistingReference {
-			active, err := queries.PartTypeActiveForAccount(ctx, sqlcgen.PartTypeActiveForAccountParams{ID: partTypeID, AccountID: accountID})
-			if err != nil {
-				return domain.MutationResult{}, false, fmt.Errorf("check part type active state: %w", err)
-			}
-			if !active {
-				return reject("validation_failed", "Part type is inactive.")
-			}
-		}
+		// An owned inactive part type remains a valid historical/reference value.
+		// active is a client selection/UI concern, not a sync authorization rule.
 	}
 
 	return domain.MutationResult{}, false, nil

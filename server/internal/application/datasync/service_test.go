@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
@@ -19,9 +20,9 @@ func (d *testDependencies) DeviceRegistered(context.Context, string, string) (bo
 	return true, nil
 }
 
-func (d *testDependencies) ApplyMutations(_ context.Context, _ string, _ string, mutations []domain.Mutation, _ time.Time) []domain.MutationResult {
-	d.applied = append(d.applied, mutations[0].MutationID)
-	return []domain.MutationResult{d.result(mutations[0])}
+func (d *testDependencies) ApplyMutation(_ context.Context, _ string, _ string, mutation domain.Mutation, _ time.Time) domain.MutationResult {
+	d.applied = append(d.applied, mutation.MutationID)
+	return d.result(mutation)
 }
 
 func (d *testDependencies) Pull(context.Context, string, int64, int, *int64) (domain.PullPage, error) {
@@ -33,18 +34,19 @@ func (d *testDependencies) ListPartTypes(context.Context, string) ([]domain.Part
 }
 
 func validMutation(id string) domain.Mutation {
+	mutationID := map[string]string{"first": "00000000-0000-4000-8000-000000000001", "second": "00000000-0000-4000-8000-000000000002", "third": "00000000-0000-4000-8000-000000000003", "retry": "00000000-0000-4000-8000-000000000004"}[id]
 	return domain.Mutation{
-		MutationID: id,
+		MutationID: mutationID,
 		EntityType: "vehicle",
 		Operation:  "create",
-		EntityID:   "vehicle-" + id,
+		EntityID:   uuid.NewString(),
 		Payload:    map[string]any{"name": "Vehicle"},
 	}
 }
 
 func TestPushStopsAtFirstTerminalResult(t *testing.T) {
 	deps := &testDependencies{result: func(mutation domain.Mutation) domain.MutationResult {
-		if mutation.MutationID == "second" {
+		if mutation.MutationID == "00000000-0000-4000-8000-000000000002" {
 			retryable := false
 			return domain.MutationResult{MutationID: mutation.MutationID, Status: "rejected", Retryable: &retryable}
 		}
@@ -60,7 +62,7 @@ func TestPushStopsAtFirstTerminalResult(t *testing.T) {
 	if len(results) != 2 || results[1].Status != "rejected" {
 		t.Fatalf("expected processed prefix ending in rejection, got %#v", results)
 	}
-	if len(deps.applied) != 2 || deps.applied[1] != "second" {
+	if len(deps.applied) != 2 || deps.applied[1] != "00000000-0000-4000-8000-000000000002" {
 		t.Fatalf("push did not stop in FIFO order: %#v", deps.applied)
 	}
 }

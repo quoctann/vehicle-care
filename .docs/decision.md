@@ -187,6 +187,8 @@ Các quyết định dưới đây **supersede** những phần cũ nói về co
 - FuelLog/ServiceLog có thể sửa và xóa mềm; OdometerLog liên quan không tự thay đổi theo FuelLog.
 - Mỗi account có catalog PartType riêng.
 - PartType seed được tạo trong transaction signup và có changefeed như entity bình thường. Thiết bị mới không cần một đường bootstrap catalog riêng.
+- PartType inactive bị ẩn khỏi lựa chọn mới trên UI nhưng vẫn là reference hợp lệ cho record offline thuộc cùng account.
+- ID của ReminderConfig được sinh xác định từ `(account, vehicle, part type)`, nên hai thiết bị tạo cùng scope sẽ hội tụ về một entity.
 
 ### 7.2. Quy tắc outbox
 
@@ -194,6 +196,7 @@ Các quyết định dưới đây **supersede** những phần cũ nói về co
 - Outbox có `account_id`, `local_seq` tăng dần, payload bất biến và `mutation_id` ổn định.
 - Client push từng mutation theo FIFO `local_seq`; không coalesce.
 - Retry do timeout/mất response gửi lại đúng mutation ID và payload cũ.
+- Device ID đã lưu cùng workspace IndexedDB phải được giữ nguyên khi retry; mất/thay đổi localStorage không được làm thay đổi idempotency key.
 - Kết quả `retryable_error` giữ mutation ở `pending` và chỉ được thử lại khi người dùng chọn **Thử lại**.
 - Kết quả terminal chuyển mutation thành `blocked`; không tự retry nguyên payload.
 - Mutation phía sau item đầu tiên bị lỗi không được gửi.
@@ -207,14 +210,18 @@ Các quyết định dưới đây **supersede** những phần cũ nói về co
 - Luôn có luồng **Khôi phục từ server**: bỏ local mutations, xóa dữ liệu local của account, reset cursor về 0 và pull lại toàn bộ feed.
 - Restore không sửa dữ liệu server. Nếu restore lỗi giữa chừng, cursor page đã commit được giữ để tiếp tục.
 - Sau repair hoặc restore thành công, account có thể trở lại trạng thái `synced` bình thường.
+- Có edit mới khi đang sync là công việc còn chờ (`pending`), không phải lỗi. Hoãn pull, giữ cursor và không ngăn auto-sync lượt sau.
+- Onboarding phải hiển thị sync/recovery ngay cả khi chưa có xe; không bắt người dùng tạo thêm record để thoát lỗi bootstrap.
 
 ### 7.4. Push/pull protocol
 
 - Push batch API vẫn giữ shape mảng để không đổi HTTP envelope, nhưng server xử lý một mutation mỗi lần và trả prefix kết quả theo FIFO. Gặp terminal/retryable thì dừng.
 - Dedupe mutation được kiểm tra trước validation phụ thuộc trạng thái để retry sau khi server đã commit luôn trả acknowledgment cũ.
+- Server khóa dòng account sequence trước dedupe để retry đồng thời không tạo blocked giả. Lỗi trùng idempotency key không được phân loại thành payload không hợp lệ.
 - Mutable dùng toàn-record LWW theo thứ tự server áp dụng. Không có `base_server_seq` và `conflict_resolved` trong protocol mới.
 - Pull dùng `until_seq` stateless thay cho bảng watermark. Các page trong một phiên dùng cùng upper bound.
 - Client kiểm tra outbox trong cùng transaction với apply page và cursor; nếu queue đã có local mutation mới thì không apply page và không tăng cursor.
+- Khi queue sạch, pull vẫn áp dụng canonical payload ở sequence bằng ACK đã nhận, kể cả OdometerLog. Chỉ bỏ qua snapshot có sequence thấp hơn, tránh khác dữ liệu vì DB làm tròn/chuẩn hóa.
 
 ### 7.5. Session offline
 
@@ -225,7 +232,7 @@ Các quyết định dưới đây **supersede** những phần cũ nói về co
 
 ### 7.6. Reset dữ liệu dev
 
-Đợt thay đổi này có migration xóa bảng pull watermark và migration IndexedDB cho outbox mới.
+Đợt thay đổi này thay toàn bộ lịch sử PostgreSQL bằng một baseline migration dành cho database sạch và có migration IndexedDB cho outbox/recovery mới.
 Không tự động drop schema. Khi muốn test sạch từ đầu:
 
 1. Dừng API và các tab frontend.

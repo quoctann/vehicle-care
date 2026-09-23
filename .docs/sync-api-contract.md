@@ -363,7 +363,10 @@ Mục này là nguồn sự thật cho code hiện tại; các ví dụ cũ ở 
 - `rejected` là terminal failure. Client chuyển item thành `blocked`, không tự gửi lại payload đó.
 - `retryable_error` là temporary failure. Client giữ item `pending`, chỉ gửi lại khi người dùng bấm **Thử lại**.
 - Timeout/mất response giữ nguyên mutation ID và payload để retry idempotent; không được sửa envelope khi chưa biết server đã commit hay chưa.
+- Device ID cũng giữ nguyên theo workspace IndexedDB. Server khóa account sequence trước lookup idempotency để concurrent retry trả ACK cũ thay vì reject do unique-key race.
 - Item blocked có nguyên nhân và có hai đường: repair bằng mutation ID mới hoặc khôi phục toàn account từ server.
+- Repair thay blocked envelope bằng mutation ID mới ngay tại vị trí FIFO cũ; nếu entity đã có revision local mới hơn, repair không ghi đè snapshot mới đó.
+- Sync và restore dùng chung account lock. Restore đang chạy hoặc đã lỗi sẽ chặn local entity write cho đến khi tiếp tục thành công hoặc người dùng đăng xuất.
 
 ### 6.2. Pull với `until_seq`
 
@@ -379,9 +382,9 @@ Response có:
 ```json
 {
   "changes": [],
-  "next_cursor": 100,
+  "next_cursor": 150,
   "until_seq": 150,
-  "has_more": true,
+  "has_more": false,
   "server_time": "2026-09-23T10:00:00Z"
 }
 ```
@@ -389,6 +392,8 @@ Response có:
 Server không còn tạo/lưu watermark. Trang đầu chụp sequence hiện tại làm `until_seq`; các trang sau dùng lại đúng bound đó. Change mới sau bound chờ phiên pull tiếp theo.
 
 Client chỉ apply một page khi outbox account vẫn sạch trong cùng Dexie transaction với entity và cursor. Nếu có pending/blocked, page không được apply và cursor không tăng.
+
+Ví dụ response rỗng trên tương ứng request đã ở `after_seq=150`. Trang `has_more=true` phải có tiến triển cursor. Edit local trong lúc chờ response làm lượt sync chuyển `pending`, không thành lỗi retryable. Canonical fields được áp dụng kể cả khi `server_seq` bằng metadata từ push ACK; ACK chỉ xác nhận mutation, không chứa business fields đã chuẩn hóa.
 
 ### 6.3. Trạng thái thành công
 
@@ -401,3 +406,6 @@ thành công cũ chỉ còn là thông tin lịch sử.
 Mười PartType mặc định được tạo cùng account sequence và append vào changefeed trong
 transaction signup. Thiết bị mới pull từ `after_seq=0` sẽ nhận cả seed catalog; endpoint
 `GET /part-types` chỉ còn là endpoint đọc phụ trợ, không phải replication path bắt buộc.
+PartType inactive không xuất hiện trong picker tạo mới, nhưng server vẫn chấp nhận reference
+từ record offline nếu PartType đó thuộc đúng account. ReminderConfig ID được sinh xác định
+từ account + vehicle + PartType để concurrent offline create cùng scope hội tụ về một ID.

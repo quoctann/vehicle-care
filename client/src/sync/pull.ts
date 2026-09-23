@@ -42,7 +42,7 @@ function validatePage(response: PullResponse, afterSeq: number, expectedUntilSeq
 }
 
 /** Pulls a bounded feed and commits each page only while the account outbox is clean. */
-export async function pullChanges(accountId: string): Promise<void> {
+export async function pullChanges(accountId: string): Promise<'complete' | 'deferred'> {
   const meta = await db.syncMeta.get(accountId)
   if (!meta) throw new Error(`Sync metadata is missing for account ${accountId}`)
 
@@ -60,9 +60,9 @@ export async function pullChanges(accountId: string): Promise<void> {
     validatePage(response, afterSeq, untilSeq)
     untilSeq ??= response.until_seq
 
-    await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes, db.syncMeta, db.outbox], async () => {
+    const applied = await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes, db.syncMeta, db.outbox], async () => {
       const dirtyOutbox = await db.outbox.where('accountId').equals(accountId).count()
-      if (dirtyOutbox > 0) throw new Error(`Cannot apply server changes while account ${accountId} has local mutations`)
+      if (dirtyOutbox > 0) return false
       for (const change of response.changes) {
         await applyPulledChange(change, accountId)
       }
@@ -70,9 +70,12 @@ export async function pullChanges(accountId: string): Promise<void> {
         lastSeenSeq: response.next_cursor,
       })
       if (updated !== 1) throw new Error(`Sync metadata disappeared for account ${accountId}`)
+      return true
     })
 
+    if (!applied) return 'deferred'
+
     afterSeq = response.next_cursor
-    if (!response.has_more) return
+    if (!response.has_more) return 'complete'
   }
 }

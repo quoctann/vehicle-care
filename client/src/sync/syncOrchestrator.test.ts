@@ -45,8 +45,10 @@ describe('runSync', () => {
       deviceId: 'device-1',
       lastSeenSeq: 0,
       nextLocalSeq: 1,
+      operation: 'idle',
       lastSyncedAt: null,
       lastSyncError: null,
+      lastSyncFailureKind: null,
       bootstrapState: 'bootstrapping',
     })
 
@@ -62,11 +64,13 @@ describe('runSync', () => {
     })
     vi.mocked(pullChanges).mockImplementation(async () => {
       calls.push('pull')
+      return 'complete'
     })
 
     const first = runSync()
     const second = runSync()
     expect(second).toBe(first)
+    await vi.waitFor(() => expect(finishBootstrap).toBeTypeOf('function'))
     finishBootstrap()
     await first
 
@@ -129,11 +133,11 @@ describe('runSync', () => {
     })
     vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' })
     vi.mocked(pushOutbox).mockResolvedValue()
-    vi.mocked(pullChanges).mockResolvedValue()
+    vi.mocked(pullChanges).mockResolvedValue('complete')
 
-    await expect(runSync()).rejects.toThrow('1 thay đổi chưa được đồng bộ')
+    await expect(runSync()).rejects.toThrow('Rejected by server')
 
-    expect(useSyncStore.getState()).toMatchObject({ status: 'retryable' })
+    expect(useSyncStore.getState()).toMatchObject({ status: 'blocked' })
     expect((await db.syncMeta.get('account-1'))?.lastSyncedAt ?? null).toBeNull()
   })
 })

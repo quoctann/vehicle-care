@@ -26,7 +26,7 @@ export async function addServiceLog(input: {
   if (input.odometerKmSnapshot != null && (!Number.isFinite(input.odometerKmSnapshot) || input.odometerKmSnapshot < 0)) {
     throw new Error('Service odometer cannot be negative.')
   }
-  if (input.costVnd != null && (!Number.isFinite(input.costVnd) || input.costVnd < 0)) throw new Error('Service cost cannot be negative.')
+  if (input.costVnd != null && (!Number.isSafeInteger(input.costVnd) || input.costVnd < 0)) throw new Error('Service cost must be a non-negative integer.')
   if (input.servicedAt && Number.isNaN(Date.parse(input.servicedAt))) throw new Error('Service time is invalid.')
   const now = new Date().toISOString()
   const log: ServiceLog = {
@@ -88,7 +88,7 @@ export function updateServiceLog(
   if (patch.odometerKmSnapshot != null && (!Number.isFinite(patch.odometerKmSnapshot) || patch.odometerKmSnapshot < 0)) {
     throw new Error('Service odometer cannot be negative.')
   }
-  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Service cost cannot be negative.')
+  if (patch.costVnd != null && (!Number.isSafeInteger(patch.costVnd) || patch.costVnd < 0)) throw new Error('Service cost must be a non-negative integer.')
   if (patch.servicedAt && Number.isNaN(Date.parse(patch.servicedAt))) throw new Error('Service time is invalid.')
   return writeServiceLogPatch(accountId, id, patch)
 }

@@ -42,8 +42,10 @@ async function seedSyncMeta() {
     deviceId: 'device-1',
     lastSeenSeq: 0,
     nextLocalSeq: 1,
+    operation: 'idle',
     lastSyncedAt: null,
     lastSyncError: null,
+    lastSyncFailureKind: null,
     bootstrapState: 'bootstrapping',
   })
 }
@@ -145,7 +147,7 @@ describe('pullChanges', () => {
       server_time: '2026-09-17T10:00:10.000Z',
     })
 
-    await expect(pullChanges(accountId)).rejects.toThrow('local mutations')
+    await expect(pullChanges(accountId)).resolves.toBe('deferred')
     expect(await db.syncMeta.get(accountId)).toMatchObject({ lastSeenSeq: 0 })
   })
 

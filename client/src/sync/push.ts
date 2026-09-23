@@ -1,7 +1,7 @@
 import * as api from '@/api/client'
 import type { MutationResult, PushMutation } from '@/api/contract.types'
 import { db, type OutboxItem } from '@/data/db'
-import { getNextOutboxItem, markOutboxAcknowledged, markOutboxBlocked, markOutboxRetryable } from '@/data/outbox'
+import { getNextOutboxItem, getOutboxHighWatermark, markOutboxAcknowledged, markOutboxBlocked, markOutboxRetryable } from '@/data/outbox'
 import { assertActiveSyncAccount } from './sessionGuard'
 import { entityTable, updateEntitySyncMeta } from './types'
 
@@ -49,11 +49,15 @@ async function applyMutationResult(item: OutboxItem, result: MutationResult): Pr
     case 'duplicate':
       await db.transaction('rw', [db.outbox, table], async () => {
         const current = await table.get(item.entityId)
-        if (current?.serverSeq != null && result.server_seq! < current.serverSeq) {
-          throw new Error(`Sync push returned a stale acknowledgment for ${item.mutationId}`)
-        }
+        const hasNewerLocalRevision = await db.outbox
+          .where('[accountId+localSeq]')
+          .between([item.accountId, item.localSeq + 1], [item.accountId, Number.MAX_SAFE_INTEGER])
+          .filter((candidate) => candidate.entityType === item.entityType && candidate.entityId === item.entityId)
+          .count()
         await markOutboxAcknowledged(item.mutationId)
-        await updateEntitySyncMeta(item.entityType, item.entityId, result.server_seq!, result.received_at_server!)
+        if (hasNewerLocalRevision === 0 && (current?.serverSeq == null || result.server_seq! >= current.serverSeq)) {
+          await updateEntitySyncMeta(item.entityType, item.entityId, result.server_seq!, result.received_at_server!)
+        }
       })
       return 'continue'
     case 'retryable_error':
@@ -71,9 +75,11 @@ async function applyMutationResult(item: OutboxItem, result: MutationResult): Pr
 
 /** Pushes one immutable envelope at a time, in account-local FIFO order. */
 export async function pushOutbox(deviceId: string, accountId: string): Promise<void> {
+  const throughLocalSeq = await getOutboxHighWatermark(accountId)
+  if (throughLocalSeq == null) return
   while (true) {
     assertActiveSyncAccount(accountId)
-    const item = await getNextOutboxItem(accountId)
+    const item = await getNextOutboxItem(accountId, throughLocalSeq)
     if (!item) return
     if (item.status === 'blocked') throw new SyncBlockedError(item, item.lastError ?? 'Mutation needs attention')
 

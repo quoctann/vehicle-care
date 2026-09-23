@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +11,51 @@ import (
 
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
+
+func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
+	t.Parallel()
+	store, _ := newTestStore(t)
+	ctx := context.Background()
+	accountID := newAccount(t, store)
+	mutation := domain.Mutation{
+		MutationID: uuid.NewString(), EntityType: "vehicle", Operation: "create",
+		EntityID: uuid.NewString(), Payload: map[string]any{"name": "Concurrent retry"},
+	}
+	const workers = 12
+	start := make(chan struct{})
+	results := make(chan domain.MutationResult, workers)
+	var ready sync.WaitGroup
+	ready.Add(workers)
+	for range workers {
+		go func() {
+			ready.Done()
+			<-start
+			results <- store.ApplyMutation(ctx, accountID, "device-1", mutation, time.Now())
+		}()
+	}
+	ready.Wait()
+	close(start)
+	counts := map[string]int{}
+	var receivedAt *time.Time
+	for range workers {
+		result := <-results
+		counts[result.Status]++
+		if result.ServerSeq == nil || *result.ServerSeq != initialAccountSeq+1 || result.ReceivedAtServer == nil {
+			t.Fatalf("retry did not return original ACK: %#v", result)
+		}
+		if receivedAt != nil && !receivedAt.Equal(*result.ReceivedAtServer) {
+			t.Fatalf("retry changed received_at_server: %#v", result)
+		}
+		receivedAt = result.ReceivedAtServer
+	}
+	if counts["applied"] != 1 || counts["duplicate"] != workers-1 {
+		t.Fatalf("expected one apply and only duplicates, got %v", counts)
+	}
+	page, err := store.Pull(ctx, accountID, initialAccountSeq, 100, nil)
+	if err != nil || len(page.Changes) != 1 || page.UntilSeq != initialAccountSeq+1 {
+		t.Fatalf("retry appended extra changes: page=%#v err=%v", page, err)
+	}
+}
 
 // TestApplyMutationsDeduplicatesAndAppliesLatestSnapshot asserts dedupe-by-mutation
 // and server-order LWW. It uses a real vehicle-typed uuid entity id
@@ -31,13 +77,13 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 		Payload: map[string]any{"name": "Second"},
 	}}, baseTime.Add(2*time.Minute))[0]
 
-	if firstResult.Status != "applied" || firstResult.ServerSeq == nil || *firstResult.ServerSeq != 1 {
+	if firstResult.Status != "applied" || firstResult.ServerSeq == nil || *firstResult.ServerSeq != initialAccountSeq+1 {
 		t.Fatalf("unexpected first result: %#v", firstResult)
 	}
-	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || *duplicate.ServerSeq != 1 || !duplicate.ReceivedAtServer.Equal(*firstResult.ReceivedAtServer) {
+	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || *duplicate.ServerSeq != initialAccountSeq+1 || !duplicate.ReceivedAtServer.Equal(*firstResult.ReceivedAtServer) {
 		t.Fatalf("duplicate did not preserve original acknowledgment: %#v", duplicate)
 	}
-	if conflict.Status != "applied" || conflict.ServerSeq == nil || *conflict.ServerSeq != 2 {
+	if conflict.Status != "applied" || conflict.ServerSeq == nil || *conflict.ServerSeq != initialAccountSeq+2 {
 		t.Fatalf("unexpected conflict result: %#v", conflict)
 	}
 }
@@ -88,14 +134,14 @@ func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
 		EntityID:   uuid.NewString(),
 		Payload: map[string]any{
 			"vehicle_id": vehicleID, "recorded_at": now.Format(time.RFC3339Nano),
-			"liters": 1.239, "cost_vnd": 123.9, "is_full_tank": true,
+			"liters": 1.239, "cost_vnd": float64(123), "is_full_tank": true,
 		},
 	}}, now)[0]
 	if result.Status != "applied" {
 		t.Fatalf("unexpected fuel result: %#v", result)
 	}
 
-	page, err := store.Pull(ctx, accountID, 0, 10, nil)
+	page, err := store.Pull(ctx, accountID, initialAccountSeq, 10, nil)
 	if err != nil {
 		t.Fatalf("pull canonical fuel change: %v", err)
 	}
@@ -158,8 +204,10 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	results := make(chan domain.MutationResult, 2)
 	for index := 1; index <= 2; index++ {
 		index := index
+		deviceID := "device-" + uuid.NewString()
+		registerTestDevice(t, store, accountID, deviceID)
 		go func() {
-			result := store.ApplyMutations(ctx, accountID, "device-"+uuid.NewString(), []domain.Mutation{{
+			result := store.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{{
 				MutationID: "mutation-" + uuid.NewString(), EntityType: "reminder_config", Operation: "create",
 				EntityID: uuid.NewString(), Payload: map[string]any{
 					"vehicle_id": vehicleID, "part_type_id": partTypeID, "interval_km": float64(3000 * index), "enabled": true,
@@ -219,7 +267,7 @@ func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
 		t.Fatalf("EntityExists leaked a match for an id that was never created")
 	}
 
-	pageA, err := store.Pull(ctx, accountA, 0, 10, nil)
+	pageA, err := store.Pull(ctx, accountA, initialAccountSeq, 10, nil)
 	if err != nil {
 		t.Fatalf("pull account a: %v", err)
 	}
@@ -237,7 +285,7 @@ func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1") // consumes seq 1
+	vehicleID := createVehicle(t, store, accountID, "device-1") // follows signup seed entries
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
 	const goroutines = 8
@@ -281,10 +329,9 @@ func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
 			maxSeq = result.seq
 		}
 	}
-	// Vehicle creation consumed seq 1, so the append-only writes must
-	// occupy exactly 2..total+1 with no gaps.
-	if maxSeq != int64(total)+1 {
-		t.Fatalf("expected max server_seq %d, got %d", total+1, maxSeq)
+	// After signup seed entries and one vehicle, each log allocates one sequence.
+	if maxSeq != initialAccountSeq+int64(total)+1 {
+		t.Fatalf("expected max server_seq %d, got %d", initialAccountSeq+int64(total)+1, maxSeq)
 	}
 	if len(seen) != total {
 		t.Fatalf("expected %d unique server_seq values, got %d", total, len(seen))
@@ -317,7 +364,7 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 		t.Fatalf("unexpected part type result: %#v", result)
 	}
 
-	page, err := store.Pull(ctx, accountID, 0, 10, nil)
+	page, err := store.Pull(ctx, accountID, initialAccountSeq, 10, nil)
 	if err != nil {
 		t.Fatalf("pull part type change: %v", err)
 	}

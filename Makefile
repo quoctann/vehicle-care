@@ -14,6 +14,7 @@ help:
 		'make migrate-up     Apply database migrations (needs DB_HOST/DB_USER/DB_PASSWORD/DB_NAME)' \
 		'make migrate-create name=<name>  Scaffold a new timestamp-prefixed migration pair' \
 		'make test           Run all tests' \
+		'make test-integration Run PostgreSQL tests; Docker is required (no skips)' \
 		'make lint           Run frontend lint and Go vet' \
 		'make build          Build frontend and backend'
 
@@ -63,6 +64,10 @@ test-fe:
 
 test-be:
 	cd server && go test -race ./...
+
+.PHONY: test-integration
+test-integration:
+	cd server && REQUIRE_POSTGRES_TESTS=1 go test -race -count=1 ./internal/adapters/postgres/...
 
 lint: lint-fe lint-be
 

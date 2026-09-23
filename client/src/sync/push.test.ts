@@ -118,4 +118,51 @@ describe('pushOutbox', () => {
     expect(replacement.mutationId).not.toBe('mutation-blocked')
     expect(await db.outbox.get('mutation-blocked')).toBeUndefined()
   })
+
+  it('does not let repair of an older blocked revision overwrite a newer local snapshot', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Newest local'))
+    await db.outbox.bulkAdd([
+      outboxItem({ mutationId: 'mutation-blocked', localSeq: 1, status: 'blocked', failureKind: 'terminal', payload: { name: 'Old invalid' } }),
+      outboxItem({ mutationId: 'mutation-newer', localSeq: 2, payload: { name: 'Newest local' } }),
+    ])
+
+    await repairBlockedMutation('mutation-blocked', { name: 'Repaired old revision' })
+
+    expect(await db.vehicles.get('vehicle-1')).toMatchObject({ name: 'Newest local' })
+    expect((await db.outbox.where('[accountId+localSeq]').equals([accountId, 1]).first())?.payload).toEqual({ name: 'Repaired old revision' })
+  })
+
+  it('acknowledges an older mutation without overwriting metadata for a newer local revision', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Newest local', 10))
+    await db.outbox.bulkAdd([
+      outboxItem({ mutationId: 'mutation-old', localSeq: 1, payload: { name: 'Old' } }),
+      outboxItem({ mutationId: 'mutation-new', localSeq: 2, payload: { name: 'Newest local' } }),
+    ])
+    vi.mocked(api.pushMutations)
+      .mockResolvedValueOnce({
+        results: [{ mutation_id: 'mutation-old', status: 'duplicate', server_seq: 7, received_at_server: '2026-09-17T10:01:00.000Z' }],
+      })
+      .mockResolvedValueOnce({
+        results: [{ mutation_id: 'mutation-new', status: 'applied', server_seq: 11, received_at_server: '2026-09-17T10:02:00.000Z' }],
+      })
+
+    await pushOutbox('device-1', accountId)
+
+    expect(await db.outbox.toArray()).toEqual([])
+    expect(await db.vehicles.get('vehicle-1')).toMatchObject({ name: 'Newest local', serverSeq: 11 })
+  })
+
+  it('stops at the queue high watermark when new local work arrives during push', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Local'))
+    await db.outbox.add(outboxItem({ mutationId: 'mutation-1', localSeq: 1 }))
+    vi.mocked(api.pushMutations).mockImplementationOnce(async () => {
+      await db.outbox.add(outboxItem({ mutationId: 'mutation-later', localSeq: 2 }))
+      return { results: [{ mutation_id: 'mutation-1', status: 'applied', server_seq: 7, received_at_server: '2026-09-17T10:01:00.000Z' }] }
+    })
+
+    await pushOutbox('device-1', accountId)
+
+    expect(api.pushMutations).toHaveBeenCalledTimes(1)
+    expect(await db.outbox.get('mutation-later')).toMatchObject({ status: 'pending' })
+  })
 })

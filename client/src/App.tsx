@@ -25,7 +25,17 @@ export default function App() {
     void db.syncMeta.get(accountId).then((meta) => {
       if (cancelled || useSessionStore.getState().account?.id !== accountId || useSyncStore.getState().status === 'syncing') return
       useSyncStore.setState({
-        status: meta?.lastSyncError ? 'error' : meta?.lastSyncedAt ? 'synced' : 'idle',
+        status: meta?.operation === 'restoring'
+          ? 'restoring'
+          : meta?.operation === 'restore_failed' || meta?.lastSyncFailureKind === 'retryable'
+            ? 'retryable'
+            : meta?.lastSyncFailureKind === 'blocked'
+              ? 'blocked'
+              : meta?.lastSyncError
+                ? 'error'
+                : meta?.lastSyncedAt
+                  ? 'synced'
+                  : 'idle',
         lastSyncedAt: meta?.lastSyncedAt ?? null,
         lastError: meta?.lastSyncError ?? null,
       })

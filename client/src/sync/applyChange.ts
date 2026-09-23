@@ -87,8 +87,11 @@ async function applyEntityChange(
       const existing = await db.odometerLogs.get(entityId)
       if (existing) {
         if (existing.accountId !== accountId) throw new Error(`Odometer log ${entityId} belongs to another account`)
-        if (existing.serverSeq == null || existing.serverSeq < serverSeq) {
+        // Push ACK already set this version, but only pull carries the canonical
+        // payload (e.g. PostgreSQL numeric rounding). Equal versions must apply.
+        if (existing.serverSeq == null || existing.serverSeq <= serverSeq) {
           await db.odometerLogs.update(entityId, {
+            ...odometerLogFieldsFromPayload(payload),
             serverSeq,
             receivedAtServer,
           })

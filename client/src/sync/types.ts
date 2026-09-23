@@ -38,8 +38,8 @@ export function entityTable(entityType: SyncEntityType) {
 
 /**
  * Cập nhật CHỈ 2 field sync metadata (không đụng field nghiệp vụ) — dùng khi push
- * trả về `applied`/`duplicate`: server xác nhận payload gửi lên đã là bản mới nhất,
- * không có field nào khác cần ghi đè.
+ * trả về `applied`/`duplicate`. Business fields canonical được nhận qua pull,
+ * kể cả khi change có cùng serverSeq với ACK này.
  */
 export async function updateEntitySyncMeta(
   entityType: SyncEntityType,

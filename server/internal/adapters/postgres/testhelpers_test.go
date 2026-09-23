@@ -9,8 +9,11 @@ import (
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/pgtest"
+	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
+
+var initialAccountSeq = int64(len(seed.Manifest))
 
 // newTestStore starts an ephemeral, migrated PostgreSQL container and opens
 // a Store against it. It skips the test (via pgtest.StartDSN) when Docker
@@ -38,7 +41,17 @@ func newAccount(t *testing.T, store *postgres.Store) string {
 	if err != nil {
 		t.Fatalf("create account: %v", err)
 	}
+	for _, deviceID := range []string{"device-1", "device-2", "device-a", "device-b"} {
+		registerTestDevice(t, store, id, deviceID)
+	}
 	return id
+}
+
+func registerTestDevice(t *testing.T, store *postgres.Store, accountID, deviceID string) {
+	t.Helper()
+	if _, err := store.RegisterDevice(context.Background(), accountID, deviceID); err != nil {
+		t.Fatalf("register test device: %v", err)
+	}
 }
 
 // createVehicle applies a "create vehicle" mutation and returns the new

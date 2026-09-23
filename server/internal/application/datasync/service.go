@@ -41,12 +41,7 @@ func (s *Service) Push(ctx context.Context, accountID, deviceID, apiVersion stri
 			results = append(results, rejected(mutation.MutationID, code, message))
 			break
 		}
-		applied := s.deps.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{mutation}, s.now())
-		if len(applied) == 0 {
-			results = append(results, retryableErrorResult(mutation.MutationID, "Mutation was not processed."))
-			break
-		}
-		result := applied[0]
+		result := s.deps.ApplyMutation(ctx, accountID, deviceID, mutation, s.now())
 		results = append(results, result)
 		if result.Status == "rejected" || result.Status == "retryable_error" {
 			break

@@ -335,6 +335,11 @@ export const vi = {
       repair: 'Sửa và tiếp tục',
       restoreFromServer: 'Khôi phục từ server',
       restoreConfirm: 'Các thay đổi local chưa đồng bộ sẽ bị xóa và dữ liệu sẽ được tải lại từ server. Tiếp tục?',
+      restoringTitle: 'Đang khôi phục dữ liệu',
+      restoringDescription: 'Workspace đang được tải lại từ server. Không thể chỉnh sửa dữ liệu trong lúc này.',
+      restoreFailedTitle: 'Khôi phục chưa hoàn tất',
+      restoreFailedDescription: 'Dữ liệu đã tải được giữ lại. Hãy thử tiếp tục từ trang gần nhất khi có kết nối.',
+      resumeRestore: 'Tiếp tục khôi phục',
     },
     errors: {
       auth_invalid: 'Email hoặc mật khẩu không chính xác.',

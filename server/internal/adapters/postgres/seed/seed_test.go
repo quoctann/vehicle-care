@@ -25,12 +25,20 @@ func TestSeedAccountPartTypesInsertsManifestForAccount(t *testing.T) {
 	accountA := insertTestAccount(t, db)
 	accountB := insertTestAccount(t, db)
 
-	queries := sqlcgen.New(db)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	queries := sqlcgen.New(tx)
 	if err := seed.SeedAccountPartTypes(ctx, queries, accountA, now); err != nil {
 		t.Fatalf("seed account a: %v", err)
 	}
 	if err := seed.SeedAccountPartTypes(ctx, queries, accountB, now); err != nil {
 		t.Fatalf("seed account b: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
 	rowsA := selectPartTypesByAccount(t, db, accountA)
@@ -55,9 +63,12 @@ func TestSeedAccountPartTypesInsertsManifestForAccount(t *testing.T) {
 func insertTestAccount(t *testing.T, db *sql.DB) string {
 	t.Helper()
 	id := uuid.NewString()
-	_, err := db.Exec(`INSERT INTO accounts (id, email) VALUES ($1, $2); INSERT INTO account_sequences (account_id) VALUES ($1)`, id, id+"@example.test")
+	_, err := db.Exec(`INSERT INTO accounts (id, email) VALUES ($1, $2)`, id, id+"@example.test")
 	if err != nil {
 		t.Fatalf("insert test account: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO account_sequences (account_id) VALUES ($1)`, id); err != nil {
+		t.Fatalf("insert account sequence: %v", err)
 	}
 	return id
 }

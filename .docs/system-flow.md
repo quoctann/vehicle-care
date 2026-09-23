@@ -15,7 +15,7 @@ Mô hình chính là **local-first, đồng bộ eventual consistency**:
 - PostgreSQL giữ trạng thái đã được server chấp nhận và thứ tự thay đổi theo tài khoản.
 - Không thể xem dữ liệu vừa lưu local là đã được sao lưu lên server cho đến khi sync thành công.
 
-**Giới hạn quan trọng:** session hiện tại vẫn phải được xác minh online mỗi lần mở app. Mở lại khi mất mạng bị chuyển về đăng nhập, dù IndexedDB còn dữ liệu. Vì vậy local-first đã có ở tầng dữ liệu nhưng trải nghiệm cold-start offline chưa hoàn chỉnh.
+Khi mở app, client thử xác minh session online. Nếu mất mạng/server lỗi và đã có account cache, người dùng vẫn mở được workspace local. Phản hồi 401 yêu cầu đăng nhập lại; cache không cấp quyền gọi API. Chưa hỗ trợ dùng guest trước lần đăng nhập đầu tiên.
 
 ## 2. Các thành phần và trách nhiệm
 
@@ -90,6 +90,7 @@ Các dữ liệu suy ra, không lưu như một nguồn sự thật thứ hai:
 - Chi phí: tổng hợp FuelLog/ServiceLog.
 
 Một cặp `(account, vehicle, part type)` chỉ có một ReminderConfig chưa tombstone. `enabled=false` vẫn chiếm cặp này; “active” trong unique constraint có nghĩa là **chưa xóa**, không phải đang bật.
+ReminderConfig dùng UUID xác định từ account, vehicle và PartType, vì vậy hai thiết bị tạo cùng scope offline sẽ dùng cùng ID; unique index phía server vẫn là lớp bảo vệ cuối.
 
 ## 4. Đăng ký, đăng nhập và khởi động app
 
@@ -110,11 +111,12 @@ Verification/reset token có storage nhưng chưa có luồng gửi email thật
 
 - Login xác thực password, tạo session/CSRF token rồi đặt cookie.
 - `App.tsx` gọi `hydrate()` → `GET /auth/session`.
-- Thành công: cập nhật Zustand session, tải PartType best-effort, khởi động auto-sync.
-- Thất bại bất kỳ, kể cả mất mạng hoặc lỗi server: đặt `anonymous`; `RequireAuth` chuyển về `/sign-in`.
-- `accountCache` trong Dexie hiện được ghi lúc bootstrap sync nhưng chưa dùng để khôi phục truy cập offline.
+- Thành công: cập nhật Zustand session và khởi động auto-sync; PartType được tải qua changefeed.
+- Lỗi mạng/server không phải 401: mở cached account nếu có, nếu không mới chuyển về sign-in.
+- 401/session expired: yêu cầu đăng nhập lại, không xóa các entity/outbox local.
+- `accountCache` được lưu khi bootstrap sync thành công và dùng làm fallback offline.
 
-Logout gọi API xóa session rồi clear session UI. Nếu API lỗi, client vẫn clear UI. Dữ liệu IndexedDB không bị xóa bởi thao tác này.
+Logout gọi API xóa session rồi xóa account cache và clear session UI. Nếu API lỗi, client vẫn clear local session. Các entity/outbox trong IndexedDB không bị xóa bởi thao tác này.
 
 ## 5. Luồng nghiệp vụ trên thiết bị
 
@@ -131,13 +133,14 @@ Logout gọi API xóa session rồi clear session UI. Nếu API lỗi, client v�
 ### 5.2. Danh mục phụ tùng
 
 - Mỗi account có UUID PartType riêng, không dùng UUID chung cho tất cả người dùng.
-- Seed mặc định có `server_seq=0` và **không được append vào changefeed**.
-- Client lấy chúng qua `GET /part-types` → `refreshPartTypesFromServer()`.
+- Seed mặc định được cấp `server_seq` và append vào changefeed ngay trong transaction signup.
+- Client nhận seed bằng pull từ cursor `0`, cùng pipeline với các entity khác.
 - Những thay đổi PartType sau đó đi qua push/pull như entity mutable khác.
 - Custom PartType có `code` bằng ID; seed PartType dùng code như `engine_oil`.
 - PartType inactive không được chọn cho reminder/service mới. Update giữ nguyên reference cũ có thể được chấp nhận dù phụ tùng đã inactive.
+- Server vẫn chấp nhận record offline tham chiếu PartType thuộc account nhưng đã bị thiết bị khác tắt sau lúc record được tạo.
 
-Đây là ngoại lệ của kiến trúc hiện tại: dữ liệu phụ tùng đi qua cả catalog fetch lẫn sync. Chỉ chạy pull từ cursor 0 chưa đủ để khôi phục các seed row chưa từng sửa.
+Không có đường replication catalog riêng. `GET /part-types` còn là API đọc phụ trợ, không được gọi để bootstrap client.
 
 ### 5.3. Cấu hình nhắc bảo dưỡng
 
@@ -202,14 +205,14 @@ Mặc định `dueSoonRatio=0.9`: đã dùng 90%, tức còn 10% chu kỳ. Xe c�
 
 Nếu service mới nhất không có KM, chiều KM fallback về baseline config, không tìm service cũ gần nhất có KM. Đây là hành vi hiện tại cần chốt lại về nghiệp vụ.
 
-Tính ngày theo timezone account. Hook hiện dùng live query theo dữ liệu; chưa có trigger riêng để tính lại khi qua nửa đêm mà dữ liệu không đổi.
+Tính ngày theo timezone account. Hook refresh mỗi phút và khi đổi trạng thái foreground/background, ngoài việc theo dõi dữ liệu qua live query.
 
 ### 5.8. Lịch sử và chi phí
 
 - History gộp FuelLog và ServiceLog chưa xóa, sort theo thời điểm nghiệp vụ.
 - Chi phí tháng nhóm theo tháng lịch trong timezone account.
 - Chi phí/KM tham khảo dùng log trong cửa sổ gần đây và chênh lệch `max(KM)-min(KM)`.
-- **Lỗi hiện tại:** query chi phí chưa lọc `deletedAt`; log đã biến mất khỏi History vẫn bị tính vào chi phí.
+- Cả History, chi phí tháng và cost/KM đều lọc FuelLog/ServiceLog có `deletedAt`.
 
 ## 6. Vòng đời một lần sync
 
@@ -219,7 +222,8 @@ Tính ngày theo timezone account. Hook hiện dùng live query theo dữ liệu
 - Auto-sync kiểm tra lúc khởi động, thay đổi session, trở lại foreground hoặc có mạng.
 - Chỉ chạy tự động khi authenticated, online, tab visible và lần thành công gần nhất cách hơn 15 phút.
 - Có timer để kiểm tra lại khi tab vẫn mở; không push ngay sau mỗi thao tác local.
-- `inFlight` gộp lời gọi đồng thời trong **một JS runtime/tab**, chưa khóa giữa nhiều tab.
+- `inFlight` gộp lời gọi trong một tab; Web Locks serialize sync/restore giữa các tab theo account. Runtime không hỗ trợ Web Locks chỉ có fallback trong process, không bảo đảm multi-tab.
+- Lỗi thật cần thao tác retry/repair/restore. Hoãn pull vì có edit local mới là `pending`, không ghi `lastSyncError` và không ngăn các lượt auto-sync tiếp theo.
 
 ### 6.2. Trình tự tổng quát
 
@@ -231,16 +235,17 @@ sequenceDiagram
     participant P as PostgreSQL
     S->>L: Đọc/tạo syncMeta theo account
     S->>A: POST /devices/register
-    loop FIFO từng mutation (tối đa 100 trong một lượt)
+    loop FIFO tới localSeq đã chốt đầu lượt
         S->>L: Đọc item đầu queue theo localSeq
         S->>A: POST /sync/push
         loop Từng mutation theo thứ tự request
-            A->>P: Validate references + apply transaction
+            A->>P: Lock account, dedupe, validate và apply transaction
             P-->>A: Kết quả từng mutation
         end
         A-->>S: Một result cho mutation
         S->>L: Ghi acknowledgment/trạng thái outbox
     end
+    Note over S,L: Chỉ pull khi push thành công và queue sạch; nếu có edit mới thì hoãn
     loop Các trang cùng until_seq
         S->>A: GET /sync/pull?after_seq=cursor&until_seq=bound
         A->>P: Đọc changefeed tới upper bound
@@ -258,7 +263,7 @@ sequenceDiagram
 |---|---|
 | `entityId` | UUID ổn định của bản ghi |
 | `mutationId` | UUID của một thao tác cần gửi; khác entity ID |
-| `deviceId` | ID installation, lấy từ local storage |
+| `deviceId` | ID khởi tạo từ localStorage/fallback, sau đó cố định trong syncMeta của workspace IndexedDB |
 | `accountId` | Phạm vi dữ liệu; server lấy account từ session |
 | `serverSeq` | Phiên bản/thứ tự server của một thay đổi trong account |
 | `lastSeenSeq` | Cursor local đã áp dụng từ pull, lưu theo account |
@@ -266,6 +271,8 @@ sequenceDiagram
 | `receivedAtServer` | Timestamp server gắn cho thay đổi; không phải cursor |
 
 ACK push cập nhật `serverSeq` của entity, **không nhảy `lastSeenSeq`**. Cursor pull chỉ tăng khi page được commit local, để không bỏ qua thay đổi từ thiết bị khác.
+
+ACK không chứa business fields canonical. Pull vẫn áp dụng payload khi sequence bằng ACK, bao gồm OdometerLog, để nhận giá trị đã chuẩn hóa/làm tròn từ PostgreSQL. Change có sequence thấp hơn local bị bỏ qua.
 
 ### 6.4. Push phía client
 
@@ -278,12 +285,14 @@ ACK push cập nhật `serverSeq` của entity, **không nhảy `lastSeenSeq`**.
 
 ### 6.5. Push phía server
 
-Application kiểm tra API version, device, batch size, payload, ownership và references. Sau đó adapter xử lý từng mutation:
+Application kiểm tra API version, device, batch size và payload. Adapter thực hiện ownership/reference validation phụ thuộc DB sau dedupe, bên trong transaction:
 
 ```text
 BEGIN
+  lock dòng account_sequences trước khi lookup mutation
   kiểm tra processed_mutations(account, device, mutation)
   nếu đã xử lý: trả acknowledgment cũ dưới dạng duplicate
+  validate ownership/references cho mutation mới
   kiểm tra trùng scope reminder khi cần
   mutable: lock bản hiện tại; cấp seq; upsert
   odometer: dedupe theo entity ID; nếu mới thì cấp seq và insert
@@ -302,7 +311,7 @@ Mutable dùng **last server-applied write wins**, tức snapshot xử lý sau th
 2. Query `after_seq < server_seq <= until_seq`, tăng dần, đọc `limit+1` để xác định `has_more`.
 3. Request sau gửi lại cùng `until_seq`; thay đổi mới sau bound đợi lượt sync kế tiếp.
 4. Trước khi apply page, transaction Dexie kiểm tra outbox account vẫn sạch.
-5. Nếu có local mutation mới, rollback page/cursor và kết thúc lượt ở trạng thái pending.
+5. Nếu có local mutation mới, không ghi page/cursor và trả `deferred`; orchestrator kết thúc ở `pending`, không lưu lỗi retryable.
 6. Nếu queue sạch, apply page và cursor trong cùng transaction.
 
 Feed dùng canonical payload từ row đã lưu. Pull bình thường không apply khi outbox còn `pending` hoặc `blocked`, nên không ghi đè local edit chưa được xử lý.
@@ -311,13 +320,16 @@ Feed dùng canonical payload từ row đã lưu. Pull bình thường không app
 
 | Kết quả | Client hiện xử lý |
 |---|---|
-| `applied` | Mark applied, cập nhật seq/timestamp |
-| `duplicate` | Như applied; ACK thấp hơn entity seq hiện tại bị báo lỗi |
+| `applied` | Xóa mutation đã ACK; cập nhật metadata nếu không có local revision mới hơn |
+| `duplicate` | Hoàn tất mutation; ACK cũ không làm lùi version, không bị coi là lỗi |
 | `rejected` | Chuyển row thành `blocked`, hiển thị nguyên nhân và action repair/restore |
 | `retryable_error` | Giữ `pending`, tăng retryCount; chỉ retry khi người dùng bấm Thử lại |
 | HTTP/network error | Giữ `pending`, lưu lỗi retryable; không auto-retry |
+| Có edit local mới trong lượt sync | Giữ `pending`, hoãn pull, không tăng cursor/lastSyncedAt, không lưu lỗi |
 
-Pull chỉ chạy sau khi push hết queue. Chỉ hiển thị “Đã đồng bộ” khi không còn `pending` hoặc `blocked`, bootstrap đã ready và pull hoàn tất. Mutation terminal không tự retry nguyên payload; người dùng có thể sửa thành mutation ID mới hoặc khôi phục toàn bộ workspace từ server. Restore xóa thay đổi local chưa sync, reset cursor và pull lại từ `0`; nếu lỗi giữa chừng, cursor đã commit được giữ để tiếp tục.
+Pull chỉ chạy sau khi push hết queue. Chỉ hiển thị “Đã đồng bộ” khi không còn `pending` hoặc `blocked`, bootstrap đã ready và pull hoàn tất. Mutation terminal không tự retry nguyên payload; người dùng có thể sửa thành mutation ID mới hoặc khôi phục toàn bộ workspace từ server. Sync và restore dùng cùng khóa theo account. Restore chặn local write, xóa thay đổi local chưa sync, reset cursor và pull lại từ `0`; nếu lỗi giữa chừng, trạng thái `restore_failed` và cursor đã commit được giữ để tiếp tục mà không xóa lại dữ liệu vừa tải.
+
+Onboarding cũng hiển thị sync/recovery: người dùng không phải tạo thêm xe chỉ để truy cập retry hoặc restore khi bootstrap lỗi. Nút recovery riêng cạnh sync cho phép mở restore cả khi lỗi pull chỉ được phân loại retryable; không cần chờ một mutation bị blocked. Có thể sửa blocked payload khi offline, còn restore cần online và xác nhận bỏ thay đổi chưa sync. Repair hiện dùng editor JSON; sửa bằng form entity thông thường không tự thay thế mutation blocked cũ.
 
 ## 7. Những gì đã có và chưa hoàn chỉnh
 
@@ -337,4 +349,6 @@ make dev
 
 Backend dùng PostgreSQL và Redis thật. `AUTO_MIGRATE=true` cho phép API chạy migration trước startup; mặc định tắt. API readiness kiểm tra cả hai dependency.
 
-Các lệnh kiểm tra: `make test`, `make lint`, `make build`. Nếu dùng migration/schema mới trên database dev cũ, cần chủ động reset database và IndexedDB trước khi test; không tự động drop schema.
+Các lệnh kiểm tra: `make test`, `make lint`, `make build`, `make test-integration`. Lệnh integration bắt buộc Docker/PostgreSQL thật; thiếu Docker sẽ fail, không skip.
+
+PostgreSQL hiện có baseline `1790121600_baseline` dùng Unix seconds, cùng convention với `migrate create`. Database đã chạy lịch sử cũ (kể cả baseline thử nghiệm `20260923000000`) phải được chủ động reset hoặc dùng database dev mới cùng Redis session và IndexedDB/PWA storage; ứng dụng không tự drop schema. Xem trạng thái kiểm chứng ở [plan](./incremental-sync-plan.md#verification-status).

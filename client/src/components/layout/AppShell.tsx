@@ -9,6 +9,9 @@ import { useSessionStore } from '@/stores/useSessionStore'
 import { BottomTabBar } from './BottomTabBar'
 import { SidebarNav } from './SidebarNav'
 import { SyncStatusBadge } from './SyncStatusBadge'
+import { WorkspaceRecovery } from './WorkspaceRecovery'
+import { db } from '@/data/db'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { VehicleSwitcher } from './VehicleSwitcher'
 
 export function AppShell() {
@@ -27,6 +30,7 @@ export function AppShell() {
   const vehicle = routeVehicleId ? routeVehicleQuery.vehicle : vehicles?.find((candidate) => candidate.id === vehicleId)
   const isOnboarding = location.pathname.startsWith('/onboarding/')
   const isHome = location.pathname.endsWith('/home')
+  const syncMeta = useLiveQuery(async () => (accountId ? await db.syncMeta.get(accountId) : undefined), [accountId])
 
   useEffect(() => {
     if (accountId && routeVehicleId && vehicle) setLastVehicleId(accountId, routeVehicleId)
@@ -34,6 +38,10 @@ export function AppShell() {
 
   if (vehicles === undefined || routeVehicleQuery.queryKey !== routeVehicleKey) {
     return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">{t('navigation.loadingGarage')}</div>
+  }
+
+  if (syncMeta?.operation === 'restoring' || syncMeta?.operation === 'restore_failed') {
+    return <WorkspaceRecovery failed={syncMeta.operation === 'restore_failed'} />
   }
 
   if (routeVehicleId && !vehicle) {
@@ -44,6 +52,9 @@ export function AppShell() {
   if (isOnboarding) {
     return (
       <div className="min-h-dvh bg-background text-foreground">
+        <div className="mx-auto flex max-w-md justify-end px-4 pt-4">
+          <SyncStatusBadge />
+        </div>
         <Outlet />
       </div>
     )

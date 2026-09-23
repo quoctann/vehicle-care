@@ -4,6 +4,8 @@
 > Tài liệu đồng hành: [Hệ thống và luồng nghiệp vụ hiện tại](./system-flow.md).
 > Các đề xuất dưới đây chưa phải thay đổi đã triển khai.
 
+**Historical review:** các finding bên dưới mô tả trạng thái trước refactor FIFO. Code đã triển khai phương án A tuần tự và các bản sửa tiếp theo; không dùng danh sách này như báo cáo lỗi hiện tại. Xem [system-flow](./system-flow.md) và [trạng thái kiểm chứng](./incremental-sync-plan.md#verification-status) cho implementation hiện hành. Các bản sửa mới gồm lock account trước dedupe, canonical odometer sau ACK, deferred sync khi có local edit, device ID ổn định theo IndexedDB, recovery trên onboarding và migration baseline Unix seconds. PostgreSQL integration còn chờ môi trường Docker để nghiệm thu.
+
 ## 1. Kết luận
 
 **Kiến trúc nền phù hợp với bài toán sync đơn giản, nhưng implementation chưa đủ chắc về correctness để gọi là ổn và tối ưu.** Không cần thay bằng CRDT, event sourcing hoặc một hệ thống queue phân tán. Nên giữ local-first + outbox + account sequence + changefeed, giảm những nhánh đặc biệt và sửa retry/concurrency trước.

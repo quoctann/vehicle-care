@@ -7,6 +7,7 @@ import { useVehicles } from '@/hooks/useVehicles'
 import { getLastVehicleId } from '@/lib/lastVehicle'
 import { useSessionStore } from '@/stores/useSessionStore'
 import { runSync } from '@/sync/syncOrchestrator'
+import { WorkspaceRecovery } from '@/components/layout/WorkspaceRecovery'
 
 /** "/" không phải 1 trang thật — luôn điều hướng sang xe dùng gần nhất hoặc màn thêm xe. */
 export function RootRedirect() {
@@ -27,6 +28,10 @@ export function RootRedirect() {
   }, [accountId, syncMeta, syncMetaQuery.accountId, vehicles])
 
   if (vehicles === undefined || !accountId || syncMetaQuery.accountId !== accountId) return null
+
+  if (syncMeta?.operation === 'restoring' || syncMeta?.operation === 'restore_failed') {
+    return <WorkspaceRecovery failed={syncMeta.operation === 'restore_failed'} />
+  }
 
   if (vehicles.length === 0 && navigator.onLine && syncMeta?.bootstrapState !== 'ready' && !syncMeta?.lastSyncError) {
     return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">{t('navigation.syncingGarage')}</div>

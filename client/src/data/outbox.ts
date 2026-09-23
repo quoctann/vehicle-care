@@ -28,8 +28,10 @@ function newSyncMeta(accountId: string, nextLocalSeq = 1): SyncMeta {
     deviceId: getOrCreateDeviceId(),
     lastSeenSeq: 0,
     nextLocalSeq,
+    operation: 'idle',
     lastSyncedAt: null,
     lastSyncError: null,
+    lastSyncFailureKind: null,
     bootstrapState: 'empty',
   }
 }
@@ -50,6 +52,7 @@ export async function enqueueMutation(params: {
   if (entity?.accountId && entity.accountId !== params.accountId) throw new Error('Cannot enqueue a mutation for another account.')
 
   const meta = await db.syncMeta.get(params.accountId) ?? newSyncMeta(params.accountId)
+  if (meta.operation !== 'idle') throw new Error('Workspace recovery is in progress. Finish recovery before editing data.')
   const item: OutboxItem = {
     mutationId: generateId(),
     accountId: params.accountId,
@@ -78,8 +81,13 @@ export function listPendingOutbox(accountId: string, limit: number): Promise<Out
     .toArray()
 }
 
-export function getNextOutboxItem(accountId: string): Promise<OutboxItem | undefined> {
-  return db.outbox.where('[accountId+localSeq]').between([accountId, Dexie.minKey], [accountId, Dexie.maxKey]).first()
+export function getNextOutboxItem(accountId: string, throughLocalSeq = Number.MAX_SAFE_INTEGER): Promise<OutboxItem | undefined> {
+  return listOutboxForAccount(accountId).then((rows) => rows.find((item) => item.localSeq <= throughLocalSeq))
+}
+
+export async function getOutboxHighWatermark(accountId: string): Promise<number | null> {
+  const rows = await listOutboxForAccount(accountId)
+  return rows.length === 0 ? null : Math.max(...rows.map((item) => item.localSeq))
 }
 
 export function countPendingOutbox(): Promise<number> {
@@ -95,7 +103,7 @@ export function countUnresolvedOutboxForAccount(accountId: string): Promise<numb
 }
 
 export function listOutboxForAccount(accountId: string): Promise<OutboxItem[]> {
-  return db.outbox.where('[accountId+localSeq]').between([accountId, Dexie.minKey], [accountId, Dexie.maxKey]).toArray()
+  return db.outbox.where('accountId').equals(accountId).sortBy('localSeq')
 }
 
 export function listBlockedOutboxForAccount(accountId: string): Promise<OutboxItem[]> {
@@ -136,25 +144,33 @@ export async function repairBlockedMutation(
   const table = entityTable(blocked.entityType)
   return db.transaction('rw', [db.outbox, db.syncMeta, table], async () => {
     const current = await db.outbox.get(mutationId)
-    const item = current ?? blocked
+    if (!current || current.status !== 'blocked') throw new Error(`Blocked mutation not found: ${mutationId}`)
+    const item = current
     const meta = await db.syncMeta.get(item.accountId) ?? newSyncMeta(item.accountId)
-    if (meta.nextLocalSeq <= item.localSeq) await db.syncMeta.put({ ...meta, nextLocalSeq: item.localSeq + 1 })
+    if (meta.operation !== 'idle') throw new Error('Workspace recovery is in progress.')
     const existing = await table.get(item.entityId) as { accountId?: string } | undefined
     if (!existing || existing.accountId !== item.accountId) throw new Error(`Entity not found for blocked mutation: ${item.entityId}`)
     const fields = repairFields(item.entityType, payload)
-    await table.update(item.entityId, fields)
+    const newerRows = await db.outbox
+      .where('[accountId+localSeq]')
+      .between([item.accountId, item.localSeq + 1], [item.accountId, Dexie.maxKey])
+      .filter((candidate) => candidate.entityType === item.entityType && candidate.entityId === item.entityId)
+      .count()
+    if (newerRows === 0) await table.update(item.entityId, fields)
     await db.outbox.delete(mutationId)
-    const replacement = await enqueueMutation({
-      accountId: item.accountId,
-      entityType: item.entityType,
+    const replacement: OutboxItem = {
+      ...item,
+      mutationId: generateId(),
       operation: operation ?? item.operation,
-      entityId: item.entityId,
       payload,
-    })
-    // Keep the repaired mutation at the blocked item's queue position so
-    // later mutations cannot bypass the repaired dependency.
-    await db.outbox.update(replacement.mutationId, { localSeq: item.localSeq, failureKind: null, lastError: null })
-    return { ...replacement, localSeq: item.localSeq, failureKind: null, lastError: null }
+      status: 'pending',
+      retryCount: 0,
+      failureKind: null,
+      lastError: null,
+      createdAt: new Date().toISOString(),
+    }
+    await db.outbox.add(replacement)
+    return replacement
   })
 }
 

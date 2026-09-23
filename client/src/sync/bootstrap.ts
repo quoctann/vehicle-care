@@ -12,19 +12,27 @@ export type SyncBootstrap = {
 /** Registers this installation and creates the account-scoped local sync bookkeeping. */
 export async function bootstrapSync(account: SessionAccount): Promise<SyncBootstrap> {
   assertActiveSyncAccount(account.id)
-  const deviceId = getOrCreateDeviceId()
-  const existing = await db.syncMeta.get(account.id)
-  const bootstrapping: SyncMeta = {
-    accountId: account.id,
-    deviceId,
-    lastSeenSeq: existing?.lastSeenSeq ?? 0,
-    nextLocalSeq: existing?.nextLocalSeq ?? 1,
-    lastSyncedAt: existing?.lastSyncedAt ?? null,
-    lastSyncError: existing?.lastSyncError ?? null,
-    bootstrapState: 'bootstrapping',
-  }
-
-  await db.syncMeta.put(bootstrapping)
+  const deviceId = await db.transaction('rw', db.syncMeta, async () => {
+    const existing = await db.syncMeta.get(account.id)
+    // Dedupe uses (account, device, mutation). Never rotate the device identity
+    // while its IndexedDB workspace survives, even if localStorage is cleared.
+    const deviceId = existing?.deviceId || getOrCreateDeviceId()
+    const bootstrapping: SyncMeta = existing
+      ? { ...existing, deviceId, bootstrapState: 'bootstrapping' }
+      : {
+          accountId: account.id,
+          deviceId,
+          lastSeenSeq: 0,
+          nextLocalSeq: 1,
+          operation: 'idle',
+          lastSyncedAt: null,
+          lastSyncError: null,
+          lastSyncFailureKind: null,
+          bootstrapState: 'bootstrapping',
+        }
+    await db.syncMeta.put(bootstrapping)
+    return deviceId
+  })
   await api.registerDevice({
     device_id: deviceId,
     platform: 'web',
@@ -33,7 +41,9 @@ export async function bootstrapSync(account: SessionAccount): Promise<SyncBootst
   assertActiveSyncAccount(account.id)
 
   await db.transaction('rw', [db.syncMeta, db.accountCache], async () => {
-    await db.syncMeta.put(bootstrapping)
+    const current = await db.syncMeta.get(account.id)
+    if (!current) throw new Error(`Sync metadata disappeared for account ${account.id}`)
+    await db.syncMeta.put({ ...current, deviceId, bootstrapState: 'bootstrapping' })
     await db.accountCache.put({
       id: 'current',
       accountId: account.id,

@@ -44,6 +44,8 @@ export type OutboxItem = {
 }
 
 export type BootstrapState = 'empty' | 'bootstrapping' | 'ready'
+export type SyncOperation = 'idle' | 'restoring' | 'restore_failed'
+export type SyncFailureKind = 'retryable' | 'blocked' | 'terminal' | null
 
 /** 1 dòng duy nhất mỗi account — sống CÙNG Dexie DB với data, xem ghi chú bootstrap trong plan. */
 export type SyncMeta = {
@@ -51,8 +53,10 @@ export type SyncMeta = {
   deviceId: string
   lastSeenSeq: number
   nextLocalSeq: number
+  operation: SyncOperation
   lastSyncedAt: IsoDateTime | null
   lastSyncError: string | null
+  lastSyncFailureKind: SyncFailureKind
   bootstrapState: BootstrapState
 }
 
@@ -206,6 +210,17 @@ class VehicleMaintenanceDb extends Dexie {
       for (const row of await outbox.toArray() as Array<Record<string, unknown>>) {
         if (row.failureKind === 'retryable' || row.failureKind === 'terminal') continue
         await outbox.put({ ...row, failureKind: row.status === 'blocked' ? 'terminal' : null })
+      }
+    })
+    // v9: persist recovery state so reloads can resume restore/retry safely.
+    this.version(9).stores({}).upgrade(async (transaction) => {
+      const syncMeta = transaction.table('syncMeta')
+      for (const existing of await syncMeta.toArray() as Array<Record<string, unknown>>) {
+        await syncMeta.put({
+          ...existing,
+          operation: existing.operation ?? 'idle',
+          lastSyncFailureKind: existing.lastSyncFailureKind ?? null,
+        })
       }
     })
   }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertCircle, Check, CloudOff, RefreshCw } from 'lucide-react'
+import { AlertCircle, Check, CloudOff, RefreshCw, Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { useSessionStore } from '@/stores/useSessionStore'
 import { useSyncStore } from '@/stores/useSyncStore'
 import { formatTime } from '@/lib/formatters'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/data/db'
 
 export function SyncStatusBadge() {
   const { t } = useTranslation()
@@ -22,6 +23,7 @@ export function SyncStatusBadge() {
   const timezone = useSessionStore((state) => state.account?.timezone)
   const outboxState = useOutboxState(accountId)
   const outbox = useLiveQuery(() => (accountId ? listOutboxForAccount(accountId) : Promise.resolve([])), [accountId], []) ?? []
+  const syncMeta = useLiveQuery(async () => (accountId ? await db.syncMeta.get(accountId) : undefined), [accountId])
   const online = useOnlineStatus()
   const status = useSyncStore((state) => state.status)
   const lastSyncedAt = useSyncStore((state) => state.lastSyncedAt)
@@ -64,7 +66,7 @@ export function SyncStatusBadge() {
   if (outboxState.pending > 0 && status !== 'blocked' && status !== 'retryable') label = t('sync.pending', { count: outboxState.pending })
 
   const canRetry = online && outboxState.blocked === 0 && (status === 'retryable' || outboxState.retryable > 0)
-  const openRecovery = status === 'blocked' || outboxState.blocked > 0 || (status === 'error' && !canRetry)
+  const openRecovery = syncMeta?.operation === 'restore_failed' || status === 'blocked' || outboxState.blocked > 0 || (status === 'error' && !canRetry)
 
   async function handleRepair() {
     if (!firstBlocked || !accountId) return
@@ -106,6 +108,17 @@ export function SyncStatusBadge() {
     >
       {icon}
       <span className="truncate">{label}</span>
+    </Button>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      disabled={status === 'syncing' || status === 'restoring'}
+      onClick={() => setRecoveryOpen(true)}
+      title={t('sync.recoveryTitle')}
+      aria-label={t('sync.recoveryTitle')}
+    >
+      <Wrench className="size-4" />
     </Button>
     <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
       <DialogContent className="max-h-[min(90dvh,42rem)] overflow-y-auto sm:max-w-lg">

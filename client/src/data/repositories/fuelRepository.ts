@@ -23,7 +23,7 @@ export async function addFuelLog(input: {
   isFullTank: boolean
 }): Promise<{ fuelLog: FuelLog; odometerLog: OdometerLog | null }> {
   if (input.liters != null && (!Number.isFinite(input.liters) || input.liters <= 0)) throw new Error('Fuel amount must be positive.')
-  if (input.costVnd != null && (!Number.isFinite(input.costVnd) || input.costVnd < 0)) throw new Error('Fuel cost cannot be negative.')
+  if (input.costVnd != null && (!Number.isSafeInteger(input.costVnd) || input.costVnd < 0)) throw new Error('Fuel cost must be a non-negative integer.')
   if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt))) throw new Error('Recorded time is invalid.')
   if (input.odometerKm != null) {
     const validation = validateOdometerReading(input.odometerKm, null)
@@ -114,7 +114,7 @@ export function updateFuelLog(
   patch: Partial<Pick<FuelLog, 'recordedAt' | 'liters' | 'costVnd' | 'shop' | 'note' | 'isFullTank'>>,
 ): Promise<void> {
   if (patch.liters != null && (!Number.isFinite(patch.liters) || patch.liters <= 0)) throw new Error('Fuel amount must be positive.')
-  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Fuel cost cannot be negative.')
+  if (patch.costVnd != null && (!Number.isSafeInteger(patch.costVnd) || patch.costVnd < 0)) throw new Error('Fuel cost must be a non-negative integer.')
   if (patch.recordedAt && Number.isNaN(Date.parse(patch.recordedAt))) throw new Error('Recorded time is invalid.')
   return writeFuelLogPatch(accountId, id, patch)
 }

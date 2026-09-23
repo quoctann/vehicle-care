@@ -112,7 +112,8 @@ describe('reminderRepository', () => {
       baselineOdometerKm: 0,
       baselineDate: null,
     })
-    expect(second.id).not.toBe(first.id)
+    expect(second.id).toBe(first.id)
+    expect(await db.reminderConfigs.get(second.id)).toMatchObject({ deletedAt: null, intervalKm: 6000 })
   })
 
   it('updateReminderConfig từ chối nếu patch làm mất cả 2 interval trên reminder chưa tombstone', async () => {
