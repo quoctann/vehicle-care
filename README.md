@@ -27,6 +27,8 @@ Các địa chỉ mặc định:
 
 `make dev` cấu hình frontend gọi backend Go thật. Nhấn `Ctrl+C` để dừng cả hai process.
 
+Muốn khỏi phải nhớ chạy `make migrate-up` mỗi lần đổi migration lúc dev, set `AUTO_MIGRATE=true` trong `.env` (xem `.env.example`) — backend tự áp dụng schema còn thiếu ngay lúc khởi động, trước khi bắt đầu lắng nghe request. Mặc định tắt và chỉ nên bật ở local: production/Kubernetes vẫn giữ migration là một bước deploy tách biệt, tự chạy (xem `.docs/architecture.md`).
+
 Tạo tài khoản mới qua màn hình đăng ký (không còn tài khoản demo dựng sẵn). Signup tự seed sẵn 10 `part_types` mặc định cho account mới (sửa/tắt/thêm tự do sau đó, không phải danh mục đóng cứng). Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
 
 ## Chạy riêng
@@ -97,10 +99,16 @@ Domain và application chỉ phụ thuộc các port trong `server/internal/port
 `make migrate-up`/`migrate-down`/`migrate-status`/`migrate-create
 name=<name>`) — API process không tự chạy migration khi startup. `part_types` không còn
 seed global qua migrate nữa — mỗi account tự có bộ 10 dòng mặc định riêng, được tạo
-trong transaction lúc signup (`postgres.Store.CreateAccount`, xem `internal/adapters/postgres/seed`). File migration đặt
+trong transaction lúc signup (`postgres.Store.CreateAccount`, xem
+`internal/adapters/postgres/seed`). File migration đặt
 tên theo unix timestamp (`<unix_timestamp>_<name>.up.sql`/`.down.sql`, ví dụ
 `1789663949_create_accounts.up.sql`) để tránh xung đột số thứ tự khi nhiều người cùng
 thêm migration trên các branch khác nhau; `migrate create` tự sinh timestamp và tên đã
 chuẩn hoá snake_case.
 
 Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/ARCHITECTURE.md`.
+
+## Tài liệu hệ thống và review
+
+- [Hệ thống và luồng nghiệp vụ hiện tại](.docs/system-flow.md): kiến trúc, mô hình dữ liệu, nghiệp vụ và vòng đời push/pull theo implementation ngày 23/09/2026.
+- [Review structure, convention và giải pháp sync](.docs/structure-sync-review.md): phát hiện ưu tiên, các phương án đơn giản hóa và lộ trình breaking changes đề xuất.

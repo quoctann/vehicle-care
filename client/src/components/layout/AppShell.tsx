@@ -4,7 +4,7 @@ import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet'
 import { useVehicle, useVehicles } from '@/hooks/useVehicles'
-import { getLastVehicleId, setLastVehicleId } from '@/lib/lastVehicle'
+import { setLastVehicleId, useLastVehicleId } from '@/lib/lastVehicle'
 import { useSessionStore } from '@/stores/useSessionStore'
 import { BottomTabBar } from './BottomTabBar'
 import { SidebarNav } from './SidebarNav'
@@ -19,7 +19,10 @@ export function AppShell() {
   const routeVehicleId = location.pathname.match(/^\/v\/([^/]+)\//)?.[1]
   const routeVehicleQuery = useVehicle(accountId, routeVehicleId)
   const routeVehicleKey = accountId && routeVehicleId ? `${accountId}:${routeVehicleId}` : null
-  const rememberedVehicleId = accountId ? getLastVehicleId(accountId) : null
+  // Reactive read (KHÔNG `getLastVehicleId` gọi thẳng) — AppShell không sở hữu "xe đang
+  // chọn", chỉ đọc lại; nếu 1 trang khác (vd SettingsPage) đổi giá trị này mà không điều
+  // hướng đi đâu, AppShell vẫn phải tự re-render theo. Xem lesson learned ở lastVehicle.ts.
+  const rememberedVehicleId = useLastVehicleId(accountId)
   const vehicleId = routeVehicleId ?? rememberedVehicleId ?? undefined
   const vehicle = routeVehicleId ? routeVehicleQuery.vehicle : vehicles?.find((candidate) => candidate.id === vehicleId)
   const isOnboarding = location.pathname.startsWith('/onboarding/')

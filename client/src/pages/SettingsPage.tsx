@@ -143,10 +143,7 @@ export function SettingsPage() {
             activeVehicleId={activeVehicleId}
             accountId={account.id}
             onOpen={(vehicle) => {
-              if (vehicle.archivedAt == null) {
-                selectVehicle(vehicle.id);
-                navigate(`/v/${vehicle.id}/home`);
-              }
+              if (vehicle.archivedAt == null) selectVehicle(vehicle.id);
             }}
             onAdd={() => navigate("/onboarding/add-vehicle")}
             onArchive={handleArchive}

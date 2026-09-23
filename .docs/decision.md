@@ -31,7 +31,7 @@ Nguyên tắc quan trọng nhất: **tách rõ dữ liệu dạng log (append-on
 | Account | Mutable, ít thay đổi | email, tạo 1 lần |
 | Device | Mutable, ít thay đổi | gắn với Account, sinh ra khi cài app |
 | Vehicle | Mutable | tên, biển số, trạng thái archived (soft delete) |
-| PartType | Static, seed data | không do user tạo ở MVP, không cần sync riêng |
+| PartType | Mutable, seed-per-account | 10 dòng mặc định copy vào account lúc signup, user tự thêm/sửa/tắt như config khác |
 | ReminderConfig | Mutable | interval_km, interval_days theo từng (vehicle, part_type) |
 | OdometerLog | **Append-only** | mỗi lần nhập KM là 1 bản ghi mới, không sửa/xóa |
 | FuelLog | **Append-only** | mỗi lần đổ xăng là 1 bản ghi, có thể liên kết OdometerLog |
@@ -142,7 +142,9 @@ Các mặc định dưới đây đã được chấp thuận và là quyết đ
 
 ### 6.3. Danh mục PartType mặc định
 
-Danh mục seed ban đầu gồm:
+Không còn danh mục global dùng chung — mỗi account có bộ `part_types` riêng, được copy từ template dưới đây thành dữ liệu sở hữu bởi chính account đó ngay lúc signup (server, transaction cùng lúc tạo account). Từ đó user sửa tên/tắt-bật/thêm mới tự do, không còn phân biệt "mặc định" (chỉ xem) và "tuỳ chỉnh".
+
+Template seed ban đầu gồm:
 
 | Code | Tên hiển thị |
 |---|---|
