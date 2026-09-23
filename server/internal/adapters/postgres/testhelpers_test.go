@@ -2,12 +2,10 @@ package postgres_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/pgtest"
@@ -15,10 +13,12 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
+var initialAccountSeq = int64(len(seed.Manifest))
+
 // newTestStore starts an ephemeral, migrated PostgreSQL container and opens
 // a Store against it. It skips the test (via pgtest.StartDSN) when Docker
 // is unavailable. The DSN is also returned for tests that need a second,
-// direct *sql.DB connection (e.g. to seed part_types).
+// direct *sql.DB connection.
 func newTestStore(t *testing.T) (*postgres.Store, string) {
 	t.Helper()
 	dsn := pgtest.StartDSN(t)
@@ -41,7 +41,17 @@ func newAccount(t *testing.T, store *postgres.Store) string {
 	if err != nil {
 		t.Fatalf("create account: %v", err)
 	}
+	for _, deviceID := range []string{"device-1", "device-2", "device-a", "device-b"} {
+		registerTestDevice(t, store, id, deviceID)
+	}
 	return id
+}
+
+func registerTestDevice(t *testing.T, store *postgres.Store, accountID, deviceID string) {
+	t.Helper()
+	if _, err := store.RegisterDevice(context.Background(), accountID, deviceID); err != nil {
+		t.Fatalf("register test device: %v", err)
+	}
 }
 
 // createVehicle applies a "create vehicle" mutation and returns the new
@@ -60,23 +70,19 @@ func createVehicle(t *testing.T, store *postgres.Store, accountID, deviceID stri
 	return vehicleID
 }
 
-// seedPartTypes seeds the fixed part_types catalog (via a second, direct
-// connection using dsn) and returns the code -> id map from the manifest,
-// for tests that need a real part_type_id to satisfy foreign keys on
-// reminder_configs/service_logs.
-func seedPartTypes(t *testing.T, dsn string) map[string]string {
+// seedPartTypes returns the code -> id map for accountID's own part_types
+// rows, already created automatically by CreateAccount (see
+// postgres/seed.SeedAccountPartTypes), for tests that need a real
+// part_type_id to satisfy foreign keys on reminder_configs/service_logs.
+func seedPartTypes(t *testing.T, store *postgres.Store, accountID string) map[string]string {
 	t.Helper()
-	db, err := sql.Open("pgx", dsn)
+	partTypes, err := store.ListPartTypes(context.Background(), accountID)
 	if err != nil {
-		t.Fatalf("open seed connection: %v", err)
+		t.Fatalf("list part types: %v", err)
 	}
-	defer db.Close()
-	if err := seed.Seed(context.Background(), db, seed.Manifest); err != nil {
-		t.Fatalf("seed part types: %v", err)
-	}
-	byCode := make(map[string]string, len(seed.Manifest))
-	for _, item := range seed.Manifest {
-		byCode[item.Code] = item.ID
+	byCode := make(map[string]string, len(partTypes))
+	for _, partType := range partTypes {
+		byCode[partType.Code] = partType.ID
 	}
 	return byCode
 }

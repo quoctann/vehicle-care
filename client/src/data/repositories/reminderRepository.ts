@@ -1,4 +1,4 @@
-import { generateId } from '@/lib/uuid'
+import { generateDeterministicId } from '@/lib/uuid'
 import { validateReminderInterval } from '@/domain/validation'
 import type { ReminderConfig } from '@/domain/types'
 import { db } from '../db'
@@ -28,8 +28,9 @@ export async function createReminderConfig(input: {
   if (!validation.valid) throw new Error(`Interval không hợp lệ: ${validation.error}`)
 
   const now = new Date().toISOString()
+  const id = await generateDeterministicId(`${input.accountId}\0${input.vehicleId}\0${input.partTypeId}`)
   const reminder: ReminderConfig = {
-    id: generateId(),
+    id,
     accountId: input.accountId,
     vehicleId: input.vehicleId,
     partTypeId: input.partTypeId,
@@ -44,14 +45,20 @@ export async function createReminderConfig(input: {
     serverSeq: null,
   }
 
-  await db.transaction('rw', db.vehicles, db.partTypes, db.reminderConfigs, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.partTypes, db.reminderConfigs, db.outbox, db.syncMeta], async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
-    if (!(await db.partTypes.get(input.partTypeId))) throw new Error('Unknown part type.')
+    const partType = await db.partTypes.get(input.partTypeId)
+    if (!partType || partType.accountId !== input.accountId || !partType.active) throw new Error('Unknown or inactive part type.')
     await assertNoActiveDuplicate(input.vehicleId, input.partTypeId)
-    await db.reminderConfigs.add(reminder)
+    const existing = await db.reminderConfigs.get(id)
+    if (existing && (existing.accountId !== input.accountId || existing.deletedAt == null)) {
+      throw new Error('Reminder config already exists.')
+    }
+    await db.reminderConfigs.put(existing ? { ...reminder, createdAtClient: existing.createdAtClient } : reminder)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'reminder_config',
-      operation: 'create',
+      operation: existing?.serverSeq != null ? 'update' : 'create',
       entityId: reminder.id,
       payload: reminderConfigToPayload(reminder),
     })
@@ -60,7 +67,7 @@ export async function createReminderConfig(input: {
 }
 
 async function writeReminderPatch(accountId: string, id: string, patch: Partial<ReminderConfig>): Promise<void> {
-  await db.transaction('rw', db.reminderConfigs, db.outbox, async () => {
+  await db.transaction('rw', [db.reminderConfigs, db.outbox, db.syncMeta], async () => {
     const current = await db.reminderConfigs.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`ReminderConfig not found: ${id}`)
     const updated: ReminderConfig = { ...current, ...patch }
@@ -74,6 +81,7 @@ async function writeReminderPatch(accountId: string, id: string, patch: Partial<
 
     await db.reminderConfigs.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'reminder_config',
       operation: 'update',
       entityId: id,

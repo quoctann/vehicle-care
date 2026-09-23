@@ -107,11 +107,11 @@ export function pushMutations(req: PushRequest): Promise<PushResponse> {
   return request('POST', '/sync/push', req)
 }
 
-export function pullChanges(params: { afterSeq: number; limit: number; watermark: string }): Promise<PullResponse> {
+export function pullChanges(params: { afterSeq: number; limit: number; untilSeq?: number }): Promise<PullResponse> {
   const query = new URLSearchParams({
     after_seq: String(params.afterSeq),
     limit: String(params.limit),
-    watermark: params.watermark,
   })
+  if (params.untilSeq != null) query.set('until_seq', String(params.untilSeq))
   return request('GET', `/sync/pull?${query.toString()}`)
 }

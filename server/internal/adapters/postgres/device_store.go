@@ -36,13 +36,13 @@ func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) 
 }
 
 // DeviceRegistered reports whether a device belongs to an account.
-func (s *Store) DeviceRegistered(ctx context.Context, accountID, deviceID string) bool {
+func (s *Store) DeviceRegistered(ctx context.Context, accountID, deviceID string) (bool, error) {
 	registered, err := s.queries.DeviceRegistered(ctx, sqlcgen.DeviceRegisteredParams{
 		AccountID: accountID,
 		DeviceID:  deviceID,
 	})
 	if err != nil {
-		return false
+		return false, fmt.Errorf("postgres: check registered device: %w", err)
 	}
-	return registered
+	return registered, nil
 }

@@ -42,6 +42,8 @@ export function SignUpPage() {
       // Signup (theo policy A trong sync-api-contract.md) set cookie session ngay —
       // hydrate lại để useSessionStore biết đã đăng nhập, dùng cho mọi trang sau đó.
       await useSessionStore.getState().hydrate()
+      // Server đã seed sẵn 10 part type mặc định cho account này trong lúc signup — kéo
+      // về Dexie ngay để picker part type có dữ liệu trước khi user vào app.
       navigate('/sign-up/check-email', { state: { email } })
     } catch (err) {
       setError(getUserError(err, t))

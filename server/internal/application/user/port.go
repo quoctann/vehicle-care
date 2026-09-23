@@ -16,8 +16,8 @@ var ErrAccountExists = errors.New("account already exists")
 // PostgreSQL adapter.
 type IAccountStore interface {
 	CreateAccount(ctx context.Context, account domain.Account) error
-	AccountByEmail(ctx context.Context, email string) (domain.Account, bool)
-	AccountByID(ctx context.Context, id string) (domain.Account, bool)
+	AccountByEmail(ctx context.Context, email string) (domain.Account, bool, error)
+	AccountByID(ctx context.Context, id string) (domain.Account, bool, error)
 	SetEmailVerified(ctx context.Context, accountID string) error
 	SetPassword(ctx context.Context, accountID string, passwordHash []byte) error
 	RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error)

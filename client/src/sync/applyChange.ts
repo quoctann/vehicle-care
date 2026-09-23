@@ -17,10 +17,9 @@ async function assertReferencedVehicle(accountId: string, vehicleId: string): Pr
 }
 
 /**
- * Áp 1 thay đổi (từ pull, hoặc từ `server_snapshot` của push `conflict_resolved`)
- * vào Dexie.
+ * Áp 1 thay đổi từ pull vào Dexie.
  *
- * Giả định tự quyết định (tài liệu không nói rõ): `createdAtClient` chỉ để hiển thị
+ * `createdAtClient` chỉ để hiển thị
  * (không dùng cho LWW/dedupe — xem `domain/types.ts`) và KHÔNG có mặt trong wire
  * payload (không hàm `*ToPayload` nào gửi field này). Khi insert 1 entity MỚI do
  * thiết bị khác tạo (mình chưa từng thấy), không có cách nào biết giá trị gốc — dùng
@@ -88,8 +87,11 @@ async function applyEntityChange(
       const existing = await db.odometerLogs.get(entityId)
       if (existing) {
         if (existing.accountId !== accountId) throw new Error(`Odometer log ${entityId} belongs to another account`)
-        if (existing.serverSeq == null || existing.serverSeq < serverSeq) {
+        // Push ACK already set this version, but only pull carries the canonical
+        // payload (e.g. PostgreSQL numeric rounding). Equal versions must apply.
+        if (existing.serverSeq == null || existing.serverSeq <= serverSeq) {
           await db.odometerLogs.update(entityId, {
+            ...odometerLogFieldsFromPayload(payload),
             serverSeq,
             receivedAtServer,
           })
@@ -169,7 +171,7 @@ async function applyEntityChange(
           receivedAtServer,
         })
       } else {
-        if (existing.accountId != null && existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
+        if (existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
         if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
         await db.partTypes.update(entityId, {
           ...fields,
@@ -190,26 +192,5 @@ async function applyEntityChange(
 export async function applyPulledChange(change: PullChange, accountId: string): Promise<void> {
   await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
     await applyEntityChange(accountId, change.entity_type, change.entity_id, change.payload, change.server_seq, change.received_at_server)
-  })
-}
-
-/**
- * Dùng chung với `applyPulledChange` cho case `conflict_resolved` của push — input là
- * `server_snapshot` (đã trùng payload mình gửi trong model LWW-by-server-receipt hiện
- * tại, xem `.docs/sync-api-contract.md` mục 2.12) thay vì 1 `PullChange`. Luôn xử lý
- * như 1 `update` (ghi đè field nghiệp vụ theo bản server) — nếu vì lý do nào đó local
- * chưa có entity này (không nên xảy ra, đây là phản hồi của chính mutation mình vừa
- * gửi) thì `applyEntityChange` tự insert mới.
- */
-export async function applyServerSnapshotToEntity(
-  entityType: SyncEntityType,
-  entityId: string,
-  snapshotPayload: Record<string, unknown>,
-  serverSeq: number,
-  receivedAtServer: string,
-  accountId: string,
-): Promise<void> {
-  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
-    await applyEntityChange(accountId, entityType, entityId, snapshotPayload, serverSeq, receivedAtServer)
   })
 }

@@ -57,8 +57,9 @@ export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelecto
                 key={partType.id}
                 type="button"
                 aria-pressed={selected}
+                disabled={!partType.active}
                 onClick={() => onChange(partType.id)}
-                className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none ${
+                className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed ${
                   selected
                     ? 'border-foreground shadow-sm ring-2 ring-background'
                     : 'border-border-subtle text-muted-foreground hover:border-border hover:text-foreground'
@@ -66,6 +67,7 @@ export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelecto
               >
                 <Icon className={`size-5 ${selected ? 'text-primary' : ''}`} aria-hidden="true" />
                 <span className="mt-3 text-xs font-semibold leading-tight text-foreground">{display.displayName}</span>
+                {!partType.active ? <span className="mt-1 text-[10px] font-medium text-muted-foreground">{t('partType.disabled')}</span> : null}
               </button>
             )
           })}

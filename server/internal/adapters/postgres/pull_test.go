@@ -10,16 +10,16 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// TestPullKeepsStableWatermark asserts the same stable-watermark pagination
+// TestPullKeepsStableUpperBound asserts bounded pagination
 // behavior as the ApplyMutations/Pull contract. odometer_logs must reference
-// a real vehicle row, so a vehicle-create mutation runs first and consumes
-// server_seq 1; every literal sequence number below is shifted by that +1.
-func TestPullKeepsStableWatermark(t *testing.T) {
+// a real vehicle row. Signup seeds the catalog first, then vehicle creation
+// consumes the next sequence; assertions use that account-specific offset.
+func TestPullKeepsStableUpperBound(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1") // consumes server_seq 1
+	vehicleID := createVehicle(t, store, accountID, "device-1") // follows signup seed entries
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
 	for index := 1; index <= 2; index++ {
@@ -29,7 +29,7 @@ func TestPullKeepsStableWatermark(t *testing.T) {
 		}}, now)
 	}
 
-	first, err := store.Pull(ctx, accountID, 1, 1, "", now)
+	first, err := store.Pull(ctx, accountID, initialAccountSeq+1, 1, nil)
 	if err != nil {
 		t.Fatalf("first pull: %v", err)
 	}
@@ -37,41 +37,37 @@ func TestPullKeepsStableWatermark(t *testing.T) {
 		MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 		Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(300), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
 	}}, now)
-	second, err := store.Pull(ctx, accountID, first.NextCursor, 10, first.Watermark, now)
+	second, err := store.Pull(ctx, accountID, first.NextCursor, 10, &first.UntilSeq)
 	if err != nil {
 		t.Fatalf("second pull: %v", err)
 	}
 
-	if !first.HasMore || len(first.Changes) != 1 || first.Changes[0].ServerSeq != 2 {
+	if !first.HasMore || len(first.Changes) != 1 || first.Changes[0].ServerSeq != initialAccountSeq+2 {
 		t.Fatalf("unexpected first page: %#v", first)
 	}
-	if second.Watermark != first.Watermark || second.HasMore || len(second.Changes) != 1 || second.Changes[0].ServerSeq != 3 {
-		t.Fatalf("new change escaped stable watermark: %#v", second)
+	if second.UntilSeq != first.UntilSeq || second.HasMore || len(second.Changes) != 1 || second.Changes[0].ServerSeq != initialAccountSeq+3 {
+		t.Fatalf("new change escaped upper bound: %#v", second)
 	}
-	retriedFinal, err := store.Pull(ctx, accountID, first.NextCursor, 10, first.Watermark, now.Add(time.Minute))
-	if err != nil || len(retriedFinal.Changes) != 1 || retriedFinal.Changes[0].ServerSeq != 3 {
+	retriedFinal, err := store.Pull(ctx, accountID, first.NextCursor, 10, &first.UntilSeq)
+	if err != nil || len(retriedFinal.Changes) != 1 || retriedFinal.Changes[0].ServerSeq != initialAccountSeq+3 {
 		t.Fatalf("final page was not retryable: page=%#v err=%v", retriedFinal, err)
 	}
-	third, err := store.Pull(ctx, accountID, second.NextCursor, 10, "", now)
-	if err != nil || len(third.Changes) != 1 || third.Changes[0].ServerSeq != 4 {
+	third, err := store.Pull(ctx, accountID, second.NextCursor, 10, nil)
+	if err != nil || len(third.Changes) != 1 || third.Changes[0].ServerSeq != initialAccountSeq+4 {
 		t.Fatalf("next pull did not include deferred change: page=%#v err=%v", third, err)
 	}
 }
 
-// TestPullWatermarkExpires asserts that a watermark past its 15 minute TTL
-// is rejected.
-func TestPullWatermarkExpires(t *testing.T) {
+func TestPullUsesExplicitUpperBound(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
-
-	first, err := store.Pull(ctx, accountID, 0, 10, "", now)
+	first, err := store.Pull(ctx, accountID, 0, 10, nil)
 	if err != nil {
-		t.Fatalf("mint watermark: %v", err)
+		t.Fatalf("read initial bound: %v", err)
 	}
-	if _, err := store.Pull(ctx, accountID, first.NextCursor, 10, first.Watermark, now.Add(16*time.Minute)); err == nil {
-		t.Fatalf("expected expired watermark to be rejected")
+	if first.UntilSeq != initialAccountSeq || int64(len(first.Changes)) != initialAccountSeq {
+		t.Fatalf("expected seeded account bound %d, got %#v", initialAccountSeq, first)
 	}
 }

@@ -3,6 +3,7 @@ import { calculateReminderStatus } from '@/domain/reminder'
 import { deriveCurrentOdometer } from '@/domain/odometer'
 import type { IanaTimezone, IsoDateTime, PartType, ReminderCalculationResult, ReminderConfig } from '@/domain/types'
 import { db } from '../db'
+import { listPartTypes } from './partTypeQueries'
 
 export type ReminderWithStatus = {
   config: ReminderConfig
@@ -31,7 +32,7 @@ export async function listReminderStatusesForVehicle(
 ): Promise<ReminderWithStatus[]> {
   const [configs, partTypes, currentOdometerKm, vehicle] = await Promise.all([
     db.reminderConfigs.where('vehicleId').equals(vehicleId).and((config) => config.accountId === accountId).toArray(),
-    db.partTypes.toArray(),
+    listPartTypes(accountId),
     getCurrentOdometer(accountId, vehicleId),
     db.vehicles.get(vehicleId),
   ])
@@ -48,7 +49,7 @@ export async function listReminderStatusesForVehicle(
       const serviceLogs = await db.serviceLogs
         .where('vehicleId')
         .equals(vehicleId)
-        .and((l) => l.accountId === accountId && l.partTypeId === config.partTypeId)
+        .and((l) => l.accountId === accountId && l.partTypeId === config.partTypeId && l.deletedAt == null)
         .toArray()
       const lastServiceLog =
         serviceLogs.length > 0 ? serviceLogs.reduce((a, b) => (b.servicedAt > a.servicedAt ? b : a)) : null

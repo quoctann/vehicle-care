@@ -149,6 +149,11 @@ export function ReminderManagement({
                   <p className="truncate text-sm font-semibold">
                     {reminder.partType.displayName}
                   </p>
+                  {!reminder.partType.active && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {t('partType.disabled')}
+                    </span>
+                  )}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reminder.result.status === "overdue" ? "bg-destructive/10 text-destructive" : reminder.result.status === "due_soon" ? "bg-warn-bg text-warn-fg" : "bg-muted text-muted-foreground"}`}
                   >

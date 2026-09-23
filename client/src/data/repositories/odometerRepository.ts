@@ -36,10 +36,11 @@ export async function addOdometerLog(input: {
     receivedAtServer: null,
     serverSeq: null,
   }
-  await db.transaction('rw', db.vehicles, db.odometerLogs, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.odometerLogs, db.outbox, db.syncMeta], async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
     await db.odometerLogs.add(log)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'odometer_log',
       operation: 'create',
       entityId: log.id,

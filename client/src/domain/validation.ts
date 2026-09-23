@@ -33,7 +33,7 @@ export function validateReminderInterval(
   intervalDays: number | null,
 ): ReminderIntervalValidationResult {
   if (intervalKm != null && (!Number.isFinite(intervalKm) || intervalKm <= 0)) return { valid: false, error: 'interval_km_not_positive' }
-  if (intervalDays != null && (!Number.isFinite(intervalDays) || intervalDays <= 0)) return { valid: false, error: 'interval_days_not_positive' }
+  if (intervalDays != null && (!Number.isSafeInteger(intervalDays) || intervalDays <= 0)) return { valid: false, error: 'interval_days_not_positive' }
   if (intervalKm == null && intervalDays == null) return { valid: false, error: 'missing_interval' }
   return { valid: true }
 }

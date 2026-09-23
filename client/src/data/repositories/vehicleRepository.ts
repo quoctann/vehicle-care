@@ -26,9 +26,10 @@ export async function createVehicle(input: {
     receivedAtServer: null,
     serverSeq: null,
   }
-  await db.transaction('rw', db.vehicles, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.outbox, db.syncMeta], async () => {
     await db.vehicles.add(vehicle)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'vehicle',
       operation: 'create',
       entityId: vehicle.id,
@@ -39,12 +40,26 @@ export async function createVehicle(input: {
 }
 
 async function writeVehiclePatch(accountId: string, id: string, patch: Partial<Vehicle>): Promise<void> {
-  await db.transaction('rw', db.vehicles, db.outbox, async () => {
+  if (patch.name !== undefined) {
+    const name = patch.name.trim()
+    if (!name || name.length > 80) throw new Error('Vehicle name must contain 1 to 80 characters.')
+    patch = { ...patch, name }
+  }
+  if (patch.plateNumber !== undefined) {
+    const plateNumber = patch.plateNumber?.trim() || null
+    if (plateNumber && plateNumber.length > 24) throw new Error('Plate number must contain at most 24 characters.')
+    patch = { ...patch, plateNumber }
+  }
+  if (patch.dueSoonRatio != null && (!Number.isFinite(patch.dueSoonRatio) || patch.dueSoonRatio <= 0 || patch.dueSoonRatio > 1)) {
+    throw new Error('Due soon ratio must be between 0 and 1.')
+  }
+  await db.transaction('rw', [db.vehicles, db.outbox, db.syncMeta], async () => {
     const current = await db.vehicles.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Vehicle not found: ${id}`)
     const updated: Vehicle = { ...current, ...patch }
     await db.vehicles.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'vehicle',
       operation: 'update',
       entityId: id,

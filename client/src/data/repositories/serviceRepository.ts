@@ -26,7 +26,7 @@ export async function addServiceLog(input: {
   if (input.odometerKmSnapshot != null && (!Number.isFinite(input.odometerKmSnapshot) || input.odometerKmSnapshot < 0)) {
     throw new Error('Service odometer cannot be negative.')
   }
-  if (input.costVnd != null && (!Number.isFinite(input.costVnd) || input.costVnd < 0)) throw new Error('Service cost cannot be negative.')
+  if (input.costVnd != null && (!Number.isSafeInteger(input.costVnd) || input.costVnd < 0)) throw new Error('Service cost must be a non-negative integer.')
   if (input.servicedAt && Number.isNaN(Date.parse(input.servicedAt))) throw new Error('Service time is invalid.')
   const now = new Date().toISOString()
   const log: ServiceLog = {
@@ -43,11 +43,13 @@ export async function addServiceLog(input: {
     receivedAtServer: null,
     serverSeq: null,
   }
-  await db.transaction('rw', db.vehicles, db.partTypes, db.serviceLogs, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.partTypes, db.serviceLogs, db.outbox, db.syncMeta], async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
-    if (!(await db.partTypes.get(input.partTypeId))) throw new Error('Unknown part type.')
+    const partType = await db.partTypes.get(input.partTypeId)
+    if (!partType || partType.accountId !== input.accountId || !partType.active) throw new Error('Unknown or inactive part type.')
     await db.serviceLogs.add(log)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'service_log',
       operation: 'create',
       entityId: log.id,
@@ -58,12 +60,17 @@ export async function addServiceLog(input: {
 }
 
 async function writeServiceLogPatch(accountId: string, id: string, patch: Partial<ServiceLog>): Promise<void> {
-  await db.transaction('rw', db.serviceLogs, db.outbox, async () => {
+  await db.transaction('rw', [db.partTypes, db.serviceLogs, db.outbox, db.syncMeta], async () => {
     const current = await db.serviceLogs.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Service log not found: ${id}`)
+    if (patch.partTypeId && patch.partTypeId !== current.partTypeId) {
+      const partType = await db.partTypes.get(patch.partTypeId)
+      if (!partType || partType.accountId !== accountId || !partType.active) throw new Error('Unknown or inactive part type.')
+    }
     const updated: ServiceLog = { ...current, ...patch }
     await db.serviceLogs.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'service_log',
       operation: 'update',
       entityId: id,
@@ -81,7 +88,7 @@ export function updateServiceLog(
   if (patch.odometerKmSnapshot != null && (!Number.isFinite(patch.odometerKmSnapshot) || patch.odometerKmSnapshot < 0)) {
     throw new Error('Service odometer cannot be negative.')
   }
-  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Service cost cannot be negative.')
+  if (patch.costVnd != null && (!Number.isSafeInteger(patch.costVnd) || patch.costVnd < 0)) throw new Error('Service cost must be a non-negative integer.')
   if (patch.servicedAt && Number.isNaN(Date.parse(patch.servicedAt))) throw new Error('Service time is invalid.')
   return writeServiceLogPatch(accountId, id, patch)
 }

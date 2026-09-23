@@ -13,8 +13,8 @@ export async function getMonthlyCosts(accountId: string, vehicleId: string, acco
   const vehicle = await db.vehicles.get(vehicleId)
   if (!vehicle || vehicle.accountId !== accountId || vehicle.deletedAt != null) return []
   const [fuelLogs, serviceLogs] = await Promise.all([
-    db.fuelLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId).toArray(),
-    db.serviceLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId).toArray(),
+    db.fuelLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
+    db.serviceLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
   ])
 
   const byMonth = new Map<string, MonthlyCost>()
@@ -56,8 +56,8 @@ export async function getCostPerKm(accountId: string, vehicleId: string, monthsB
   const cutoffIso = cutoff.toISOString()
 
   const [fuelLogs, serviceLogs, odometerLogs] = await Promise.all([
-    db.fuelLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId).toArray(),
-    db.serviceLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId).toArray(),
+    db.fuelLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
+    db.serviceLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId && log.deletedAt == null).toArray(),
     db.odometerLogs.where('vehicleId').equals(vehicleId).and((log) => log.accountId === accountId).toArray(),
   ])
 

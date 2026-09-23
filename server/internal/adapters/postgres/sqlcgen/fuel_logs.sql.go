@@ -29,6 +29,34 @@ func (q *Queries) FuelLogExists(ctx context.Context, arg FuelLogExistsParams) (b
 	return exists, err
 }
 
+const canonicalFuelLogPayload = `-- name: CanonicalFuelLogPayload :one
+SELECT jsonb_build_object(
+    'vehicle_id', vehicle_id,
+    'recorded_at', recorded_at,
+    'liters', liters,
+    'cost_vnd', cost_vnd,
+    'shop', shop,
+    'note', note,
+    'odometer_log_id', odometer_log_id,
+    'is_full_tank', is_full_tank,
+    'deleted_at', deleted_at
+)
+FROM fuel_logs
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalFuelLogPayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalFuelLogPayload(ctx context.Context, arg CanonicalFuelLogPayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalFuelLogPayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
 const lockFuelLogForUpdate = `-- name: LockFuelLogForUpdate :one
 SELECT server_seq FROM fuel_logs WHERE account_id = $1 AND id = $2 FOR UPDATE
 `
@@ -51,7 +79,8 @@ const upsertFuelLog = `-- name: UpsertFuelLog :exec
 INSERT INTO fuel_logs (account_id, id, vehicle_id, recorded_at, liters, cost_vnd, shop, note, odometer_log_id, is_full_tank, deleted_at, server_seq, received_at_server)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 ON CONFLICT (account_id, id) DO UPDATE
-  SET recorded_at = EXCLUDED.recorded_at,
+  SET vehicle_id = EXCLUDED.vehicle_id,
+      recorded_at = EXCLUDED.recorded_at,
       liters = EXCLUDED.liters,
       cost_vnd = EXCLUDED.cost_vnd,
       shop = EXCLUDED.shop,

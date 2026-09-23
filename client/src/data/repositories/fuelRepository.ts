@@ -23,7 +23,7 @@ export async function addFuelLog(input: {
   isFullTank: boolean
 }): Promise<{ fuelLog: FuelLog; odometerLog: OdometerLog | null }> {
   if (input.liters != null && (!Number.isFinite(input.liters) || input.liters <= 0)) throw new Error('Fuel amount must be positive.')
-  if (input.costVnd != null && (!Number.isFinite(input.costVnd) || input.costVnd < 0)) throw new Error('Fuel cost cannot be negative.')
+  if (input.costVnd != null && (!Number.isSafeInteger(input.costVnd) || input.costVnd < 0)) throw new Error('Fuel cost must be a non-negative integer.')
   if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt))) throw new Error('Recorded time is invalid.')
   if (input.odometerKm != null) {
     const validation = validateOdometerReading(input.odometerKm, null)
@@ -66,11 +66,12 @@ export async function addFuelLog(input: {
     serverSeq: null,
   }
 
-  await db.transaction('rw', db.vehicles, db.fuelLogs, db.odometerLogs, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.fuelLogs, db.odometerLogs, db.outbox, db.syncMeta], async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
     if (odometerLog) {
       await db.odometerLogs.add(odometerLog)
       await enqueueMutation({
+        accountId: input.accountId,
         entityType: 'odometer_log',
         operation: 'create',
         entityId: odometerLog.id,
@@ -79,6 +80,7 @@ export async function addFuelLog(input: {
     }
     await db.fuelLogs.add(fuelLog)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'fuel_log',
       operation: 'create',
       entityId: fuelLog.id,
@@ -90,12 +92,13 @@ export async function addFuelLog(input: {
 }
 
 async function writeFuelLogPatch(accountId: string, id: string, patch: Partial<FuelLog>): Promise<void> {
-  await db.transaction('rw', db.fuelLogs, db.outbox, async () => {
+  await db.transaction('rw', [db.fuelLogs, db.outbox, db.syncMeta], async () => {
     const current = await db.fuelLogs.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Fuel log not found: ${id}`)
     const updated: FuelLog = { ...current, ...patch }
     await db.fuelLogs.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'fuel_log',
       operation: 'update',
       entityId: id,
@@ -111,7 +114,7 @@ export function updateFuelLog(
   patch: Partial<Pick<FuelLog, 'recordedAt' | 'liters' | 'costVnd' | 'shop' | 'note' | 'isFullTank'>>,
 ): Promise<void> {
   if (patch.liters != null && (!Number.isFinite(patch.liters) || patch.liters <= 0)) throw new Error('Fuel amount must be positive.')
-  if (patch.costVnd != null && (!Number.isFinite(patch.costVnd) || patch.costVnd < 0)) throw new Error('Fuel cost cannot be negative.')
+  if (patch.costVnd != null && (!Number.isSafeInteger(patch.costVnd) || patch.costVnd < 0)) throw new Error('Fuel cost must be a non-negative integer.')
   if (patch.recordedAt && Number.isNaN(Date.parse(patch.recordedAt))) throw new Error('Recorded time is invalid.')
   return writeFuelLogPatch(accountId, id, patch)
 }

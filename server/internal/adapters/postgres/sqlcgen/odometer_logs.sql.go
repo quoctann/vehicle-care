@@ -83,3 +83,27 @@ func (q *Queries) OdometerLogExists(ctx context.Context, arg OdometerLogExistsPa
 	err := row.Scan(&exists)
 	return exists, err
 }
+
+const canonicalOdometerLogPayload = `-- name: CanonicalOdometerLogPayload :one
+SELECT jsonb_build_object(
+    'vehicle_id', vehicle_id,
+    'odometer_km', odometer_km,
+    'recorded_at', recorded_at,
+    'source', source,
+    'note', note
+)
+FROM odometer_logs
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalOdometerLogPayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalOdometerLogPayload(ctx context.Context, arg CanonicalOdometerLogPayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalOdometerLogPayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}

@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
@@ -15,10 +17,13 @@ import (
 
 const pgUniqueViolation = "23505"
 
-// CreateAccount inserts the account and its account_sequences row (current
-// current_seq = 0) in one transaction. The two rows must always exist
+// CreateAccount inserts the account, its account_sequences row (current_seq
+// = 0), and its own copy of the default part_types catalog, all in one
+// transaction. The account and account_sequences rows must always exist
 // together: NextSeq (used by ApplyMutations) locks and updates the
-// account_sequences row and has nothing to lock if it is missing.
+// account_sequences row and has nothing to lock if it is missing. part_types
+// seeding is bundled into the same transaction so a brand-new account never
+// exists without its default catalog.
 func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -43,6 +48,9 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 	if err := queries.InsertAccountSequenceRow(ctx, account.ID); err != nil {
 		return fmt.Errorf("postgres: insert account sequence row: %w", err)
 	}
+	if err := seed.SeedAccountPartTypes(ctx, queries, account.ID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("postgres: seed account part types: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("postgres: commit create account: %w", err)
 	}
@@ -57,21 +65,27 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 // reported the same way as "not found": callers cannot tell the two apart
 // through this method. That is an existing limitation of the interface,
 // not something introduced by this adapter.
-func (s *Store) AccountByEmail(ctx context.Context, email string) (domain.Account, bool) {
+func (s *Store) AccountByEmail(ctx context.Context, email string) (domain.Account, bool, error) {
 	row, err := s.queries.AccountByEmail(ctx, email)
 	if err != nil {
-		return domain.Account{}, false
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Account{}, false, nil
+		}
+		return domain.Account{}, false, fmt.Errorf("postgres: find account by email: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true
+	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
 }
 
 // AccountByID looks up an account by primary key.
-func (s *Store) AccountByID(ctx context.Context, id string) (domain.Account, bool) {
+func (s *Store) AccountByID(ctx context.Context, id string) (domain.Account, bool, error) {
 	row, err := s.queries.AccountByID(ctx, id)
 	if err != nil {
-		return domain.Account{}, false
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Account{}, false, nil
+		}
+		return domain.Account{}, false, fmt.Errorf("postgres: find account by id: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true
+	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
 }
 
 // SetEmailVerified marks an account email as verified.

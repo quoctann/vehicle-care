@@ -6,7 +6,9 @@ này mở rộng mục D (D1-D8) của `implementation-plan-section-5.md`, áp d
 auth mới (session cookie + Redis + Google OAuth) thay cho đề xuất OTP/magic-link ban
 đầu trong `decision.md`.*
 
-Trạng thái triển khai hiện tại: **frontend đã implement UI + client API layer đúng
+Trạng thái triển khai hiện tại: **frontend/backend đã implement contract sync tuần tự A**.
+Một số ví dụ lịch sử bên dưới vẫn giữ shape cũ để tham khảo; các override ở mục 2.15
+là nguồn sự thật cho implementation hiện tại. Frontend đã implement UI + client API layer đúng
 theo tài liệu này. Backend Go thật (bao gồm adapter Postgres + Redis) đã được xây
 dựng và implement gần như toàn bộ hợp đồng này** — xem `.docs/TONG-HOP-KY-THUAT.md`
 mục 2 để biết chi tiết trạng thái đã xong/còn thiếu. Hai gap còn lại so với hợp đồng:
@@ -254,27 +256,28 @@ Client chỉ nâng `last_seen_seq` cục bộ = `next_cursor` SAU KHI đã lưu 
 // Response 200
 {
   "part_types": [
-    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1", "account_id": null },
+    { "id": "649e41d9-00f8-4929-b343-407e4896060d", "code": "engine_oil", "name_vi": "Dầu nhớt động cơ", "display_order": 1, "active": true, "seed_version": "v1", "account_id": "acc_1" },
     { "id": "b2f1...", "code": "b2f1...", "name_vi": "Phanh đĩa sau (độ)", "display_order": 999, "active": true, "seed_version": "custom", "account_id": "acc_1" }
   ]
 }
 ```
 
-Danh mục `part_type` gồm 2 phần: (1) 10 dòng seed cố định dùng chung mọi account
-(`account_id: null`, KHÔNG sửa/xoá được — client không được tự sinh/hardcode UUID riêng
-cho các dòng này, xem `.docs/20260919-feedback.md` mục 1) và (2) hạng mục tuỳ chỉnh do
-từng account tự tạo (`account_id` = account sở hữu, mục 2 "Yêu cầu new feature" trong
-feedback doc). Endpoint này trả TOÀN BỘ 2 phần gộp lại (kể cả `active=false`) — client tự
-lọc theo `active` khi hiển thị picker. **Khác với Stage 1**: `part_type` giờ LÀ entity
-mutable thật trong change-feed (có `server_seq`, đi qua `sync/push`/`sync/pull` như
-`vehicle`) — endpoint `GET /part-types` vẫn là cách bootstrap/full-refresh, còn tạo/sửa/
-xoá (soft, qua `active`) hạng mục tuỳ chỉnh đi qua `POST /sync/push` với
-`entity_type: "part_type"`. Quy ước bắt buộc: `payload.code` PHẢI bằng chính `entity_id`
-của mutation (server từ chối `validation_failed` nếu sai) — đây là cách tránh đụng độ
-với ràng buộc `UNIQUE(code)` toàn cục mà không cần đổi sang composite/partial unique
-index (vì `entity_id` luôn là UUID mới). Dòng seed (`account_id: null`) không thể bị
-sửa/xoá qua mutation — server chỉ chấp nhận `update` khi `part_type` đó thuộc đúng
-account gửi request (`ownership_invalid` nếu không).
+Không còn khái niệm dòng global dùng chung mọi account. `part_type` LÀ entity mutable
+thật trong change-feed (có `server_seq`, đi qua `sync/push`/`sync/pull` như `vehicle`),
+luôn thuộc về đúng 1 account (`account_id` không bao giờ `null`) — kể cả 10 dòng "mặc
+định" cũng chỉ là dữ liệu được server tự copy vào account lúc signup (transaction cùng
+lúc tạo account), sửa/tắt được y hệt hạng mục tự thêm sau đó. Endpoint này trả TOÀN BỘ
+danh mục của account gọi request (kể cả `active=false`) — client tự lọc theo `active`
+khi hiển thị picker; đây vẫn là cách bootstrap/full-refresh, còn tạo/sửa/xoá (soft, qua
+`active`) đi qua `POST /sync/push` với `entity_type: "part_type"`. Quy ước bắt buộc CHỈ
+áp dụng cho `operation: "create"`: `payload.code` PHẢI bằng chính `entity_id` của mutation
+(server từ chối `validation_failed` nếu sai) — cách này tránh đụng độ với ràng buộc
+`UNIQUE(account_id, code)` mà không cần thêm 1 query kiểm tra riêng (vì `entity_id` luôn
+là UUID mới, không trùng ai). Ràng buộc này KHÔNG áp dụng cho `update` — hạng mục seed có
+`code` (vd `"engine_oil"`) khác hẳn `id` (UUID) và vẫn phải sửa/tắt được bình thường; quy
+tắc "code == entity_id" chỉ có ý nghĩa lúc tạo mới. `UpsertPartType` cũng không cho phép
+đổi `code` qua nhánh update (chỉ `name_vi`/`active` được ghi đè). Server chỉ chấp nhận `update` khi `part_type` đó thuộc
+đúng account gửi request (`ownership_invalid` nếu không).
 
 ## 3. Error model (D6)
 
@@ -346,3 +349,63 @@ Client (đã dùng offline, có Vehicle/OdometerLog local, chưa có account)
 - Rate-limit auth endpoints (login/signup/forgot) và sync endpoints (push/pull) độc lập nhau.
 - Validate payload ở cả API layer lẫn database constraint (không tin tưởng riêng 1 lớp).
 - Log có request_id/mutation_id/server_seq nhưng KHÔNG log password, token, OTP, hay nội dung payload nhạy cảm.
+
+## 6. Current implementation override — incremental sync A
+
+Mục này là nguồn sự thật cho code hiện tại; các ví dụ cũ ở mục 2.12–4.3 về
+`base_server_seq`, `conflict_resolved` và `watermark` được xem là historical.
+
+### 6.1. Push tuần tự và recovery
+
+- Request vẫn giữ `{ mutations: [...] }` để không phải đổi HTTP envelope, nhưng client gửi một mutation mỗi request.
+- Server xử lý theo thứ tự và trả prefix kết quả. Khi một mutation trả `rejected` hoặc `retryable_error`, server dừng, các mutation phía sau chưa được xử lý.
+- `applied` và `duplicate` là terminal-success. `duplicate` trả acknowledgment đã lưu của mutation ID cũ.
+- `rejected` là terminal failure. Client chuyển item thành `blocked`, không tự gửi lại payload đó.
+- `retryable_error` là temporary failure. Client giữ item `pending`, chỉ gửi lại khi người dùng bấm **Thử lại**.
+- Timeout/mất response giữ nguyên mutation ID và payload để retry idempotent; không được sửa envelope khi chưa biết server đã commit hay chưa.
+- Device ID cũng giữ nguyên theo workspace IndexedDB. Server khóa account sequence trước lookup idempotency để concurrent retry trả ACK cũ thay vì reject do unique-key race.
+- Item blocked có nguyên nhân và có hai đường: repair bằng mutation ID mới hoặc khôi phục toàn account từ server.
+- Repair thay blocked envelope bằng mutation ID mới ngay tại vị trí FIFO cũ; nếu entity đã có revision local mới hơn, repair không ghi đè snapshot mới đó.
+- Sync và restore dùng chung account lock. Restore đang chạy hoặc đã lỗi sẽ chặn local entity write cho đến khi tiếp tục thành công hoặc người dùng đăng xuất.
+
+### 6.2. Pull với `until_seq`
+
+Request hiện tại:
+
+```text
+GET /sync/pull?after_seq=41&limit=100
+GET /sync/pull?after_seq=100&limit=100&until_seq=150
+```
+
+Response có:
+
+```json
+{
+  "changes": [],
+  "next_cursor": 150,
+  "until_seq": 150,
+  "has_more": false,
+  "server_time": "2026-09-23T10:00:00Z"
+}
+```
+
+Server không còn tạo/lưu watermark. Trang đầu chụp sequence hiện tại làm `until_seq`; các trang sau dùng lại đúng bound đó. Change mới sau bound chờ phiên pull tiếp theo.
+
+Client chỉ apply một page khi outbox account vẫn sạch trong cùng Dexie transaction với entity và cursor. Nếu có pending/blocked, page không được apply và cursor không tăng.
+
+Ví dụ response rỗng trên tương ứng request đã ở `after_seq=150`. Trang `has_more=true` phải có tiến triển cursor. Edit local trong lúc chờ response làm lượt sync chuyển `pending`, không thành lỗi retryable. Canonical fields được áp dụng kể cả khi `server_seq` bằng metadata từ push ACK; ACK chỉ xác nhận mutation, không chứa business fields đã chuẩn hóa.
+
+### 6.3. Trạng thái thành công
+
+`last_synced_at` chỉ được cập nhật sau khi push hết queue, pull hoàn tất và không còn
+pending/blocked. Một mutation local mới làm trạng thái quay về chưa đồng bộ; timestamp
+thành công cũ chỉ còn là thông tin lịch sử.
+
+### 6.4. PartType seed
+
+Mười PartType mặc định được tạo cùng account sequence và append vào changefeed trong
+transaction signup. Thiết bị mới pull từ `after_seq=0` sẽ nhận cả seed catalog; endpoint
+`GET /part-types` chỉ còn là endpoint đọc phụ trợ, không phải replication path bắt buộc.
+PartType inactive không xuất hiện trong picker tạo mới, nhưng server vẫn chấp nhận reference
+từ record offline nếu PartType đó thuộc đúng account. ReminderConfig ID được sinh xác định
+từ account + vehicle + PartType để concurrent offline create cùng scope hội tụ về một ID.

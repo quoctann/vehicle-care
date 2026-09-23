@@ -3,20 +3,17 @@
 // PostgreSQL-only behavior (row locks, unique_violation, SAVEPOINT).
 //
 // Every test using this package requires a working Docker (or compatible)
-// daemon reachable from the test process. If Docker is unavailable, callers
-// should skip with t.Skipf rather than fail the whole suite.
+// daemon reachable from the test process. Local runs skip when unavailable;
+// REQUIRE_POSTGRES_TESTS=1 makes infrastructure failures fatal for CI/acceptance.
 package pgtest
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
@@ -29,8 +26,8 @@ import (
 // connection pool (e.g. to construct a postgres.Store) should open it from
 // this DSN themselves.
 //
-// If Docker is not available in the current environment, the test is
-// skipped (not failed) with an explanation.
+// If Docker is not available, skip with an explanation unless the caller sets
+// REQUIRE_POSTGRES_TESTS=1 (make test-integration).
 func StartDSN(t *testing.T) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -44,6 +41,9 @@ func StartDSN(t *testing.T) string {
 		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
+		if os.Getenv("REQUIRE_POSTGRES_TESTS") == "1" {
+			t.Fatalf("pgtest: PostgreSQL integration tests are required, but Docker failed: %v", err)
+		}
 		t.Skipf("pgtest: docker unavailable, skipping PostgreSQL-backed test: %v", err)
 		return ""
 	}
@@ -65,7 +65,7 @@ func StartDSN(t *testing.T) string {
 	if err := waitForPing(db); err != nil {
 		t.Fatalf("pgtest: ping db: %v", err)
 	}
-	if err := migrateUp(db); err != nil {
+	if err := migrations.Up(db); err != nil {
 		t.Fatalf("pgtest: migrate up: %v", err)
 	}
 
@@ -105,23 +105,4 @@ func waitForPing(db *sql.DB) error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	return lastErr
-}
-
-func migrateUp(db *sql.DB) error {
-	sourceDriver, err := iofs.New(migrations.FS, ".")
-	if err != nil {
-		return fmt.Errorf("load migration source: %w", err)
-	}
-	dbDriver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return fmt.Errorf("create postgres driver: %w", err)
-	}
-	m, err := migrate.NewWithInstance("iofs", sourceDriver, "postgres", dbDriver)
-	if err != nil {
-		return fmt.Errorf("create migrator: %w", err)
-	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("apply migrations: %w", err)
-	}
-	return nil
 }

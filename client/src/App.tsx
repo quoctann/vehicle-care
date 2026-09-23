@@ -2,22 +2,49 @@ import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { ThemeColorSync } from '@/components/theme/ThemeColorSync'
 import { Toaster } from '@/components/ui/sonner'
-import { refreshPartTypesFromServer, seedPartTypes } from '@/data/seed'
+import { db } from '@/data/db'
 import { AppRouter } from '@/routes/router'
 import { startAutoSync } from '@/sync/autoSync'
 import { useSessionStore } from '@/stores/useSessionStore'
+import { useSyncStore } from '@/stores/useSyncStore'
 
 export default function App() {
   const hydrate = useSessionStore((s) => s.hydrate)
+  const accountId = useSessionStore((s) => s.account?.id)
 
   useEffect(() => {
     // Cookie session (nếu có) tự đính kèm — không cần đọc gì từ local storage.
-    hydrate()
-    // Idempotent (bulkPut theo id cố định) — an toàn gọi lại mỗi lần app khởi động.
-    seedPartTypes()
-    // Best-effort: đồng bộ lại từ server (nguồn sự thật duy nhất cho UUID part_type).
-    void refreshPartTypesFromServer()
+    void hydrate()
   }, [hydrate])
+
+  useEffect(() => {
+    let cancelled = false
+    useSyncStore.setState({ status: 'idle', lastSyncedAt: null, lastError: null })
+    if (!accountId) return
+
+    void db.syncMeta.get(accountId).then((meta) => {
+      if (cancelled || useSessionStore.getState().account?.id !== accountId || useSyncStore.getState().status === 'syncing') return
+      useSyncStore.setState({
+        status: meta?.operation === 'restoring'
+          ? 'restoring'
+          : meta?.operation === 'restore_failed' || meta?.lastSyncFailureKind === 'retryable'
+            ? 'retryable'
+            : meta?.lastSyncFailureKind === 'blocked'
+              ? 'blocked'
+              : meta?.lastSyncError
+                ? 'error'
+                : meta?.lastSyncedAt
+                  ? 'synced'
+                  : 'idle',
+        lastSyncedAt: meta?.lastSyncedAt ?? null,
+        lastError: meta?.lastSyncError ?? null,
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
 
   useEffect(() => startAutoSync(), [])
 

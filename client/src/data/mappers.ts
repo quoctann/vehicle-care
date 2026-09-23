@@ -69,7 +69,7 @@ export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
 }
 
 /**
- * Wire payload (snake_case, từ `PullChange.payload` hoặc `MutationResult.server_snapshot`)
+ * Wire payload (snake_case, từ `PullChange.payload`)
  * → field domain (camelCase) — chiều NGƯỢC của các hàm `*ToPayload` ở trên. Dùng bởi
  * `sync/applyChange.ts`. KHÔNG bao gồm `id` (lấy từ `entity_id` của change/mutation),
  * `accountId` (lấy từ `useSessionStore` tại thời điểm apply), hay field server-owned
@@ -195,16 +195,13 @@ export function fuelLogFieldsFromPayload(
  * JSON đã typed (không phải `Record<string, unknown>` từ change-feed) nên không cần
  * validate runtime lại. `seed_version` server là chuỗi (`"v1"`, `"v2"`, ...) còn domain
  * `PartType.seedVersion` là số — lấy phần số, mặc định 1 nếu không parse được.
- */
-/**
- * Từ `GET /part-types` (bootstrap/full-refresh, KHÔNG phải pull change-feed) khi Dexie
- * CHƯA có dòng này (xem `refreshPartTypesFromServer` — nếu đã có, chỉ merge field nghiệp
- * vụ, giữ nguyên `serverSeq`/`receivedAtServer`/`createdAtClient` cũ). Response này không
- * có `server_seq` nên dòng MỚI để `null` như 1 entity vừa tạo cục bộ; nếu user sửa ngay,
- * mutation gửi `base_server_seq: null` → server vẫn áp dụng đúng (ON CONFLICT DO UPDATE
- * không phụ thuộc field này), chỉ mất tín hiệu `conflict_resolved` cho lần sửa đầu tiên
- * đó — đánh đổi chấp nhận được, tránh phải thêm server_seq vào REST response chỉ để phục
- * vụ 1 edge case hiếm.
+ *
+ * `serverSeq`/`receivedAtServer` LẤY THẲNG từ DTO (không để `null`) — bug thật đã xảy ra:
+ * để `null` khiến `push.ts` coi mọi dòng bootstrap qua `GET /part-types` là "chưa từng
+ * thấy từ server", gửi lại mọi lần sửa dưới dạng `operation: "create"` thay vì `"update"`,
+ * mà `create` bắt buộc `code === id` — không bao giờ đúng với hạng mục seed (`code` kiểu
+ * `"engine_oil"`, `id` là UUID) → server từ chối vĩnh viễn mọi lần sửa hạng mục seed. Xem
+ * `contract.types.ts` (`PartTypeDto`) và `refreshPartTypesFromServer` (merge logic).
  */
 export function partTypeFromDto(dto: PartTypeDto): PartType {
   const seedVersion = Number(dto.seed_version.replace(/^v/, ''))
@@ -217,8 +214,8 @@ export function partTypeFromDto(dto: PartTypeDto): PartType {
     seedVersion: Number.isFinite(seedVersion) ? seedVersion : 1,
     accountId: dto.account_id,
     createdAtClient: new Date().toISOString(),
-    receivedAtServer: null,
-    serverSeq: null,
+    receivedAtServer: dto.received_at_server,
+    serverSeq: dto.server_seq,
   }
 }
 

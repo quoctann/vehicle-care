@@ -37,6 +37,10 @@ export function startAutoSync(): () => void {
     const meta = await db.syncMeta.get(account.id)
     if (stopped || currentCheck !== checkId) return
 
+    // A failed sync requires an explicit user action. This prevents foreground
+    // events from retrying a broken queue forever.
+    if (meta?.lastSyncError) return
+
     const lastSyncMs = meta?.lastSyncedAt ? Date.parse(meta.lastSyncedAt) : Number.NaN
     const elapsed = Number.isFinite(lastSyncMs) ? Date.now() - lastSyncMs : Number.POSITIVE_INFINITY
     if (elapsed > AUTO_SYNC_INTERVAL_MS) {

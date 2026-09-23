@@ -31,7 +31,10 @@ func NewService(deps IDependencies, sessionTTL time.Duration) *Service {
 
 // Login validates credentials and creates a new session.
 func (s *Service) Login(ctx context.Context, email, password string) (domain.Account, string, string, error) {
-	account, found := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	if err != nil {
+		return domain.Account{}, "", "", &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+	}
 	if !found || bcrypt.CompareHashAndPassword(account.PasswordHash, []byte(password)) != nil {
 		return domain.Account{}, "", "", &app.Error{Code: "auth_invalid", Message: "Invalid email or password."}
 	}
@@ -57,7 +60,9 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 	if !validEmail(email) || !validPassword(password) {
 		return domain.Account{}, "", "", "", validation("Invalid email or password (password must be 8 to 72 bytes).")
 	}
-	if _, found := s.deps.AccountByEmail(ctx, email); found {
+	if _, found, err := s.deps.AccountByEmail(ctx, email); err != nil {
+		return domain.Account{}, "", "", "", &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+	} else if found {
 		return domain.Account{}, "", "", "", &app.Error{Code: "conflict", Message: "Email is already registered."}
 	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -81,7 +86,10 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 
 // CreateVerificationToken creates a token when an account exists.
 func (s *Service) CreateVerificationToken(ctx context.Context, email string) (string, bool, error) {
-	account, found := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	if err != nil {
+		return "", false, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+	}
 	if !found {
 		return "", false, nil
 	}
@@ -91,7 +99,10 @@ func (s *Service) CreateVerificationToken(ctx context.Context, email string) (st
 
 // CreateResetToken creates a password reset token when an account exists.
 func (s *Service) CreateResetToken(ctx context.Context, email string) (string, bool, error) {
-	account, found := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	if err != nil {
+		return "", false, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+	}
 	if !found {
 		return "", false, nil
 	}
@@ -130,7 +141,10 @@ func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.
 	if !found {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
 	}
-	account, found := s.deps.AccountByID(ctx, session.AccountID)
+	account, found, err := s.deps.AccountByID(ctx, session.AccountID)
+	if err != nil {
+		return domain.Session{}, domain.Account{}, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+	}
 	if !found {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
 	}

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -10,6 +9,7 @@ import {
   SheetDescription,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { updateVehicleDetails } from '@/data/repositories/vehicleRepository'
 import { DUE_SOON_REMAINING_RATIO } from '@/domain/constants'
@@ -36,10 +36,6 @@ export function EditVehicleSheet({ open, onOpenChange, accountId, vehicle }: Edi
   )
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-
-  function step(amount: number) {
-    setPercent((current) => Math.min(MAX_PERCENT, Math.max(MIN_PERCENT, current + amount)))
-  }
 
   async function save() {
     const trimmedName = name.trim()
@@ -104,24 +100,21 @@ export function EditVehicleSheet({ open, onOpenChange, accountId, vehicle }: Edi
             </div>
 
             {customThreshold ? (
-              <div className="mt-3 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => step(-1)}
-                  aria-label={t('odometer.decrease')}
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[12px] border bg-card transition hover:border-foreground"
-                >
-                  <Minus className="size-4" />
-                </button>
-                <div className="flex-1 text-center text-xl font-bold tracking-[-0.02em]">{percent}%</div>
-                <button
-                  type="button"
-                  onClick={() => step(1)}
-                  aria-label={t('odometer.increase')}
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[12px] border bg-card transition hover:border-foreground"
-                >
-                  <Plus className="size-4" />
-                </button>
+              <div className="mt-3">
+                <div className="text-center text-xl font-bold tracking-[-0.02em]">{percent}%</div>
+                <Slider
+                  className="mt-3"
+                  min={MIN_PERCENT}
+                  max={MAX_PERCENT}
+                  step={1}
+                  value={[percent]}
+                  onValueChange={([value]) => setPercent(value)}
+                  aria-label={t('vehicle.customThreshold')}
+                />
+                <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+                  <span>{MIN_PERCENT}%</span>
+                  <span>{MAX_PERCENT}%</span>
+                </div>
               </div>
             ) : null}
           </div>

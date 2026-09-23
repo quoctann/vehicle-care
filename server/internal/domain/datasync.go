@@ -6,24 +6,22 @@ import "time"
 
 // Mutation describes one client-side entity change.
 type Mutation struct {
-	MutationID    string         `json:"mutation_id"`
-	EntityType    string         `json:"entity_type"`
-	Operation     string         `json:"operation"`
-	EntityID      string         `json:"entity_id"`
-	Payload       map[string]any `json:"payload"`
-	BaseServerSeq *int64         `json:"base_server_seq,omitempty"`
+	MutationID string         `json:"mutation_id"`
+	EntityType string         `json:"entity_type"`
+	Operation  string         `json:"operation"`
+	EntityID   string         `json:"entity_id"`
+	Payload    map[string]any `json:"payload"`
 }
 
 // MutationResult is the acknowledgment for one mutation.
 type MutationResult struct {
-	MutationID       string         `json:"mutation_id"`
-	Status           string         `json:"status"`
-	ServerSeq        *int64         `json:"server_seq,omitempty"`
-	ReceivedAtServer *time.Time     `json:"received_at_server,omitempty"`
-	ErrorCode        string         `json:"error_code,omitempty"`
-	ErrorMessage     string         `json:"error_message,omitempty"`
-	Retryable        *bool          `json:"retryable,omitempty"`
-	ServerSnapshot   map[string]any `json:"server_snapshot,omitempty"`
+	MutationID       string     `json:"mutation_id"`
+	Status           string     `json:"status"`
+	ServerSeq        *int64     `json:"server_seq,omitempty"`
+	ReceivedAtServer *time.Time `json:"received_at_server,omitempty"`
+	ErrorCode        string     `json:"error_code,omitempty"`
+	ErrorMessage     string     `json:"error_message,omitempty"`
+	Retryable        *bool      `json:"retryable,omitempty"`
 }
 
 //MARK: change feed
@@ -38,10 +36,10 @@ type Change struct {
 	ReceivedAtServer time.Time      `json:"received_at_server"`
 }
 
-// PullPage is one stable-watermark page from the changefeed.
+// PullPage is one bounded page from the changefeed.
 type PullPage struct {
 	Changes    []Change
 	NextCursor int64
-	Watermark  string
+	UntilSeq   int64
 	HasMore    bool
 }

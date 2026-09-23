@@ -11,7 +11,10 @@ import { runSync } from './syncOrchestrator'
 
 vi.mock('./bootstrap', () => ({ bootstrapSync: vi.fn() }))
 vi.mock('./pull', () => ({ pullChanges: vi.fn() }))
-vi.mock('./push', () => ({ pushOutbox: vi.fn() }))
+vi.mock('./push', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./push')>()
+  return { ...actual, pushOutbox: vi.fn() }
+})
 
 afterEach(async () => {
   vi.clearAllMocks()
@@ -41,8 +44,11 @@ describe('runSync', () => {
       accountId: 'account-1',
       deviceId: 'device-1',
       lastSeenSeq: 0,
+      nextLocalSeq: 1,
+      operation: 'idle',
       lastSyncedAt: null,
       lastSyncError: null,
+      lastSyncFailureKind: null,
       bootstrapState: 'bootstrapping',
     })
 
@@ -58,11 +64,13 @@ describe('runSync', () => {
     })
     vi.mocked(pullChanges).mockImplementation(async () => {
       calls.push('pull')
+      return 'complete'
     })
 
     const first = runSync()
     const second = runSync()
     expect(second).toBe(first)
+    await vi.waitFor(() => expect(finishBootstrap).toBeTypeOf('function'))
     finishBootstrap()
     await first
 
@@ -89,5 +97,47 @@ describe('runSync', () => {
 
     await expect(runSync()).rejects.toThrow('Expired')
     expect(useSessionStore.getState()).toMatchObject({ status: 'anonymous', account: null })
+  })
+
+  it('does not report synced while an account mutation is unresolved', async () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      account: { id: 'account-1', email: 'rider@example.com', name: null, timezone: 'UTC', emailVerified: true },
+    })
+    await db.vehicles.put({
+      id: 'vehicle-1',
+      accountId: 'account-1',
+      name: 'Local vehicle',
+      plateNumber: null,
+      archivedAt: null,
+      deletedAt: null,
+      dueSoonRatio: null,
+      createdAtClient: '2026-09-17T09:00:00.000Z',
+      receivedAtServer: null,
+      serverSeq: null,
+    })
+    await db.outbox.put({
+      mutationId: 'mutation-rejected',
+      entityType: 'vehicle',
+      operation: 'create',
+      entityId: 'vehicle-1',
+      payload: { name: 'Local vehicle' },
+      accountId: 'account-1',
+      localSeq: 1,
+      baseServerSeq: null,
+      status: 'blocked',
+      retryCount: 0,
+      lastError: 'Rejected by server',
+      failureKind: 'terminal',
+      createdAt: '2026-09-17T10:00:00.000Z',
+    })
+    vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' })
+    vi.mocked(pushOutbox).mockResolvedValue()
+    vi.mocked(pullChanges).mockResolvedValue('complete')
+
+    await expect(runSync()).rejects.toThrow('Rejected by server')
+
+    expect(useSyncStore.getState()).toMatchObject({ status: 'blocked' })
+    expect((await db.syncMeta.get('account-1'))?.lastSyncedAt ?? null).toBeNull()
   })
 })

@@ -5,14 +5,20 @@ import { DEFAULT_SYNC_PAGE_SIZE } from '@/domain/constants'
 import { applyPulledChange } from './applyChange'
 import { assertActiveSyncAccount } from './sessionGuard'
 
-function validatePage(response: PullResponse, afterSeq: number, expectedWatermark: string | null): void {
+function validatePage(response: PullResponse, afterSeq: number, expectedUntilSeq: number | null): void {
   if (!Number.isSafeInteger(response.next_cursor) || response.next_cursor < afterSeq) {
     throw new Error('Sync pull returned an invalid cursor')
   }
-  if (expectedWatermark != null && response.watermark !== expectedWatermark) {
-    throw new Error('Sync pull changed its watermark during pagination')
+  if (!Number.isSafeInteger(response.until_seq) || response.until_seq < response.next_cursor) {
+    throw new Error('Sync pull returned an invalid upper bound')
   }
-  if (response.has_more && (!response.watermark || response.next_cursor <= afterSeq)) {
+  if (expectedUntilSeq != null && response.until_seq !== expectedUntilSeq) {
+    throw new Error('Sync pull changed its upper bound during pagination')
+  }
+  if (response.has_more && response.next_cursor <= afterSeq) {
+    throw new Error('Sync pull returned an empty page without making progress')
+  }
+  if (response.has_more && response.next_cursor >= response.until_seq) {
     throw new Error('Sync pull did not make progress')
   }
 
@@ -22,6 +28,7 @@ function validatePage(response: PullResponse, afterSeq: number, expectedWatermar
       !Number.isSafeInteger(change.server_seq) ||
       change.server_seq <= previousSeq ||
       change.server_seq > response.next_cursor ||
+      change.server_seq > response.until_seq ||
       typeof change.entity_id !== 'string' ||
       change.entity_id.length === 0 ||
       typeof change.payload !== 'object' ||
@@ -34,26 +41,28 @@ function validatePage(response: PullResponse, afterSeq: number, expectedWatermar
   }
 }
 
-/** Pulls one stable-watermark session and commits each page with its cursor atomically. */
-export async function pullChanges(accountId: string): Promise<void> {
+/** Pulls a bounded feed and commits each page only while the account outbox is clean. */
+export async function pullChanges(accountId: string): Promise<'complete' | 'deferred'> {
   const meta = await db.syncMeta.get(accountId)
   if (!meta) throw new Error(`Sync metadata is missing for account ${accountId}`)
 
   let afterSeq = meta.lastSeenSeq
-  let watermark: string | null = null
+  let untilSeq: number | null = null
 
   while (true) {
     assertActiveSyncAccount(accountId)
     const response = await api.pullChanges({
       afterSeq,
       limit: DEFAULT_SYNC_PAGE_SIZE,
-      watermark: watermark ?? '',
+      ...(untilSeq == null ? {} : { untilSeq }),
     })
     assertActiveSyncAccount(accountId)
-    validatePage(response, afterSeq, watermark)
-    watermark ??= response.watermark
+    validatePage(response, afterSeq, untilSeq)
+    untilSeq ??= response.until_seq
 
-    await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes, db.syncMeta], async () => {
+    const applied = await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes, db.syncMeta, db.outbox], async () => {
+      const dirtyOutbox = await db.outbox.where('accountId').equals(accountId).count()
+      if (dirtyOutbox > 0) return false
       for (const change of response.changes) {
         await applyPulledChange(change, accountId)
       }
@@ -61,9 +70,12 @@ export async function pullChanges(accountId: string): Promise<void> {
         lastSeenSeq: response.next_cursor,
       })
       if (updated !== 1) throw new Error(`Sync metadata disappeared for account ${accountId}`)
+      return true
     })
 
+    if (!applied) return 'deferred'
+
     afterSeq = response.next_cursor
-    if (!response.has_more) return
+    if (!response.has_more) return 'complete'
   }
 }

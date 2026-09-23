@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS notification_deliveries;
+DROP TABLE IF EXISTS processed_mutations;
+DROP TABLE IF EXISTS change_feed;
+DROP TABLE IF EXISTS service_logs;
+DROP TABLE IF EXISTS fuel_logs;
+DROP TABLE IF EXISTS odometer_logs;
+DROP TABLE IF EXISTS reminder_configs;
+DROP TABLE IF EXISTS vehicles;
+DROP TABLE IF EXISTS part_types;
+DROP TABLE IF EXISTS account_sequences;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS accounts;
+DROP EXTENSION IF EXISTS citext;

@@ -2,45 +2,94 @@ package seed_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/pgtest"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
+	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 )
 
-// TestSeedIsIdempotent runs the seed twice and asserts the second run
-// creates no duplicate rows and changes no id or code, per C3 in
-// .docs/implementation-plan-section-5.md.
-//
-// Requires a real Docker daemon (testcontainers). If Docker is unavailable
-// in this environment, pgtest.StartDB skips the test rather than failing it.
-func TestSeedIsIdempotent(t *testing.T) {
+// TestSeedAccountPartTypesInsertsManifestForAccount asserts a single call
+// inserts exactly the manifest's rows for the given account, and that two
+// different accounts get disjoint ids for the same codes.
+func TestSeedAccountPartTypesInsertsManifestForAccount(t *testing.T) {
 	t.Parallel()
 	db := pgtest.StartDB(t)
 	ctx := context.Background()
+	now := time.Now().UTC()
 
-	if err := seed.Seed(ctx, db, seed.Manifest); err != nil {
-		t.Fatalf("first seed: %v", err)
+	accountA := insertTestAccount(t, db)
+	accountB := insertTestAccount(t, db)
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := seed.Seed(ctx, db, seed.Manifest); err != nil {
-		t.Fatalf("second seed: %v", err)
+	defer tx.Rollback()
+	queries := sqlcgen.New(tx)
+	if err := seed.SeedAccountPartTypes(ctx, queries, accountA, now); err != nil {
+		t.Fatalf("seed account a: %v", err)
+	}
+	if err := seed.SeedAccountPartTypes(ctx, queries, accountB, now); err != nil {
+		t.Fatalf("seed account b: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
-	var count int
-	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM part_types").Scan(&count); err != nil {
-		t.Fatalf("count part_types: %v", err)
-	}
-	if count != len(seed.Manifest) {
-		t.Fatalf("expected %d part_types after two seed runs, got %d", len(seed.Manifest), count)
+	rowsA := selectPartTypesByAccount(t, db, accountA)
+	rowsB := selectPartTypesByAccount(t, db, accountB)
+
+	if len(rowsA) != len(seed.Manifest) || len(rowsB) != len(seed.Manifest) {
+		t.Fatalf("expected %d part_types per account, got a=%d b=%d", len(seed.Manifest), len(rowsA), len(rowsB))
 	}
 
 	for _, item := range seed.Manifest {
-		var id, code string
-		if err := db.QueryRowContext(ctx, "SELECT id, code FROM part_types WHERE id = $1", item.ID).Scan(&id, &code); err != nil {
-			t.Fatalf("lookup %s: %v", item.Code, err)
+		idA, okA := rowsA[item.Code]
+		idB, okB := rowsB[item.Code]
+		if !okA || !okB {
+			t.Fatalf("code %s missing for one of the accounts: a=%v b=%v", item.Code, okA, okB)
 		}
-		if id != item.ID || code != item.Code {
-			t.Fatalf("seed row drifted: want id=%s code=%s, got id=%s code=%s", item.ID, item.Code, id, code)
+		if idA == idB {
+			t.Fatalf("code %s got the same id for both accounts: %s", item.Code, idA)
 		}
 	}
+}
+
+func insertTestAccount(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	id := uuid.NewString()
+	_, err := db.Exec(`INSERT INTO accounts (id, email) VALUES ($1, $2)`, id, id+"@example.test")
+	if err != nil {
+		t.Fatalf("insert test account: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO account_sequences (account_id) VALUES ($1)`, id); err != nil {
+		t.Fatalf("insert account sequence: %v", err)
+	}
+	return id
+}
+
+func selectPartTypesByAccount(t *testing.T, db *sql.DB, accountID string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT code, id FROM part_types WHERE account_id = $1`, accountID)
+	if err != nil {
+		t.Fatalf("select part_types: %v", err)
+	}
+	defer rows.Close()
+	byCode := map[string]string{}
+	for rows.Next() {
+		var code, id string
+		if err := rows.Scan(&code, &id); err != nil {
+			t.Fatalf("scan part_type row: %v", err)
+		}
+		byCode[code] = id
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate part_types: %v", err)
+	}
+	return byCode
 }

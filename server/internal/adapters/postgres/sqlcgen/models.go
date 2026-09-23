@@ -94,7 +94,7 @@ type PartType struct {
 	SeedVersion      string    `json:"seed_version"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
-	AccountID        *string   `json:"account_id"`
+	AccountID        string    `json:"account_id"`
 	ServerSeq        int64     `json:"server_seq"`
 	ReceivedAtServer time.Time `json:"received_at_server"`
 }
@@ -113,13 +113,6 @@ type ProcessedMutation struct {
 	Retryable        sql.NullBool   `json:"retryable"`
 	ServerSnapshot   []byte         `json:"server_snapshot"`
 	CreatedAt        time.Time      `json:"created_at"`
-}
-
-type PullWatermark struct {
-	AccountID  string    `json:"account_id"`
-	Token      string    `json:"token"`
-	UpperBound int64     `json:"upper_bound"`
-	ExpiresAt  time.Time `json:"expires_at"`
 }
 
 type ReminderConfig struct {

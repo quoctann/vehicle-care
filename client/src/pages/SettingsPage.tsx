@@ -16,6 +16,7 @@ import type { Vehicle } from "@/domain/types";
 import { useVehicles } from "@/hooks/useVehicles";
 import { getLastVehicleId, setLastVehicleId } from "@/lib/lastVehicle";
 import { useSessionStore } from "@/stores/useSessionStore";
+import { db } from "@/data/db";
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -44,6 +45,7 @@ export function SettingsPage() {
     } catch {
       // Clear the local session even when the remote session is already unavailable.
     } finally {
+      await db.accountCache.delete('current');
       clear();
       navigate("/sign-in", { replace: true });
     }
@@ -143,10 +145,7 @@ export function SettingsPage() {
             activeVehicleId={activeVehicleId}
             accountId={account.id}
             onOpen={(vehicle) => {
-              if (vehicle.archivedAt == null) {
-                selectVehicle(vehicle.id);
-                navigate(`/v/${vehicle.id}/home`);
-              }
+              if (vehicle.archivedAt == null) selectVehicle(vehicle.id);
             }}
             onAdd={() => navigate("/onboarding/add-vehicle")}
             onArchive={handleArchive}

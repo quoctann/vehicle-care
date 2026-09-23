@@ -35,6 +35,10 @@ func (s *Server) push(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+	if len(request.Mutations) == 0 {
+		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "mutations must not be empty.", false)
+		return
+	}
 	results, err := s.datasyncService.Push(c.Request.Context(), mustAccount(c).ID, request.DeviceID, request.APIVersion, request.Mutations)
 	if err != nil {
 		s.writeError(c, err)
@@ -67,13 +71,22 @@ func (s *Server) pull(c *gin.Context) {
 		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "limit is invalid.", false)
 		return
 	}
-	page, err := s.datasyncService.Pull(c.Request.Context(), mustAccount(c).ID, afterSeq, limit, c.Query("watermark"))
+	var untilSeq *int64
+	if rawUntilSeq, ok := c.GetQuery("until_seq"); ok {
+		parsedUntilSeq, parseErr := strconv.ParseInt(rawUntilSeq, 10, 64)
+		if parseErr != nil {
+			s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "until_seq is invalid.", false)
+			return
+		}
+		untilSeq = &parsedUntilSeq
+	}
+	page, err := s.datasyncService.Pull(c.Request.Context(), mustAccount(c).ID, afterSeq, limit, untilSeq)
 	if err != nil {
 		s.writeError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"changes": page.Changes, "next_cursor": page.NextCursor, "watermark": page.Watermark,
+		"changes": page.Changes, "next_cursor": page.NextCursor, "until_seq": page.UntilSeq,
 		"has_more": page.HasMore, "server_time": time.Now().UTC(),
 	})
 }

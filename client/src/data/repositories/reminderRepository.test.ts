@@ -7,11 +7,12 @@ afterEach(clearAllTables)
 
 const VEHICLE_ID = 'veh-1'
 const PART_TYPE_ID = 'pt-engine-oil'
+const ACCOUNT_ID = 'acc-1'
 
 beforeEach(async () => {
   await db.vehicles.put({
     id: VEHICLE_ID,
-    accountId: 'acc-1',
+    accountId: ACCOUNT_ID,
     name: 'Test bike',
     plateNumber: null,
     archivedAt: null,
@@ -28,7 +29,7 @@ beforeEach(async () => {
     displayOrder: 1,
     active: true,
     seedVersion: 1,
-    accountId: null,
+    accountId: ACCOUNT_ID,
     createdAtClient: '2026-01-01T00:00:00.000Z',
     receivedAtServer: null,
     serverSeq: null,
@@ -111,7 +112,8 @@ describe('reminderRepository', () => {
       baselineOdometerKm: 0,
       baselineDate: null,
     })
-    expect(second.id).not.toBe(first.id)
+    expect(second.id).toBe(first.id)
+    expect(await db.reminderConfigs.get(second.id)).toMatchObject({ deletedAt: null, intervalKm: 6000 })
   })
 
   it('updateReminderConfig từ chối nếu patch làm mất cả 2 interval trên reminder chưa tombstone', async () => {

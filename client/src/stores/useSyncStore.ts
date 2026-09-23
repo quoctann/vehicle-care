@@ -8,7 +8,7 @@ import { create } from 'zustand'
  * `sync/syncOrchestrator.ts` — store này chỉ là nơi orchestrator ghi kết quả vào
  * để UI subscribe, UI không tự gọi setter này.
  */
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error'
+export type SyncStatus = 'idle' | 'syncing' | 'pending' | 'synced' | 'retryable' | 'blocked' | 'restoring' | 'error'
 
 type SyncStore = {
   status: SyncStatus
@@ -16,6 +16,10 @@ type SyncStore = {
   lastError: string | null
   setSyncing: () => void
   setSynced: (at: string) => void
+  setPending: () => void
+  setRetryable: (message: string) => void
+  setBlocked: (message: string) => void
+  setRestoring: () => void
   setError: (message: string) => void
 }
 
@@ -25,5 +29,9 @@ export const useSyncStore = create<SyncStore>((set) => ({
   lastError: null,
   setSyncing: () => set({ status: 'syncing', lastError: null }),
   setSynced: (at) => set({ status: 'synced', lastSyncedAt: at, lastError: null }),
+  setPending: () => set({ status: 'pending', lastError: null }),
+  setRetryable: (message) => set({ status: 'retryable', lastError: message }),
+  setBlocked: (message) => set({ status: 'blocked', lastError: message }),
+  setRestoring: () => set({ status: 'restoring', lastError: null }),
   setError: (message) => set({ status: 'error', lastError: message }),
 }))

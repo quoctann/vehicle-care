@@ -11,27 +11,31 @@ import (
 )
 
 const listPartTypes = `-- name: ListPartTypes :many
-SELECT id, code, name_vi, display_order, active, seed_version, account_id
+SELECT id, code, name_vi, display_order, active, seed_version, account_id, server_seq, received_at_server
 FROM part_types
-WHERE account_id IS NULL OR account_id = $1
-ORDER BY (account_id IS NOT NULL), display_order, created_at
+WHERE account_id = $1
+ORDER BY display_order, created_at
 `
 
 type ListPartTypesRow struct {
-	ID           string  `json:"id"`
-	Code         string  `json:"code"`
-	NameVi       string  `json:"name_vi"`
-	DisplayOrder int32   `json:"display_order"`
-	Active       bool    `json:"active"`
-	SeedVersion  string  `json:"seed_version"`
-	AccountID    *string `json:"account_id"`
+	ID               string    `json:"id"`
+	Code             string    `json:"code"`
+	NameVi           string    `json:"name_vi"`
+	DisplayOrder     int32     `json:"display_order"`
+	Active           bool      `json:"active"`
+	SeedVersion      string    `json:"seed_version"`
+	AccountID        string    `json:"account_id"`
+	ServerSeq        int64     `json:"server_seq"`
+	ReceivedAtServer time.Time `json:"received_at_server"`
 }
 
-// Global catalog rows (account_id IS NULL) plus this account's own custom
-// rows; global rows sort first by display_order, custom rows after in
-// creation order (display_order is a fixed constant for custom rows, see
-// buildUpsertPartTypeParams).
-func (q *Queries) ListPartTypes(ctx context.Context, accountID *string) ([]ListPartTypesRow, error) {
+// This account's own part_types rows (seeded at signup plus anything it
+// added itself); seeded rows sort first by display_order, custom rows after
+// in creation order (display_order is a fixed constant for custom rows, see
+// buildUpsertPartTypeParams). Includes server_seq/received_at_server so the
+// client can learn the real server_seq for a bootstrapped row instead of
+// treating it as "never seen from server" (see domain.PartType doc comment).
+func (q *Queries) ListPartTypes(ctx context.Context, accountID string) ([]ListPartTypesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPartTypes, accountID)
 	if err != nil {
 		return nil, err
@@ -48,6 +52,8 @@ func (q *Queries) ListPartTypes(ctx context.Context, accountID *string) ([]ListP
 			&i.Active,
 			&i.SeedVersion,
 			&i.AccountID,
+			&i.ServerSeq,
+			&i.ReceivedAtServer,
 		); err != nil {
 			return nil, err
 		}
@@ -67,8 +73,8 @@ SELECT server_seq FROM part_types WHERE account_id = $1 AND id = $2 FOR UPDATE
 `
 
 type LockPartTypeForUpdateParams struct {
-	AccountID *string `json:"account_id"`
-	ID        string  `json:"id"`
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
 }
 
 // Row lock scoped to THIS account — a sql.ErrNoRows result means either the
@@ -82,6 +88,24 @@ func (q *Queries) LockPartTypeForUpdate(ctx context.Context, arg LockPartTypeFor
 	return server_seq, err
 }
 
+const partTypeActiveForAccount = `-- name: PartTypeActiveForAccount :one
+SELECT EXISTS (
+    SELECT 1 FROM part_types WHERE id = $1 AND account_id = $2 AND active
+)
+`
+
+type PartTypeActiveForAccountParams struct {
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
+}
+
+func (q *Queries) PartTypeActiveForAccount(ctx context.Context, arg PartTypeActiveForAccountParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, partTypeActiveForAccount, arg.ID, arg.AccountID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const partTypeOwnedByAccount = `-- name: PartTypeOwnedByAccount :one
 SELECT EXISTS (
     SELECT 1 FROM part_types WHERE id = $1 AND account_id = $2
@@ -89,8 +113,8 @@ SELECT EXISTS (
 `
 
 type PartTypeOwnedByAccountParams struct {
-	ID        string  `json:"id"`
-	AccountID *string `json:"account_id"`
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
 }
 
 func (q *Queries) PartTypeOwnedByAccount(ctx context.Context, arg PartTypeOwnedByAccountParams) (bool, error) {
@@ -100,7 +124,31 @@ func (q *Queries) PartTypeOwnedByAccount(ctx context.Context, arg PartTypeOwnedB
 	return exists, err
 }
 
-const upsertPartType = `-- name: UpsertPartType :exec
+const canonicalPartTypePayload = `-- name: CanonicalPartTypePayload :one
+SELECT jsonb_build_object(
+    'code', code,
+    'name_vi', name_vi,
+    'display_order', display_order,
+    'active', active,
+    'seed_version', seed_version
+)
+FROM part_types
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalPartTypePayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalPartTypePayload(ctx context.Context, arg CanonicalPartTypePayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalPartTypePayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
+const upsertPartType = `-- name: UpsertPartType :execrows
 INSERT INTO part_types (id, account_id, code, name_vi, display_order, active, seed_version, server_seq, received_at_server)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (id) DO UPDATE
@@ -108,11 +156,12 @@ ON CONFLICT (id) DO UPDATE
       active = EXCLUDED.active,
       server_seq = EXCLUDED.server_seq,
       received_at_server = EXCLUDED.received_at_server
+  WHERE part_types.account_id = EXCLUDED.account_id
 `
 
 type UpsertPartTypeParams struct {
 	ID               string    `json:"id"`
-	AccountID        *string   `json:"account_id"`
+	AccountID        string    `json:"account_id"`
 	Code             string    `json:"code"`
 	NameVi           string    `json:"name_vi"`
 	DisplayOrder     int32     `json:"display_order"`
@@ -122,8 +171,8 @@ type UpsertPartTypeParams struct {
 	ReceivedAtServer time.Time `json:"received_at_server"`
 }
 
-func (q *Queries) UpsertPartType(ctx context.Context, arg UpsertPartTypeParams) error {
-	_, err := q.db.ExecContext(ctx, upsertPartType,
+func (q *Queries) UpsertPartType(ctx context.Context, arg UpsertPartTypeParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, upsertPartType,
 		arg.ID,
 		arg.AccountID,
 		arg.Code,
@@ -134,5 +183,8 @@ func (q *Queries) UpsertPartType(ctx context.Context, arg UpsertPartTypeParams) 
 		arg.ServerSeq,
 		arg.ReceivedAtServer,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
