@@ -6,7 +6,9 @@ này mở rộng mục D (D1-D8) của `implementation-plan-section-5.md`, áp d
 auth mới (session cookie + Redis + Google OAuth) thay cho đề xuất OTP/magic-link ban
 đầu trong `decision.md`.*
 
-Trạng thái triển khai hiện tại: **frontend đã implement UI + client API layer đúng
+Trạng thái triển khai hiện tại: **frontend/backend đã implement contract sync tuần tự A**.
+Một số ví dụ lịch sử bên dưới vẫn giữ shape cũ để tham khảo; các override ở mục 2.15
+là nguồn sự thật cho implementation hiện tại. Frontend đã implement UI + client API layer đúng
 theo tài liệu này. Backend Go thật (bao gồm adapter Postgres + Redis) đã được xây
 dựng và implement gần như toàn bộ hợp đồng này** — xem `.docs/TONG-HOP-KY-THUAT.md`
 mục 2 để biết chi tiết trạng thái đã xong/còn thiếu. Hai gap còn lại so với hợp đồng:
@@ -347,3 +349,55 @@ Client (đã dùng offline, có Vehicle/OdometerLog local, chưa có account)
 - Rate-limit auth endpoints (login/signup/forgot) và sync endpoints (push/pull) độc lập nhau.
 - Validate payload ở cả API layer lẫn database constraint (không tin tưởng riêng 1 lớp).
 - Log có request_id/mutation_id/server_seq nhưng KHÔNG log password, token, OTP, hay nội dung payload nhạy cảm.
+
+## 6. Current implementation override — incremental sync A
+
+Mục này là nguồn sự thật cho code hiện tại; các ví dụ cũ ở mục 2.12–4.3 về
+`base_server_seq`, `conflict_resolved` và `watermark` được xem là historical.
+
+### 6.1. Push tuần tự và recovery
+
+- Request vẫn giữ `{ mutations: [...] }` để không phải đổi HTTP envelope, nhưng client gửi một mutation mỗi request.
+- Server xử lý theo thứ tự và trả prefix kết quả. Khi một mutation trả `rejected` hoặc `retryable_error`, server dừng, các mutation phía sau chưa được xử lý.
+- `applied` và `duplicate` là terminal-success. `duplicate` trả acknowledgment đã lưu của mutation ID cũ.
+- `rejected` là terminal failure. Client chuyển item thành `blocked`, không tự gửi lại payload đó.
+- `retryable_error` là temporary failure. Client giữ item `pending`, chỉ gửi lại khi người dùng bấm **Thử lại**.
+- Timeout/mất response giữ nguyên mutation ID và payload để retry idempotent; không được sửa envelope khi chưa biết server đã commit hay chưa.
+- Item blocked có nguyên nhân và có hai đường: repair bằng mutation ID mới hoặc khôi phục toàn account từ server.
+
+### 6.2. Pull với `until_seq`
+
+Request hiện tại:
+
+```text
+GET /sync/pull?after_seq=41&limit=100
+GET /sync/pull?after_seq=100&limit=100&until_seq=150
+```
+
+Response có:
+
+```json
+{
+  "changes": [],
+  "next_cursor": 100,
+  "until_seq": 150,
+  "has_more": true,
+  "server_time": "2026-09-23T10:00:00Z"
+}
+```
+
+Server không còn tạo/lưu watermark. Trang đầu chụp sequence hiện tại làm `until_seq`; các trang sau dùng lại đúng bound đó. Change mới sau bound chờ phiên pull tiếp theo.
+
+Client chỉ apply một page khi outbox account vẫn sạch trong cùng Dexie transaction với entity và cursor. Nếu có pending/blocked, page không được apply và cursor không tăng.
+
+### 6.3. Trạng thái thành công
+
+`last_synced_at` chỉ được cập nhật sau khi push hết queue, pull hoàn tất và không còn
+pending/blocked. Một mutation local mới làm trạng thái quay về chưa đồng bộ; timestamp
+thành công cũ chỉ còn là thông tin lịch sử.
+
+### 6.4. PartType seed
+
+Mười PartType mặc định được tạo cùng account sequence và append vào changefeed trong
+transaction signup. Thiết bị mới pull từ `after_seq=0` sẽ nhận cả seed catalog; endpoint
+`GET /part-types` chỉ còn là endpoint đọc phụ trợ, không phải replication path bắt buộc.

@@ -71,7 +71,7 @@ make build
 - Sync: `POST /sync/push` và `GET /sync/pull`.
 - Session dùng cookie `sid`; request ghi đã xác thực cần cookie và header `X-CSRF-Token`.
 - Push hỗ trợ idempotency, sequence theo account và LWW cho mutable entity.
-- Pull dùng stable watermark trong suốt một phiên phân trang.
+- Pull dùng `until_seq` stateless trong suốt một phiên phân trang.
 
 ## Persistence
 
@@ -112,3 +112,4 @@ Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng a
 
 - [Hệ thống và luồng nghiệp vụ hiện tại](.docs/system-flow.md): kiến trúc, mô hình dữ liệu, nghiệp vụ và vòng đời push/pull theo implementation ngày 23/09/2026.
 - [Review structure, convention và giải pháp sync](.docs/structure-sync-review.md): phát hiện ưu tiên, các phương án đơn giản hóa và lộ trình breaking changes đề xuất.
+- [Plan incremental sync A](.docs/incremental-sync-plan.md): invariants, checklist nghiệm thu và runbook reset dev thủ công.

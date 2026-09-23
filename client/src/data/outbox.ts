@@ -1,84 +1,181 @@
 import { generateId } from '@/lib/uuid'
-import { db, type OutboxEntityType, type OutboxItem, type OutboxOperation, type OutboxStatus } from './db'
+import { getOrCreateDeviceId } from '@/lib/deviceId'
+import Dexie from 'dexie'
+import { db, type OutboxEntityType, type OutboxFailureKind, type OutboxItem, type OutboxOperation, type OutboxStatus, type SyncMeta } from './db'
+import {
+  fuelLogFieldsFromPayload,
+  odometerLogFieldsFromPayload,
+  partTypeFieldsFromPayload,
+  reminderConfigFieldsFromPayload,
+  serviceLogFieldsFromPayload,
+  vehicleFieldsFromPayload,
+} from './mappers'
+
+function entityTable(entityType: OutboxEntityType) {
+  switch (entityType) {
+    case 'vehicle': return db.vehicles
+    case 'reminder_config': return db.reminderConfigs
+    case 'odometer_log': return db.odometerLogs
+    case 'fuel_log': return db.fuelLogs
+    case 'service_log': return db.serviceLogs
+    case 'part_type': return db.partTypes
+  }
+}
+
+function newSyncMeta(accountId: string, nextLocalSeq = 1): SyncMeta {
+  return {
+    accountId,
+    deviceId: getOrCreateDeviceId(),
+    lastSeenSeq: 0,
+    nextLocalSeq,
+    lastSyncedAt: null,
+    lastSyncError: null,
+    bootstrapState: 'empty',
+  }
+}
 
 /**
- * Phải gọi hàm này BÊN TRONG cùng 1 `db.transaction('rw', [entityTable, db.outbox], ...)`
- * với lệnh ghi entity — Dexie tự động gộp mọi lệnh gọi table trong lúc transaction
- * đang chạy (kể cả gọi từ hàm khác) vào ĐÚNG 1 transaction đó, miễn là nằm trong
- * cùng chuỗi async liên tục (không qua `setTimeout`/tách luồng).
+ * Must be called from the same transaction as the entity write. The mutation
+ * envelope is immutable after this function returns, including its revision.
  */
 export async function enqueueMutation(params: {
+  accountId: string
   entityType: OutboxEntityType
   operation: OutboxOperation
   entityId: string
   payload: Record<string, unknown>
-}): Promise<void> {
+}): Promise<OutboxItem> {
+  const table = entityTable(params.entityType)
+  const entity = await table.get(params.entityId) as { accountId?: string; serverSeq?: number | null } | undefined
+  if (entity?.accountId && entity.accountId !== params.accountId) throw new Error('Cannot enqueue a mutation for another account.')
+
+  const meta = await db.syncMeta.get(params.accountId) ?? newSyncMeta(params.accountId)
   const item: OutboxItem = {
     mutationId: generateId(),
+    accountId: params.accountId,
+    localSeq: meta.nextLocalSeq,
     entityType: params.entityType,
     operation: params.operation,
     entityId: params.entityId,
     payload: params.payload,
+    baseServerSeq: entity?.serverSeq ?? null,
     status: 'pending',
     retryCount: 0,
     lastError: null,
+    failureKind: null,
     createdAt: new Date().toISOString(),
   }
   await db.outbox.add(item)
+  await db.syncMeta.put({ ...meta, nextLocalSeq: meta.nextLocalSeq + 1 })
+  return item
 }
 
-export function listPendingOutbox(limit: number): Promise<OutboxItem[]> {
-  return db.outbox.where('status').equals('pending' satisfies OutboxStatus).sortBy('createdAt').then((rows) => rows.slice(0, limit))
+export function listPendingOutbox(accountId: string, limit: number): Promise<OutboxItem[]> {
+  return db.outbox
+    .where('[accountId+status+localSeq]')
+    .between([accountId, 'pending', Dexie.minKey], [accountId, 'pending', Dexie.maxKey])
+    .limit(limit)
+    .toArray()
+}
+
+export function getNextOutboxItem(accountId: string): Promise<OutboxItem | undefined> {
+  return db.outbox.where('[accountId+localSeq]').between([accountId, Dexie.minKey], [accountId, Dexie.maxKey]).first()
 }
 
 export function countPendingOutbox(): Promise<number> {
   return db.outbox.where('status').equals('pending' satisfies OutboxStatus).count()
 }
 
-async function countOutboxForAccount(accountId: string, statuses: OutboxStatus[]): Promise<number> {
-  const rows = (await Promise.all(statuses.map((status) => db.outbox.where('status').equals(status).toArray()))).flat()
-  const ownership = await Promise.all(
-    rows.map(async (item) => {
-      switch (item.entityType) {
-        case 'vehicle':
-          return (await db.vehicles.get(item.entityId))?.accountId === accountId
-        case 'reminder_config':
-          return (await db.reminderConfigs.get(item.entityId))?.accountId === accountId
-        case 'odometer_log':
-          return (await db.odometerLogs.get(item.entityId))?.accountId === accountId
-        case 'fuel_log':
-          return (await db.fuelLogs.get(item.entityId))?.accountId === accountId
-        case 'service_log':
-          return (await db.serviceLogs.get(item.entityId))?.accountId === accountId
-        case 'part_type':
-          return (await db.partTypes.get(item.entityId))?.accountId === accountId
-      }
-    }),
-  )
-  return ownership.filter(Boolean).length
-}
-
 export function countPendingOutboxForAccount(accountId: string): Promise<number> {
-  return countOutboxForAccount(accountId, ['pending'])
+  return db.outbox.where('[accountId+status+localSeq]').between([accountId, 'pending', Dexie.minKey], [accountId, 'pending', Dexie.maxKey]).count()
 }
 
 export function countUnresolvedOutboxForAccount(accountId: string): Promise<number> {
-  return countOutboxForAccount(accountId, ['pending', 'rejected', 'retryable_error'])
+  return db.outbox.where('accountId').equals(accountId).count()
 }
 
-export async function markOutboxApplied(mutationId: string): Promise<void> {
-  await db.outbox.update(mutationId, { status: 'applied' satisfies OutboxStatus })
+export function listOutboxForAccount(accountId: string): Promise<OutboxItem[]> {
+  return db.outbox.where('[accountId+localSeq]').between([accountId, Dexie.minKey], [accountId, Dexie.maxKey]).toArray()
 }
 
-export async function markOutboxRejected(mutationId: string, error: string): Promise<void> {
-  await db.outbox.update(mutationId, { status: 'rejected' satisfies OutboxStatus, lastError: error })
+export function listBlockedOutboxForAccount(accountId: string): Promise<OutboxItem[]> {
+  return listOutboxForAccount(accountId).then((rows) => rows.filter((item) => item.status === 'blocked'))
+}
+
+export async function markOutboxAcknowledged(mutationId: string): Promise<void> {
+  await db.outbox.delete(mutationId)
+}
+
+export async function markOutboxBlocked(mutationId: string, error: string): Promise<void> {
+  await db.outbox.update(mutationId, {
+    status: 'blocked' satisfies OutboxStatus,
+    lastError: error,
+    failureKind: 'terminal' satisfies OutboxFailureKind,
+  })
 }
 
 export async function markOutboxRetryable(mutationId: string, error: string): Promise<void> {
   const current = await db.outbox.get(mutationId)
+  if (!current) return
   await db.outbox.update(mutationId, {
     status: 'pending' satisfies OutboxStatus,
-    retryCount: (current?.retryCount ?? 0) + 1,
+    retryCount: current.retryCount + 1,
     lastError: error,
+    failureKind: 'retryable' satisfies OutboxFailureKind,
   })
+}
+
+/** Replace a terminal mutation rather than retrying its old envelope. */
+export async function repairBlockedMutation(
+  mutationId: string,
+  payload: Record<string, unknown>,
+  operation?: OutboxOperation,
+): Promise<OutboxItem> {
+  const blocked = await db.outbox.get(mutationId)
+  if (!blocked || blocked.status !== 'blocked') throw new Error(`Blocked mutation not found: ${mutationId}`)
+  const table = entityTable(blocked.entityType)
+  return db.transaction('rw', [db.outbox, db.syncMeta, table], async () => {
+    const current = await db.outbox.get(mutationId)
+    const item = current ?? blocked
+    const meta = await db.syncMeta.get(item.accountId) ?? newSyncMeta(item.accountId)
+    if (meta.nextLocalSeq <= item.localSeq) await db.syncMeta.put({ ...meta, nextLocalSeq: item.localSeq + 1 })
+    const existing = await table.get(item.entityId) as { accountId?: string } | undefined
+    if (!existing || existing.accountId !== item.accountId) throw new Error(`Entity not found for blocked mutation: ${item.entityId}`)
+    const fields = repairFields(item.entityType, payload)
+    await table.update(item.entityId, fields)
+    await db.outbox.delete(mutationId)
+    const replacement = await enqueueMutation({
+      accountId: item.accountId,
+      entityType: item.entityType,
+      operation: operation ?? item.operation,
+      entityId: item.entityId,
+      payload,
+    })
+    // Keep the repaired mutation at the blocked item's queue position so
+    // later mutations cannot bypass the repaired dependency.
+    await db.outbox.update(replacement.mutationId, { localSeq: item.localSeq, failureKind: null, lastError: null })
+    return { ...replacement, localSeq: item.localSeq, failureKind: null, lastError: null }
+  })
+}
+
+function repairFields(entityType: OutboxEntityType, payload: Record<string, unknown>): Record<string, unknown> {
+  switch (entityType) {
+    case 'vehicle': return vehicleFieldsFromPayload(payload)
+    case 'reminder_config': return reminderConfigFieldsFromPayload(payload)
+    case 'odometer_log': return odometerLogFieldsFromPayload(payload)
+    case 'fuel_log': return fuelLogFieldsFromPayload(payload)
+    case 'service_log': return serviceLogFieldsFromPayload(payload)
+    case 'part_type': return partTypeFieldsFromPayload(payload)
+  }
+}
+
+export async function clearRetryableFailure(mutationId: string): Promise<void> {
+  const item = await db.outbox.get(mutationId)
+  if (!item || item.status !== 'pending' || item.failureKind !== 'retryable') return
+  await db.outbox.update(mutationId, { lastError: null, failureKind: null })
+}
+
+export async function deleteBlockedMutationsForEntity(accountId: string, entityType: OutboxEntityType, entityId: string): Promise<void> {
+  const rows = await db.outbox.where('accountId').equals(accountId).toArray()
+  await Promise.all(rows.filter((item) => item.entityType === entityType && item.entityId === entityId && item.status === 'blocked').map((item) => db.outbox.delete(item.mutationId)))
 }

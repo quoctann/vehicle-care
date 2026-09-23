@@ -86,3 +86,27 @@ func (q *Queries) VehicleExists(ctx context.Context, arg VehicleExistsParams) (b
 	err := row.Scan(&exists)
 	return exists, err
 }
+
+const canonicalVehiclePayload = `-- name: CanonicalVehiclePayload :one
+SELECT jsonb_build_object(
+    'name', name,
+    'plate_number', plate_number,
+    'archived_at', archived_at,
+    'deleted_at', deleted_at,
+    'due_soon_ratio', due_soon_ratio
+)
+FROM vehicles
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalVehiclePayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalVehiclePayload(ctx context.Context, arg CanonicalVehiclePayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalVehiclePayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}

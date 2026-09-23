@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import * as api from '@/api/client'
 import type { AccountDto } from '@/api/contract.types'
+import { db } from '@/data/db'
+import { ApiError } from '@/api/errors'
 
 /**
  * `useSessionStore` chỉ giữ TRẠNG THÁI ĐĂNG NHẬP hiện tại (mỏng, đúng nguyên tắc
@@ -38,7 +40,25 @@ export const useSessionStore = create<SessionStore>((set) => ({
     try {
       const { account } = await api.getSession()
       set({ status: 'authenticated', account: mapAccountDto(account) })
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.code === 'session_expired' || error.code === 'auth_invalid')) {
+        set({ status: 'anonymous', account: null })
+        return
+      }
+      const cached = await db.accountCache.get('current').catch(() => undefined)
+      if (cached) {
+        set({
+          status: 'authenticated',
+          account: {
+            id: cached.accountId,
+            email: cached.email,
+            name: cached.name,
+            timezone: cached.timezone,
+            emailVerified: cached.emailVerified,
+          },
+        })
+        return
+      }
       set({ status: 'anonymous', account: null })
     }
   },

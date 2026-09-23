@@ -3,6 +3,17 @@ SELECT EXISTS (
     SELECT 1 FROM vehicles WHERE account_id = $1 AND id = $2
 );
 
+-- name: CanonicalVehiclePayload :one
+SELECT jsonb_build_object(
+    'name', name,
+    'plate_number', plate_number,
+    'archived_at', archived_at,
+    'deleted_at', deleted_at,
+    'due_soon_ratio', due_soon_ratio
+)
+FROM vehicles
+WHERE account_id = $1 AND id = $2;
+
 -- name: LockVehicleForUpdate :one
 -- Row lock used to serialize concurrent mutations of the same vehicle. A
 -- sql.ErrNoRows result means the vehicle has no current snapshot yet.

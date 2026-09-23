@@ -69,7 +69,7 @@ export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
 }
 
 /**
- * Wire payload (snake_case, từ `PullChange.payload` hoặc `MutationResult.server_snapshot`)
+ * Wire payload (snake_case, từ `PullChange.payload`)
  * → field domain (camelCase) — chiều NGƯỢC của các hàm `*ToPayload` ở trên. Dùng bởi
  * `sync/applyChange.ts`. KHÔNG bao gồm `id` (lấy từ `entity_id` của change/mutation),
  * `accountId` (lấy từ `useSessionStore` tại thời điểm apply), hay field server-owned

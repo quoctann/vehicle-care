@@ -10,6 +10,17 @@ FROM part_types
 WHERE account_id = $1
 ORDER BY display_order, created_at;
 
+-- name: CanonicalPartTypePayload :one
+SELECT jsonb_build_object(
+    'code', code,
+    'name_vi', name_vi,
+    'display_order', display_order,
+    'active', active,
+    'seed_version', seed_version
+)
+FROM part_types
+WHERE account_id = $1 AND id = $2;
+
 -- name: LockPartTypeForUpdate :one
 -- Row lock scoped to THIS account — a sql.ErrNoRows result means either the
 -- row doesn't exist yet, or it exists but is a global/other-account row this

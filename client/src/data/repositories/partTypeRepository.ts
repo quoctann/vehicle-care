@@ -29,9 +29,10 @@ export async function createPartType(accountId: string, displayName: string): Pr
     receivedAtServer: null,
     serverSeq: null,
   }
-  await db.transaction('rw', db.partTypes, db.outbox, async () => {
+  await db.transaction('rw', [db.partTypes, db.outbox, db.syncMeta], async () => {
     await db.partTypes.add(partType)
     await enqueueMutation({
+      accountId,
       entityType: 'part_type',
       operation: 'create',
       entityId: id,
@@ -42,12 +43,13 @@ export async function createPartType(accountId: string, displayName: string): Pr
 }
 
 async function writePartTypePatch(accountId: string, id: string, patch: Partial<PartType>): Promise<void> {
-  await db.transaction('rw', db.partTypes, db.outbox, async () => {
+  await db.transaction('rw', [db.partTypes, db.outbox, db.syncMeta], async () => {
     const current = await db.partTypes.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Part type not found: ${id}`)
     const updated: PartType = { ...current, ...patch }
     await db.partTypes.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'part_type',
       operation: 'update',
       entityId: id,

@@ -3,6 +3,20 @@ SELECT EXISTS (
     SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2
 );
 
+-- name: CanonicalReminderConfigPayload :one
+SELECT jsonb_build_object(
+    'vehicle_id', vehicle_id,
+    'part_type_id', part_type_id,
+    'interval_km', interval_km,
+    'interval_days', interval_days,
+    'baseline_odometer_km', baseline_odometer_km,
+    'baseline_date', baseline_date,
+    'enabled', enabled,
+    'deleted_at', deleted_at
+)
+FROM reminder_configs
+WHERE account_id = $1 AND id = $2;
+
 -- name: ReminderConfigUsesPartType :one
 SELECT EXISTS (
     SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2 AND part_type_id = $3

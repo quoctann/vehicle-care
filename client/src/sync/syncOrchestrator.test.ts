@@ -11,7 +11,10 @@ import { runSync } from './syncOrchestrator'
 
 vi.mock('./bootstrap', () => ({ bootstrapSync: vi.fn() }))
 vi.mock('./pull', () => ({ pullChanges: vi.fn() }))
-vi.mock('./push', () => ({ pushOutbox: vi.fn() }))
+vi.mock('./push', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./push')>()
+  return { ...actual, pushOutbox: vi.fn() }
+})
 
 afterEach(async () => {
   vi.clearAllMocks()
@@ -41,6 +44,7 @@ describe('runSync', () => {
       accountId: 'account-1',
       deviceId: 'device-1',
       lastSeenSeq: 0,
+      nextLocalSeq: 1,
       lastSyncedAt: null,
       lastSyncError: null,
       bootstrapState: 'bootstrapping',
@@ -114,9 +118,13 @@ describe('runSync', () => {
       operation: 'create',
       entityId: 'vehicle-1',
       payload: { name: 'Local vehicle' },
-      status: 'rejected',
+      accountId: 'account-1',
+      localSeq: 1,
+      baseServerSeq: null,
+      status: 'blocked',
       retryCount: 0,
       lastError: 'Rejected by server',
+      failureKind: 'terminal',
       createdAt: '2026-09-17T10:00:00.000Z',
     })
     vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' })
@@ -125,7 +133,7 @@ describe('runSync', () => {
 
     await expect(runSync()).rejects.toThrow('1 thay đổi chưa được đồng bộ')
 
-    expect(useSyncStore.getState()).toMatchObject({ status: 'error' })
+    expect(useSyncStore.getState()).toMatchObject({ status: 'retryable' })
     expect((await db.syncMeta.get('account-1'))?.lastSyncedAt ?? null).toBeNull()
   })
 })

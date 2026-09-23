@@ -75,6 +75,33 @@ func (q *Queries) ReminderConfigExists(ctx context.Context, arg ReminderConfigEx
 	return exists, err
 }
 
+const canonicalReminderConfigPayload = `-- name: CanonicalReminderConfigPayload :one
+SELECT jsonb_build_object(
+    'vehicle_id', vehicle_id,
+    'part_type_id', part_type_id,
+    'interval_km', interval_km,
+    'interval_days', interval_days,
+    'baseline_odometer_km', baseline_odometer_km,
+    'baseline_date', baseline_date,
+    'enabled', enabled,
+    'deleted_at', deleted_at
+)
+FROM reminder_configs
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalReminderConfigPayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalReminderConfigPayload(ctx context.Context, arg CanonicalReminderConfigPayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalReminderConfigPayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
 const reminderConfigUsesPartType = `-- name: ReminderConfigUsesPartType :one
 SELECT EXISTS (
     SELECT 1 FROM reminder_configs WHERE account_id = $1 AND id = $2 AND part_type_id = $3

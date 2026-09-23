@@ -172,3 +172,67 @@ Lốp và má phanh được tách trước/sau. Dây curoa và nhông, sên, đ
 ---
 
 *Tài liệu này là điểm chốt để bắt đầu triển khai từng phần theo checklist ở mục 5. Có thể cập nhật thêm khi phát sinh quyết định mới trong quá trình build.*
+
+---
+
+## 7. Quyết định cập nhật — incremental sync A
+
+Các quyết định dưới đây **supersede** những phần cũ nói về coalesce, watermark,
+`conflict_resolved` và việc chỉ có Vehicle/ReminderConfig là mutable.
+
+### 7.1. Mô hình dữ liệu thực tế
+
+- `Vehicle`, `ReminderConfig`, `PartType`, `FuelLog` và `ServiceLog` là mutable snapshot.
+- `OdometerLog` là append-only.
+- FuelLog/ServiceLog có thể sửa và xóa mềm; OdometerLog liên quan không tự thay đổi theo FuelLog.
+- Mỗi account có catalog PartType riêng.
+- PartType seed được tạo trong transaction signup và có changefeed như entity bình thường. Thiết bị mới không cần một đường bootstrap catalog riêng.
+
+### 7.2. Quy tắc outbox
+
+- Mỗi local write ghi entity và outbox trong cùng IndexedDB transaction.
+- Outbox có `account_id`, `local_seq` tăng dần, payload bất biến và `mutation_id` ổn định.
+- Client push từng mutation theo FIFO `local_seq`; không coalesce.
+- Retry do timeout/mất response gửi lại đúng mutation ID và payload cũ.
+- Kết quả `retryable_error` giữ mutation ở `pending` và chỉ được thử lại khi người dùng chọn **Thử lại**.
+- Kết quả terminal chuyển mutation thành `blocked`; không tự retry nguyên payload.
+- Mutation phía sau item đầu tiên bị lỗi không được gửi.
+
+### 7.3. Trạng thái sync và recovery
+
+- Không có lỗi âm thầm hoặc vòng retry vô hạn.
+- Mutation blocked luôn có `error_code`/nguyên nhân và hành động: sửa payload tạo mutation ID mới hoặc khôi phục từ server.
+- Pull bình thường không chạy khi account còn `pending` hoặc `blocked`.
+- “Đã đồng bộ” chỉ được hiển thị khi outbox sạch, bootstrap đã hoàn tất và pull thành công.
+- Luôn có luồng **Khôi phục từ server**: bỏ local mutations, xóa dữ liệu local của account, reset cursor về 0 và pull lại toàn bộ feed.
+- Restore không sửa dữ liệu server. Nếu restore lỗi giữa chừng, cursor page đã commit được giữ để tiếp tục.
+- Sau repair hoặc restore thành công, account có thể trở lại trạng thái `synced` bình thường.
+
+### 7.4. Push/pull protocol
+
+- Push batch API vẫn giữ shape mảng để không đổi HTTP envelope, nhưng server xử lý một mutation mỗi lần và trả prefix kết quả theo FIFO. Gặp terminal/retryable thì dừng.
+- Dedupe mutation được kiểm tra trước validation phụ thuộc trạng thái để retry sau khi server đã commit luôn trả acknowledgment cũ.
+- Mutable dùng toàn-record LWW theo thứ tự server áp dụng. Không có `base_server_seq` và `conflict_resolved` trong protocol mới.
+- Pull dùng `until_seq` stateless thay cho bảng watermark. Các page trong một phiên dùng cùng upper bound.
+- Client kiểm tra outbox trong cùng transaction với apply page và cursor; nếu queue đã có local mutation mới thì không apply page và không tăng cursor.
+
+### 7.5. Session offline
+
+- Có thể mở workspace local từ account cache khi lỗi mạng/server không phải 401.
+- 401/session expired yêu cầu đăng nhập lại nhưng không xóa dữ liệu local.
+- Logout chủ động xóa account cache hiện tại.
+- Không hỗ trợ guest workspace trước lần đăng nhập đầu tiên trong MVP.
+
+### 7.6. Reset dữ liệu dev
+
+Đợt thay đổi này có migration xóa bảng pull watermark và migration IndexedDB cho outbox mới.
+Không tự động drop schema. Khi muốn test sạch từ đầu:
+
+1. Dừng API và các tab frontend.
+2. Chủ động reset database PostgreSQL dev hoặc dùng database mới.
+3. Chạy `make migrate-up`.
+4. Xóa Redis session/token dev nếu cần.
+5. Clear IndexedDB/PWA storage của các browser test.
+6. Signup account mới và test hai browser/profile.
+
+Không được chỉ reset PostgreSQL mà giữ outbox/cursor cũ trên browser.

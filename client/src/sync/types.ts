@@ -8,8 +8,8 @@ import { db } from '@/data/db'
  * `entityType` -> Dexie table, và danh sách entity mutable (LWW).
  */
 
-/** Entity mutable cần `base_server_seq` khi push và có thể nhận `conflict_resolved`.
- * `fuel_log`/`service_log` sửa/xoá được (feedback Feature #3) nên cũng mutable —
+/** Mutable entities use full-record LWW in server application order.
+ * `fuel_log`/`service_log` sửa/xoá được nên cũng mutable —
  * chỉ `odometer_log` còn append-only thật (dedupe theo id, không bao giờ conflict —
  * decision.md mục 3.4; sửa/xoá số km sẽ ảnh hưởng baseline_odometer_km của reminder). */
 const MUTABLE_ENTITY_TYPES: ReadonlySet<SyncEntityType> = new Set(['vehicle', 'reminder_config', 'fuel_log', 'service_log', 'part_type'])

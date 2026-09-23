@@ -55,7 +55,7 @@ func TestSeedAccountPartTypesInsertsManifestForAccount(t *testing.T) {
 func insertTestAccount(t *testing.T, db *sql.DB) string {
 	t.Helper()
 	id := uuid.NewString()
-	_, err := db.Exec(`INSERT INTO accounts (id, email) VALUES ($1, $2)`, id, id+"@example.test")
+	_, err := db.Exec(`INSERT INTO accounts (id, email) VALUES ($1, $2); INSERT INTO account_sequences (account_id) VALUES ($1)`, id, id+"@example.test")
 	if err != nil {
 		t.Fatalf("insert test account: %v", err)
 	}

@@ -41,6 +41,7 @@ async function seedSyncMeta() {
     accountId,
     deviceId: 'device-1',
     lastSeenSeq: 0,
+    nextLocalSeq: 1,
     lastSyncedAt: null,
     lastSyncError: null,
     bootstrapState: 'bootstrapping',
@@ -54,20 +55,20 @@ afterEach(async () => {
 })
 
 describe('pullChanges', () => {
-  it('reuses one watermark and commits each page with its cursor', async () => {
+  it('reuses one upper bound and commits each page with its cursor', async () => {
     await seedSyncMeta()
     vi.mocked(api.pullChanges)
       .mockResolvedValueOnce({
         changes: [vehicleChange(1, 'vehicle-1')],
         next_cursor: 1,
-        watermark: 'wm-stable',
+      until_seq: 2,
         has_more: true,
         server_time: '2026-09-17T10:00:10.000Z',
       })
       .mockResolvedValueOnce({
         changes: [vehicleChange(2, 'vehicle-2')],
         next_cursor: 2,
-        watermark: 'wm-stable',
+        until_seq: 2,
         has_more: false,
         server_time: '2026-09-17T10:00:11.000Z',
       })
@@ -77,12 +78,11 @@ describe('pullChanges', () => {
     expect(api.pullChanges).toHaveBeenNthCalledWith(1, {
       afterSeq: 0,
       limit: 100,
-      watermark: '',
     })
     expect(api.pullChanges).toHaveBeenNthCalledWith(2, {
       afterSeq: 1,
       limit: 100,
-      watermark: 'wm-stable',
+      untilSeq: 2,
     })
     expect(await db.syncMeta.get(accountId)).toMatchObject({ lastSeenSeq: 2 })
     expect(await db.vehicles.get('vehicle-2')).toMatchObject({
@@ -108,7 +108,7 @@ describe('pullChanges', () => {
     const page: PullResponse = {
       changes: [vehicleChange(1, 'would-be-inserted'), vehicleChange(2, 'collision')],
       next_cursor: 2,
-      watermark: 'wm-atomic',
+        until_seq: 2,
       has_more: false,
       server_time: '2026-09-17T10:00:10.000Z',
     }
@@ -117,6 +117,49 @@ describe('pullChanges', () => {
     await expect(pullChanges(accountId)).rejects.toThrow('belongs to another account')
 
     expect(await db.vehicles.get('would-be-inserted')).toBeUndefined()
+    expect(await db.syncMeta.get(accountId)).toMatchObject({ lastSeenSeq: 0 })
+  })
+
+  it('refuses a page when the account outbox is dirty', async () => {
+    await seedSyncMeta()
+    await db.outbox.put({
+      mutationId: 'mutation-pending',
+      accountId,
+      localSeq: 1,
+      entityType: 'vehicle',
+      operation: 'create',
+      entityId: 'vehicle-1',
+      payload: { name: 'Local' },
+      baseServerSeq: null,
+      status: 'pending',
+      retryCount: 0,
+      lastError: null,
+      failureKind: null,
+      createdAt: '2026-09-17T10:00:00.000Z',
+    })
+    vi.mocked(api.pullChanges).mockResolvedValueOnce({
+      changes: [],
+      next_cursor: 1,
+      until_seq: 1,
+      has_more: false,
+      server_time: '2026-09-17T10:00:10.000Z',
+    })
+
+    await expect(pullChanges(accountId)).rejects.toThrow('local mutations')
+    expect(await db.syncMeta.get(accountId)).toMatchObject({ lastSeenSeq: 0 })
+  })
+
+  it('rejects an empty page that claims more changes without advancing the cursor', async () => {
+    await seedSyncMeta()
+    vi.mocked(api.pullChanges).mockResolvedValueOnce({
+      changes: [],
+      next_cursor: 0,
+      until_seq: 1,
+      has_more: true,
+      server_time: '2026-09-17T10:00:10.000Z',
+    })
+
+    await expect(pullChanges(accountId)).rejects.toThrow('empty page')
     expect(await db.syncMeta.get(accountId)).toMatchObject({ lastSeenSeq: 0 })
   })
 })

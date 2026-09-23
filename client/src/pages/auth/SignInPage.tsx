@@ -8,7 +8,6 @@ import { PasswordInput } from '@/components/auth/PasswordInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { refreshPartTypesFromServer } from '@/data/seed'
 import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore'
 import { getUserError } from '@/lib/userError'
 
@@ -28,9 +27,6 @@ export function SignInPage() {
     try {
       const { account } = await api.login({ email, password })
       setAuthenticated(mapAccountDto(account))
-      // Đảm bảo Dexie có part types của account này trước khi vào app (thiết bị mới/
-      // vừa xoá local storage sẽ chưa có gì cho tới lần refresh này).
-      await refreshPartTypesFromServer()
       navigate('/', { replace: true })
     } catch (err) {
       setError(getUserError(err, t))

@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '@/api/client'
 import { db, type OutboxItem } from '@/data/db'
+import { repairBlockedMutation } from '@/data/outbox'
 import { clearAllTables } from '@/data/testUtils'
 import { useSessionStore } from '@/stores/useSessionStore'
 import { pushOutbox } from './push'
 
 vi.mock('@/api/client', () => ({ pushMutations: vi.fn() }))
 
+const accountId = 'account-1'
+
 beforeEach(() => {
   useSessionStore.getState().setAuthenticated({
-    id: 'account-1',
+    id: accountId,
     email: 'test@example.com',
     name: null,
     timezone: 'UTC',
@@ -23,154 +26,96 @@ afterEach(async () => {
   await clearAllTables()
 })
 
-describe('pushOutbox', () => {
-  it('coalesces mutable rows to the latest snapshot and applies a conflict result', async () => {
-    await db.vehicles.put({
-      id: 'vehicle-1',
-      accountId: 'account-1',
-      name: 'Latest',
-      plateNumber: null,
-      archivedAt: null,
-      deletedAt: null,
-      dueSoonRatio: null,
-      createdAtClient: '2026-09-17T09:00:00.000Z',
-      receivedAtServer: null,
-      serverSeq: null,
-    })
-    const common: Omit<OutboxItem, 'mutationId' | 'payload'> = {
-      entityType: 'vehicle',
-      operation: 'update',
-      entityId: 'vehicle-1',
-      status: 'pending',
+function vehicle(id: string, name: string, serverSeq: number | null = null) {
+  return {
+    id,
+    accountId,
+    name,
+    plateNumber: null,
+    archivedAt: null,
+    deletedAt: null,
+    dueSoonRatio: null,
+    createdAtClient: '2026-09-17T09:00:00.000Z',
+    receivedAtServer: serverSeq == null ? null : '2026-09-17T10:00:00.000Z',
+    serverSeq,
+  }
+}
+
+function outboxItem(overrides: Partial<OutboxItem>): OutboxItem {
+  return {
+    mutationId: 'mutation-1',
+    accountId,
+    localSeq: 1,
+    entityType: 'vehicle',
+    operation: 'update',
+    entityId: 'vehicle-1',
+    payload: { name: 'Local' },
+    baseServerSeq: null,
+    status: 'pending',
       retryCount: 0,
       lastError: null,
-      createdAt: '2026-09-17T10:00:00.000Z',
-    }
+      failureKind: null,
+    createdAt: '2026-09-17T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('pushOutbox', () => {
+  it('sends every mutation in local FIFO order without coalescing', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Latest'))
     await db.outbox.bulkAdd([
-      {
-        ...common,
-        mutationId: 'mutation-old',
-        payload: { name: 'Old' },
-        createdAt: '2026-09-17T09:59:59.999Z',
-      },
-      {
-        ...common,
-        mutationId: 'mutation-latest',
-        payload: { name: 'Latest', plate_number: null },
-      },
+      outboxItem({ mutationId: 'mutation-1', localSeq: 1, payload: { name: 'Old' } }),
+      outboxItem({ mutationId: 'mutation-2', localSeq: 2, payload: { name: 'Latest' } }),
     ])
     vi.mocked(api.pushMutations).mockImplementation(async ({ mutations }) => ({
-      results: mutations.map((mutation) => ({
-        mutation_id: mutation.mutation_id,
-        status: 'conflict_resolved' as const,
-        server_seq: 7,
+      results: [{
+        mutation_id: mutations[0].mutation_id,
+        status: 'applied',
+        server_seq: mutations[0].mutation_id === 'mutation-1' ? 7 : 8,
         received_at_server: '2026-09-17T10:01:00.000Z',
-        server_snapshot: mutation.payload,
-      })),
+      }],
     }))
 
-    await pushOutbox('device-1', 'account-1')
+    await pushOutbox('device-1', accountId)
 
-    expect(api.pushMutations).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mutations: [
-          expect.objectContaining({
-            mutation_id: 'mutation-latest',
-            operation: 'create',
-            payload: { name: 'Latest', plate_number: null },
-          }),
-        ],
-      }),
-    )
-    expect(await db.outbox.get('mutation-old')).toMatchObject({
-      status: 'applied',
-    })
-    expect(await db.outbox.get('mutation-latest')).toMatchObject({
-      status: 'applied',
-    })
-    expect(await db.vehicles.get('vehicle-1')).toMatchObject({
-      name: 'Latest',
-      serverSeq: 7,
-    })
+    expect(vi.mocked(api.pushMutations).mock.calls.map(([request]) => request.mutations[0].mutation_id)).toEqual([
+      'mutation-1',
+      'mutation-2',
+    ])
+    expect(await db.outbox.toArray()).toEqual([])
+    expect(await db.vehicles.get('vehicle-1')).toMatchObject({ serverSeq: 8 })
   })
 
-  it('rejects a stale acknowledgment without advancing entity metadata', async () => {
-    await db.vehicles.put({
-      id: 'vehicle-stale',
-      accountId: 'account-1',
-      name: 'Current',
-      plateNumber: null,
-      archivedAt: null,
-      deletedAt: null,
-      dueSoonRatio: null,
-      createdAtClient: '2026-09-17T09:00:00.000Z',
-      receivedAtServer: '2026-09-17T10:00:00.000Z',
-      serverSeq: 10,
-    })
-    await db.outbox.add({
-      mutationId: 'mutation-stale',
-      entityType: 'vehicle',
-      operation: 'update',
-      entityId: 'vehicle-stale',
-      payload: { name: 'Current', plate_number: null, archived_at: null, deleted_at: null },
-      status: 'pending',
-      retryCount: 0,
-      lastError: null,
-      createdAt: '2026-09-17T10:01:00.000Z',
-    })
+  it('keeps a retryable mutation pending and stops before the next FIFO item', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Local'))
+    await db.outbox.bulkAdd([
+      outboxItem({ mutationId: 'mutation-1', localSeq: 1 }),
+      outboxItem({ mutationId: 'mutation-2', localSeq: 2 }),
+    ])
     vi.mocked(api.pushMutations).mockResolvedValue({
-      results: [{
-        mutation_id: 'mutation-stale',
-        status: 'applied',
-        server_seq: 7,
-        received_at_server: '2026-09-17T10:02:00.000Z',
-      }],
+      results: [{ mutation_id: 'mutation-1', status: 'retryable_error', error_message: 'Try later' }],
     })
 
-    await expect(pushOutbox('device-1', 'account-1')).rejects.toThrow('stale acknowledgment')
-    expect(await db.vehicles.get('vehicle-stale')).toMatchObject({ serverSeq: 10 })
-    expect(await db.outbox.get('mutation-stale')).toMatchObject({ status: 'pending' })
+    await expect(pushOutbox('device-1', accountId)).rejects.toThrow('Try later')
+
+    expect(api.pushMutations).toHaveBeenCalledTimes(1)
+    expect(await db.outbox.get('mutation-1')).toMatchObject({ status: 'pending', retryCount: 1, lastError: 'Try later' })
+    expect(await db.outbox.get('mutation-2')).toMatchObject({ status: 'pending' })
   })
 
-  it('keeps a server-rejected mutation visible for user action', async () => {
-    await db.vehicles.put({
-      id: 'vehicle-rejected',
-      accountId: 'account-1',
-      name: 'Rejected',
-      plateNumber: null,
-      archivedAt: null,
-      deletedAt: null,
-      dueSoonRatio: null,
-      createdAtClient: '2026-09-17T09:00:00.000Z',
-      receivedAtServer: null,
-      serverSeq: null,
-    })
-    await db.outbox.add({
-      mutationId: 'mutation-rejected',
-      entityType: 'vehicle',
-      operation: 'create',
-      entityId: 'vehicle-rejected',
-      payload: { name: 'Rejected' },
-      status: 'pending',
-      retryCount: 0,
-      lastError: null,
-      createdAt: '2026-09-17T10:01:00.000Z',
-    })
+  it('blocks terminal mutations and repairs them with a new mutation id', async () => {
+    await db.vehicles.put(vehicle('vehicle-1', 'Local'))
+    await db.outbox.add(outboxItem({ mutationId: 'mutation-blocked' }))
     vi.mocked(api.pushMutations).mockResolvedValue({
-      results: [{
-        mutation_id: 'mutation-rejected',
-        status: 'rejected',
-        error_code: 'validation_failed',
-        error_message: 'Invalid vehicle',
-        retryable: false,
-      }],
+      results: [{ mutation_id: 'mutation-blocked', status: 'rejected', error_message: 'Invalid vehicle' }],
     })
 
-    await pushOutbox('device-1', 'account-1')
+    await expect(pushOutbox('device-1', accountId)).rejects.toThrow('Invalid vehicle')
 
-    expect(await db.outbox.get('mutation-rejected')).toMatchObject({
-      status: 'rejected',
-      lastError: 'Invalid vehicle',
-    })
+    expect(await db.outbox.get('mutation-blocked')).toMatchObject({ status: 'blocked', lastError: 'Invalid vehicle' })
+    const replacement = await repairBlockedMutation('mutation-blocked', { name: 'Repaired' })
+    expect(replacement).toMatchObject({ accountId, localSeq: 1, status: 'pending', payload: { name: 'Repaired' } })
+    expect(replacement.mutationId).not.toBe('mutation-blocked')
+    expect(await db.outbox.get('mutation-blocked')).toBeUndefined()
   })
 })

@@ -11,8 +11,8 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// TestApplyMutationsDeduplicatesAndDetectsConflict asserts dedupe-by-mutation
-// and LWW-conflict detection. It uses a real vehicle-typed uuid entity id
+// TestApplyMutationsDeduplicatesAndAppliesLatestSnapshot asserts dedupe-by-mutation
+// and server-order LWW. It uses a real vehicle-typed uuid entity id
 // since the vehicles table enforces a uuid primary key.
 func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 	t.Parallel()
@@ -26,10 +26,9 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 
 	firstResult := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{first}, baseTime)[0]
 	duplicate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{first}, baseTime.Add(time.Minute))[0]
-	staleSeq := int64(0)
 	conflict := store.ApplyMutations(ctx, accountID, "device-2", []domain.Mutation{{
 		MutationID: "mutation-2", EntityType: "vehicle", Operation: "update", EntityID: vehicleID,
-		Payload: map[string]any{"name": "Second"}, BaseServerSeq: &staleSeq,
+		Payload: map[string]any{"name": "Second"},
 	}}, baseTime.Add(2*time.Minute))[0]
 
 	if firstResult.Status != "applied" || firstResult.ServerSeq == nil || *firstResult.ServerSeq != 1 {
@@ -38,7 +37,7 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || *duplicate.ServerSeq != 1 || !duplicate.ReceivedAtServer.Equal(*firstResult.ReceivedAtServer) {
 		t.Fatalf("duplicate did not preserve original acknowledgment: %#v", duplicate)
 	}
-	if conflict.Status != "conflict_resolved" || conflict.ServerSeq == nil || *conflict.ServerSeq != 2 || conflict.ServerSnapshot["name"] != "Second" {
+	if conflict.Status != "applied" || conflict.ServerSeq == nil || *conflict.ServerSeq != 2 {
 		t.Fatalf("unexpected conflict result: %#v", conflict)
 	}
 }
@@ -71,6 +70,74 @@ func TestAppendOnlyDuplicateReturnsOriginalAcknowledgment(t *testing.T) {
 	}
 	if second.Status != "duplicate" || second.ServerSeq == nil || *second.ServerSeq != *first.ServerSeq {
 		t.Fatalf("second write with different mutation_id was not treated as duplicate: %#v", second)
+	}
+}
+
+func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
+	t.Parallel()
+	store, _ := newTestStore(t)
+	ctx := context.Background()
+	accountID := newAccount(t, store)
+	vehicleID := createVehicle(t, store, accountID, "device-1")
+	now := time.Date(2026, 9, 17, 10, 0, 0, 123000000, time.UTC)
+
+	result := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+		MutationID: "canonical-fuel",
+		EntityType: "fuel_log",
+		Operation:  "create",
+		EntityID:   uuid.NewString(),
+		Payload: map[string]any{
+			"vehicle_id": vehicleID, "recorded_at": now.Format(time.RFC3339Nano),
+			"liters": 1.239, "cost_vnd": 123.9, "is_full_tank": true,
+		},
+	}}, now)[0]
+	if result.Status != "applied" {
+		t.Fatalf("unexpected fuel result: %#v", result)
+	}
+
+	page, err := store.Pull(ctx, accountID, 0, 10, nil)
+	if err != nil {
+		t.Fatalf("pull canonical fuel change: %v", err)
+	}
+	if len(page.Changes) != 2 {
+		t.Fatalf("expected vehicle and fuel changes, got %#v", page.Changes)
+	}
+	fuelPayload := page.Changes[1].Payload
+	if fuelPayload["liters"] != 1.24 || fuelPayload["cost_vnd"] != float64(123) {
+		t.Fatalf("change feed did not use persisted numeric values: %#v", fuelPayload)
+	}
+}
+
+func TestDuplicateIsReturnedBeforeStatefulValidation(t *testing.T) {
+	t.Parallel()
+	store, _ := newTestStore(t)
+	ctx := context.Background()
+	accountID := newAccount(t, store)
+	vehicleID := createVehicle(t, store, accountID, "device-1")
+	partTypes := seedPartTypes(t, store, accountID)
+	partTypeID := partTypes["engine_oil"]
+	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
+	payload := map[string]any{
+		"vehicle_id": vehicleID, "part_type_id": partTypeID,
+		"serviced_at": now.Format(time.RFC3339),
+	}
+	mutation := domain.Mutation{MutationID: "service-retry", EntityType: "service_log", Operation: "create", EntityID: uuid.NewString(), Payload: payload}
+	first := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{mutation}, now)[0]
+	if first.Status != "applied" {
+		t.Fatalf("unexpected first service result: %#v", first)
+	}
+
+	deactivate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+		MutationID: "part-type-deactivate", EntityType: "part_type", Operation: "update", EntityID: partTypeID,
+		Payload: map[string]any{"code": "engine_oil", "name_vi": "Dau may", "display_order": float64(1), "active": false, "seed_version": "1"},
+	}}, now.Add(time.Minute))[0]
+	if deactivate.Status != "applied" {
+		t.Fatalf("unexpected deactivation result: %#v", deactivate)
+	}
+
+	duplicate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{mutation}, now.Add(2*time.Minute))[0]
+	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || first.ServerSeq == nil || *duplicate.ServerSeq != *first.ServerSeq {
+		t.Fatalf("retry was statefully revalidated instead of deduplicated: %#v", duplicate)
 	}
 }
 
@@ -133,14 +200,26 @@ func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
 	if resultA.Status != "applied" || resultB.Status != "applied" {
 		t.Fatalf("same entity id in two accounts should both apply independently: a=%#v b=%#v", resultA, resultB)
 	}
-	if !store.EntityExists(ctx, accountA, "vehicle", sharedVehicleID) || !store.EntityExists(ctx, accountB, "vehicle", sharedVehicleID) {
+	existsA, err := store.EntityExists(ctx, accountA, "vehicle", sharedVehicleID)
+	if err != nil {
+		t.Fatalf("check account a ownership: %v", err)
+	}
+	existsB, err := store.EntityExists(ctx, accountB, "vehicle", sharedVehicleID)
+	if err != nil {
+		t.Fatalf("check account b ownership: %v", err)
+	}
+	if !existsA || !existsB {
 		t.Fatalf("EntityExists should see each account's own row")
 	}
-	if store.EntityExists(ctx, accountA, "vehicle", uuid.NewString()) {
+	existsMissing, err := store.EntityExists(ctx, accountA, "vehicle", uuid.NewString())
+	if err != nil {
+		t.Fatalf("check missing ownership: %v", err)
+	}
+	if existsMissing {
 		t.Fatalf("EntityExists leaked a match for an id that was never created")
 	}
 
-	pageA, err := store.Pull(ctx, accountA, 0, 10, "", now)
+	pageA, err := store.Pull(ctx, accountA, 0, 10, nil)
 	if err != nil {
 		t.Fatalf("pull account a: %v", err)
 	}
@@ -238,7 +317,7 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 		t.Fatalf("unexpected part type result: %#v", result)
 	}
 
-	page, err := store.Pull(ctx, accountID, 0, 10, "", now)
+	page, err := store.Pull(ctx, accountID, 0, 10, nil)
 	if err != nil {
 		t.Fatalf("pull part type change: %v", err)
 	}
@@ -270,10 +349,18 @@ func TestPartTypeUpsertCannotCrossAccountBoundary(t *testing.T) {
 		MutationID: "part-type-b", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
 	}}, now)[0]
 
-	if first.Status != "applied" || second.Status != "retryable_error" {
+	if first.Status != "applied" || second.Status != "rejected" || second.ErrorCode != "ownership_invalid" {
 		t.Fatalf("unexpected cross-account results: first=%#v second=%#v", first, second)
 	}
-	if !store.EntityExists(ctx, accountA, "part_type", entityID) || store.EntityExists(ctx, accountB, "part_type", entityID) {
+	existsA, err := store.EntityExists(ctx, accountA, "part_type", entityID)
+	if err != nil {
+		t.Fatalf("check account a part type: %v", err)
+	}
+	existsB, err := store.EntityExists(ctx, accountB, "part_type", entityID)
+	if err != nil {
+		t.Fatalf("check account b part type: %v", err)
+	}
+	if !existsA || existsB {
 		t.Fatalf("part type ownership changed across account boundary")
 	}
 }
@@ -304,12 +391,16 @@ func TestServiceLogUpdateChangesPartType(t *testing.T) {
 	payload["part_type_id"] = secondPartTypeID
 	updated := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
 		MutationID: "service-update", EntityType: "service_log", Operation: "update", EntityID: serviceID,
-		Payload: payload, BaseServerSeq: created.ServerSeq,
+		Payload: payload,
 	}}, now.Add(time.Minute))[0]
 	if updated.Status != "applied" {
 		t.Fatalf("unexpected update result: %#v", updated)
 	}
-	if !store.EntityReferencesPartType(ctx, accountID, "service_log", serviceID, secondPartTypeID) {
+	references, err := store.EntityReferencesPartType(ctx, accountID, "service_log", serviceID, secondPartTypeID)
+	if err != nil {
+		t.Fatalf("check updated service part type: %v", err)
+	}
+	if !references {
 		t.Fatalf("service log did not persist the changed part type")
 	}
 }

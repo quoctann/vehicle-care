@@ -115,13 +115,6 @@ type ProcessedMutation struct {
 	CreatedAt        time.Time      `json:"created_at"`
 }
 
-type PullWatermark struct {
-	AccountID  string    `json:"account_id"`
-	Token      string    `json:"token"`
-	UpperBound int64     `json:"upper_bound"`
-	ExpiresAt  time.Time `json:"expires_at"`
-}
-
 type ReminderConfig struct {
 	AccountID          string         `json:"account_id"`
 	ID                 string         `json:"id"`

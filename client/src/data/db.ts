@@ -17,7 +17,8 @@ import type {
 
 export type OutboxEntityType = 'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log' | 'part_type'
 export type OutboxOperation = 'create' | 'update'
-export type OutboxStatus = 'pending' | 'sent' | 'applied' | 'rejected' | 'retryable_error'
+export type OutboxStatus = 'pending' | 'blocked'
+export type OutboxFailureKind = 'retryable' | 'terminal'
 
 /**
  * 1 dòng outbox = 1 lần thao tác cần đẩy lên server (không phải 1 entity — 1 entity
@@ -26,14 +27,19 @@ export type OutboxStatus = 'pending' | 'sent' | 'applied' | 'rejected' | 'retrya
  */
 export type OutboxItem = {
   mutationId: string
+  accountId: string
+  localSeq: number
   entityType: OutboxEntityType
   operation: OutboxOperation
   entityId: string
   /** Snapshot payload tại thời điểm ghi — JSON-serializable, gửi nguyên vẹn lên server khi push. */
   payload: unknown
+  /** Revision used to build this envelope. It must not be read again during retry. */
+  baseServerSeq: number | null
   status: OutboxStatus
   retryCount: number
   lastError: string | null
+  failureKind: OutboxFailureKind | null
   createdAt: IsoDateTime
 }
 
@@ -44,6 +50,7 @@ export type SyncMeta = {
   accountId: string
   deviceId: string
   lastSeenSeq: number
+  nextLocalSeq: number
   lastSyncedAt: IsoDateTime | null
   lastSyncError: string | null
   bootstrapState: BootstrapState
@@ -59,6 +66,7 @@ export type AccountCache = {
   email: string
   name: string | null
   timezone: IanaTimezone
+  emailVerified: boolean
   deviceId: string
   cachedAt: IsoDateTime
 }
@@ -119,6 +127,86 @@ class VehicleMaintenanceDb extends Dexie {
 
       await partTypes.bulkDelete(legacyIds)
       await transaction.table<OutboxItem, string>('outbox').where('entityId').anyOf(legacyIds).delete()
+    })
+    // v6: account-scoped FIFO outbox. Acknowledged legacy rows are discarded;
+    // retryable legacy rows remain pending and rejected rows become blocked.
+    this.version(6).stores({
+      outbox: 'mutationId, entityId, accountId, localSeq, [accountId+localSeq], [accountId+status+localSeq]',
+    }).upgrade(async (transaction) => {
+      const outbox = transaction.table('outbox')
+      const rows = await outbox.toArray() as Array<Record<string, unknown>>
+      const entities = {
+        vehicle: transaction.table('vehicles'),
+        reminder_config: transaction.table('reminderConfigs'),
+        odometer_log: transaction.table('odometerLogs'),
+        fuel_log: transaction.table('fuelLogs'),
+        service_log: transaction.table('serviceLogs'),
+        part_type: transaction.table('partTypes'),
+      } as const
+      const nextByAccount = new Map<string, number>()
+
+      for (const row of rows.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))) {
+        const entityTable = entities[row.entityType as keyof typeof entities]
+        const entity = entityTable ? await entityTable.get(row.entityId as string) as { accountId?: string; serverSeq?: number | null } : undefined
+        const accountId = typeof row.accountId === 'string' ? row.accountId : entity?.accountId
+        if (!accountId) {
+          await outbox.delete(row.mutationId as string)
+          continue
+        }
+
+        const localSeq = nextByAccount.get(accountId) ?? 1
+        nextByAccount.set(accountId, localSeq + 1)
+        const legacyStatus = row.status as string
+        if (legacyStatus === 'applied') {
+          await outbox.delete(row.mutationId as string)
+          continue
+        }
+        await outbox.put({
+          ...row,
+          accountId,
+          localSeq,
+          baseServerSeq: row.baseServerSeq ?? entity?.serverSeq ?? null,
+          status: legacyStatus === 'rejected' ? 'blocked' : 'pending',
+          failureKind: legacyStatus === 'rejected' ? 'terminal' : null,
+        })
+      }
+
+      const syncMeta = transaction.table('syncMeta')
+      for (const [accountId, nextLocalSeq] of nextByAccount) {
+        const existing = await syncMeta.get(accountId) as Record<string, unknown> | undefined
+        await syncMeta.put({
+          accountId,
+          deviceId: existing?.deviceId ?? '',
+          lastSeenSeq: existing?.lastSeenSeq ?? 0,
+          nextLocalSeq: Math.max(Number(existing?.nextLocalSeq ?? 1), nextLocalSeq),
+          lastSyncedAt: existing?.lastSyncedAt ?? null,
+          lastSyncError: existing?.lastSyncError ?? null,
+          bootstrapState: existing?.bootstrapState ?? 'empty',
+        })
+      }
+      for (const existing of await syncMeta.toArray() as Array<Record<string, unknown>>) {
+        if (typeof existing.nextLocalSeq === 'number') continue
+        await syncMeta.put({ ...existing, nextLocalSeq: 1 })
+      }
+    })
+    // v7: retain a simple status index for global pending-count consumers.
+    this.version(7).stores({
+      outbox: 'mutationId, entityId, accountId, status, localSeq, [accountId+localSeq], [accountId+status+localSeq]',
+    }).upgrade(async (transaction) => {
+      const syncMeta = transaction.table('syncMeta')
+      for (const existing of await syncMeta.toArray() as Array<Record<string, unknown>>) {
+        if (typeof existing.nextLocalSeq === 'number') continue
+        await syncMeta.put({ ...existing, nextLocalSeq: 1 })
+      }
+    })
+    // v8: explicitly classify the last failure so retry and terminal actions
+    // cannot be inferred from a human-readable error string.
+    this.version(8).stores({}).upgrade(async (transaction) => {
+      const outbox = transaction.table('outbox')
+      for (const row of await outbox.toArray() as Array<Record<string, unknown>>) {
+        if (row.failureKind === 'retryable' || row.failureKind === 'terminal') continue
+        await outbox.put({ ...row, failureKind: row.status === 'blocked' ? 'terminal' : null })
+      }
     })
   }
 }

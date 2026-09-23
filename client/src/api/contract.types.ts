@@ -1,7 +1,7 @@
 /**
  * ĐÂY LÀ HỢP ĐỒNG DÙNG CHUNG FE/BE (nguồn sự thật phía TypeScript).
  *
- * Mirror 1:1 nội dung `.docs/sync-api-contract.md`. Sửa tài liệu đó TRƯỚC, rồi
+ * Mirror nội dung current implementation ở `.docs/sync-api-contract.md`. Sửa tài liệu đó TRƯỚC, rồi
  * đồng bộ tay các type ở file này SAU — không tự ý đổi shape ở đây mà không cập
  * nhật doc. Field trên "wire" (JSON thật sự trao đổi qua HTTP) dùng snake_case
  * đúng như response server trả về; việc map sang domain type (camelCase, ở
@@ -53,17 +53,6 @@ export type PushMutation = {
   entity_id: string
   /** Snapshot đầy đủ entity tại thời điểm mutation — shape khớp domain type tương ứng, field snake_case. */
   payload: Record<string, unknown>
-  /**
-   * CHỈ áp dụng cho entity mutable (vehicle, reminder_config): `server_seq` gần nhất
-   * mà client BIẾT về entity này lúc tạo mutation (null nếu client chưa từng thấy
-   * bản nào từ server — entity mới tạo hoàn toàn cục bộ). Server dùng field này để
-   * phân biệt `applied` (client đang sửa trên đúng bản mới nhất) với
-   * `conflict_resolved` (đã có mutation khác từ thiết bị khác đáp xuống SAU bản
-   * client biết nhưng TRƯỚC mutation này — LWW vẫn áp dụng bản mới nhất theo thời
-   * điểm server nhận, `conflict_resolved` chỉ là tín hiệu "client nên biết state đã
-   * bị người khác đổi", không phải từ chối).
-   */
-  base_server_seq?: number | null
 }
 
 export type PushRequest = {
@@ -72,7 +61,7 @@ export type PushRequest = {
   mutations: PushMutation[]
 }
 
-export type MutationResultStatus = 'applied' | 'duplicate' | 'rejected' | 'retryable_error' | 'conflict_resolved'
+export type MutationResultStatus = 'applied' | 'duplicate' | 'rejected' | 'retryable_error'
 
 export type MutationResult = {
   mutation_id: string
@@ -82,8 +71,6 @@ export type MutationResult = {
   error_code?: ApiErrorCode
   error_message?: string
   retryable?: boolean
-  /** Chỉ có khi status = conflict_resolved — snapshot MỚI NHẤT phía server, client phải ghi đè local bằng giá trị này. */
-  server_snapshot?: Record<string, unknown>
 }
 
 export type PushResponse = { results: MutationResult[] }
@@ -100,7 +87,7 @@ export type PullChange = {
 export type PullResponse = {
   changes: PullChange[]
   next_cursor: number
-  watermark: string
+  until_seq: number
   has_more: boolean
   /** Chỉ để observability — KHÔNG dùng để xử lý conflict phía client. */
   server_time: string
@@ -109,14 +96,8 @@ export type PullResponse = {
 // ────────────────────────── Part type catalog (2.14) ──────────────────────────
 
 /**
- * Entity mutable thật (đi qua push/pull như vehicle) — luôn thuộc về một account.
- * `server_seq`/`received_at_server` BẮT BUỘC có ở đây (khác các REST bootstrap khác) —
- * thiếu 2 field này khiến client coi mọi dòng bootstrap qua endpoint này là "chưa từng
- * thấy từ server" (`serverSeq: null`), làm `push.ts` gửi lại MỌI lần sửa dưới dạng
- * `operation: "create"` thay vì `"update"` — mà `create` bắt buộc `code === id`, điều
- * không bao giờ đúng với hạng mục seed (`code` kiểu `"engine_oil"`, `id` là UUID) → mọi
- * lần sửa hạng mục seed bị server từ chối vĩnh viễn. Đây là bug thật đã xảy ra, không phải
- * giả định — xem `partTypeFromDto`.
+ * Entity mutable thật đi qua push/pull như vehicle. Seed rows cũng có server sequence
+ * và changefeed entry; endpoint này chỉ là read-only catalog phụ trợ.
  */
 export type PartTypeDto = {
   id: string

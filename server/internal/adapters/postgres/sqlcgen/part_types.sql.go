@@ -124,6 +124,30 @@ func (q *Queries) PartTypeOwnedByAccount(ctx context.Context, arg PartTypeOwnedB
 	return exists, err
 }
 
+const canonicalPartTypePayload = `-- name: CanonicalPartTypePayload :one
+SELECT jsonb_build_object(
+    'code', code,
+    'name_vi', name_vi,
+    'display_order', display_order,
+    'active', active,
+    'seed_version', seed_version
+)
+FROM part_types
+WHERE account_id = $1 AND id = $2
+`
+
+type CanonicalPartTypePayloadParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) CanonicalPartTypePayload(ctx context.Context, arg CanonicalPartTypePayloadParams) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, canonicalPartTypePayload, arg.AccountID, arg.ID)
+	var payload []byte
+	err := row.Scan(&payload)
+	return payload, err
+}
+
 const upsertPartType = `-- name: UpsertPartType :execrows
 INSERT INTO part_types (id, account_id, code, name_vi, display_order, active, seed_version, server_seq, received_at_server)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

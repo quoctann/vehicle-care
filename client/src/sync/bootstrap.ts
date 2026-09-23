@@ -18,6 +18,7 @@ export async function bootstrapSync(account: SessionAccount): Promise<SyncBootst
     accountId: account.id,
     deviceId,
     lastSeenSeq: existing?.lastSeenSeq ?? 0,
+    nextLocalSeq: existing?.nextLocalSeq ?? 1,
     lastSyncedAt: existing?.lastSyncedAt ?? null,
     lastSyncError: existing?.lastSyncError ?? null,
     bootstrapState: 'bootstrapping',
@@ -39,6 +40,7 @@ export async function bootstrapSync(account: SessionAccount): Promise<SyncBootst
       email: account.email,
       name: account.name,
       timezone: account.timezone,
+      emailVerified: account.emailVerified,
       deviceId,
       cachedAt: new Date().toISOString(),
     })

@@ -26,9 +26,10 @@ export async function createVehicle(input: {
     receivedAtServer: null,
     serverSeq: null,
   }
-  await db.transaction('rw', db.vehicles, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.outbox, db.syncMeta], async () => {
     await db.vehicles.add(vehicle)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'vehicle',
       operation: 'create',
       entityId: vehicle.id,
@@ -39,12 +40,13 @@ export async function createVehicle(input: {
 }
 
 async function writeVehiclePatch(accountId: string, id: string, patch: Partial<Vehicle>): Promise<void> {
-  await db.transaction('rw', db.vehicles, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.outbox, db.syncMeta], async () => {
     const current = await db.vehicles.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`Vehicle not found: ${id}`)
     const updated: Vehicle = { ...current, ...patch }
     await db.vehicles.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'vehicle',
       operation: 'update',
       entityId: id,

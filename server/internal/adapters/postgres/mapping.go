@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -21,8 +22,7 @@ func marshalPayload(payload map[string]any) ([]byte, error) {
 }
 
 // unmarshalPayload decodes a jsonb column back into a payload map. It
-// returns nil for an empty/NULL column, matching domain.MutationResult's
-// omitempty ServerSnapshot.
+// returns nil for an empty/NULL column.
 func unmarshalPayload(data []byte) (map[string]any, error) {
 	if len(data) == 0 {
 		return nil, nil
@@ -310,4 +310,31 @@ func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]
 		ServerSeq:          seq,
 		ReceivedAtServer:   receivedAt,
 	}, nil
+}
+
+func canonicalPayload(ctx context.Context, queries *sqlcgen.Queries, accountID, entityType, entityID string) (map[string]any, error) {
+	var (
+		data []byte
+		err  error
+	)
+	switch entityType {
+	case "vehicle":
+		data, err = queries.CanonicalVehiclePayload(ctx, sqlcgen.CanonicalVehiclePayloadParams{AccountID: accountID, ID: entityID})
+	case "reminder_config":
+		data, err = queries.CanonicalReminderConfigPayload(ctx, sqlcgen.CanonicalReminderConfigPayloadParams{AccountID: accountID, ID: entityID})
+	case "odometer_log":
+		data, err = queries.CanonicalOdometerLogPayload(ctx, sqlcgen.CanonicalOdometerLogPayloadParams{AccountID: accountID, ID: entityID})
+	case "fuel_log":
+		data, err = queries.CanonicalFuelLogPayload(ctx, sqlcgen.CanonicalFuelLogPayloadParams{AccountID: accountID, ID: entityID})
+	case "service_log":
+		data, err = queries.CanonicalServiceLogPayload(ctx, sqlcgen.CanonicalServiceLogPayloadParams{AccountID: accountID, ID: entityID})
+	case "part_type":
+		data, err = queries.CanonicalPartTypePayload(ctx, sqlcgen.CanonicalPartTypePayloadParams{AccountID: accountID, ID: entityID})
+	default:
+		return nil, fmt.Errorf("postgres: canonical payload for unsupported entity type %q", entityType)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: read canonical %s payload: %w", entityType, err)
+	}
+	return unmarshalPayload(data)
 }

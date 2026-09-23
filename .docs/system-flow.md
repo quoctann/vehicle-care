@@ -1,7 +1,7 @@
 # Vehicle Care — Hệ thống và luồng nghiệp vụ hiện tại
 
 > Đối chiếu trực tiếp working tree ngày 23/09/2026, bao gồm các thay đổi đang dev.
-> Đây là mô tả **implementation hiện tại**. Các điểm cần sửa và phương án thiết kế tiếp theo nằm trong [bản review](./structure-sync-review.md).
+> Đây là mô tả **implementation sau incremental sync A**. Reset dữ liệu dev không được tự động thực hiện; xem runbook ở cuối tài liệu.
 
 ## 1. Hệ thống giải quyết bài toán gì?
 
@@ -231,22 +231,22 @@ sequenceDiagram
     participant P as PostgreSQL
     S->>L: Đọc/tạo syncMeta theo account
     S->>A: POST /devices/register
-    loop Các batch pending (tối đa 100)
-        S->>L: Đọc outbox, lọc account, coalesce
+    loop FIFO từng mutation (tối đa 100 trong một lượt)
+        S->>L: Đọc item đầu queue theo localSeq
         S->>A: POST /sync/push
         loop Từng mutation theo thứ tự request
             A->>P: Validate references + apply transaction
             P-->>A: Kết quả từng mutation
         end
-        A-->>S: results
+        A-->>S: Một result cho mutation
         S->>L: Ghi acknowledgment/trạng thái outbox
     end
-    loop Các trang cùng watermark
-        S->>A: GET /sync/pull?after_seq=cursor
+    loop Các trang cùng until_seq
+        S->>A: GET /sync/pull?after_seq=cursor&until_seq=bound
         A->>P: Đọc changefeed tới upper bound
         P-->>A: changes
-        A-->>S: changes, next_cursor, watermark, has_more
-        S->>L: Transaction: apply changes + cập nhật cursor
+        A-->>S: changes, next_cursor, until_seq, has_more
+        S->>L: Transaction: queue sạch → apply changes + cập nhật cursor
     end
     S->>L: Kiểm tra còn unresolved không
     S->>L: Thành công thì cập nhật lastSyncedAt
@@ -262,19 +262,19 @@ sequenceDiagram
 | `accountId` | Phạm vi dữ liệu; server lấy account từ session |
 | `serverSeq` | Phiên bản/thứ tự server của một thay đổi trong account |
 | `lastSeenSeq` | Cursor local đã áp dụng từ pull, lưu theo account |
-| `base_server_seq` | Phiên bản client gửi để nhận biết update trên bản cũ |
+| `localSeq` | Thứ tự FIFO của mutation trong thiết bị |
 | `receivedAtServer` | Timestamp server gắn cho thay đổi; không phải cursor |
 
 ACK push cập nhật `serverSeq` của entity, **không nhảy `lastSeenSeq`**. Cursor pull chỉ tăng khi page được commit local, để không bỏ qua thay đổi từ thiết bị khác.
 
 ### 6.4. Push phía client
 
-1. Đọc pending outbox, sort `createdAt`, kiểm tra account qua entity local.
-2. Coalesce mutable: giữ snapshot mới nhất theo timestamp cho mỗi entity; nếu timestamp bằng nhau, gửi tất cả bản bằng nhau.
-3. Chia tối đa 100 mutation/request.
-4. Đọc `serverSeq` hiện có lúc build request để gắn `base_server_seq`; chưa có seq thì đổi operation thành `create`.
-5. Gửi request và kiểm tra đủ/đúng result theo mutation ID.
-6. Apply ACK theo transaction local. Các mutation bị coalesce chỉ được đánh dấu applied khi snapshot thay thế được chấp nhận.
+1. Đọc item đầu tiên theo `accountId + localSeq`.
+2. Nếu item là `blocked`, dừng và yêu cầu repair hoặc restore.
+3. Gửi một mutation với đúng payload/operation/mutation ID đã enqueue.
+4. ACK `applied`/`duplicate` thì xóa item khỏi outbox và cập nhật metadata entity.
+5. `retryable_error` giữ item ở `pending` và dừng lượt sync; `rejected` chuyển thành `blocked` và dừng lượt sync.
+6. Không tự retry terminal mutation, không coalesce và không gửi các item phía sau item lỗi.
 
 ### 6.5. Push phía server
 
@@ -294,19 +294,18 @@ COMMIT
 
 Entity update, cấp seq, append feed và lưu acknowledgment của mutation được chấp nhận nằm trong cùng transaction. `account_sequences` cập nhật theo row lock; nhiều account có sequence độc lập. Một HTTP batch có thể thành công một phần.
 
-Mutable dùng **last server-applied write wins**, tức snapshot xử lý sau thắng toàn bản ghi. `base_server_seq` cũ chỉ khiến status thành `conflict_resolved`; server vẫn ghi snapshot vừa nhận. Đây không phải optimistic concurrency rejection, field-level merge hay CRDT. Timestamp client không quyết định người thắng.
+Mutable dùng **last server-applied write wins**, tức snapshot xử lý sau thắng toàn bản ghi. Không dùng timestamp client hoặc optimistic conflict status. Đây không phải field-level merge hay CRDT; nếu hai thiết bị cùng sửa offline, mutation được server xử lý sau sẽ thắng.
 
 ### 6.6. Pull phía server và client
 
-1. Request đầu không có watermark: server đọc current account sequence làm upper bound.
-2. Lưu token watermark trong PostgreSQL với hạn 15 phút.
-3. Query `after_seq < server_seq <= upper_bound`, tăng dần, đọc `limit+1` để xác định `has_more`.
-4. Request sau dùng cùng token; thay đổi mới sau upper bound đợi lượt sync kế tiếp.
-5. Client kiểm tra cursor/sequence, rồi áp dụng **cả page và cursor trong một transaction Dexie**.
-6. Nếu apply lỗi, rollback page và cursor; lần sau tiếp tục từ page đã commit gần nhất.
-7. Watermark chỉ giữ trong bộ nhớ của lượt pull; lượt sync mới xin watermark mới.
+1. Request đầu không có `until_seq`: server đọc current account sequence làm upper bound.
+2. Query `after_seq < server_seq <= until_seq`, tăng dần, đọc `limit+1` để xác định `has_more`.
+3. Request sau gửi lại cùng `until_seq`; thay đổi mới sau bound đợi lượt sync kế tiếp.
+4. Trước khi apply page, transaction Dexie kiểm tra outbox account vẫn sạch.
+5. Nếu có local mutation mới, rollback page/cursor và kết thúc lượt ở trạng thái pending.
+6. Nếu queue sạch, apply page và cursor trong cùng transaction.
 
-Feed hiện chứa payload lấy từ request mutation, không phải snapshot đọc lại từ row đã lưu. Mutable local chỉ bỏ qua change có seq thấp hơn; chưa kiểm tra pending outbox trước khi ghi đè business fields.
+Feed dùng canonical payload từ row đã lưu. Pull bình thường không apply khi outbox còn `pending` hoặc `blocked`, nên không ghi đè local edit chưa được xử lý.
 
 ### 6.7. Kết quả và retry
 
@@ -314,18 +313,17 @@ Feed hiện chứa payload lấy từ request mutation, không phải snapshot �
 |---|---|
 | `applied` | Mark applied, cập nhật seq/timestamp |
 | `duplicate` | Như applied; ACK thấp hơn entity seq hiện tại bị báo lỗi |
-| `conflict_resolved` | Apply server snapshot rồi mark applied |
-| `rejected` | Giữ row với status rejected, không tự gửi lại |
-| `retryable_error` | Đưa về pending, tăng retryCount; đợi lượt sync sau |
-| HTTP/network error | Giữ pending và kết thúc lượt sync bằng lỗi |
+| `rejected` | Chuyển row thành `blocked`, hiển thị nguyên nhân và action repair/restore |
+| `retryable_error` | Giữ `pending`, tăng retryCount; chỉ retry khi người dùng bấm Thử lại |
+| HTTP/network error | Giữ `pending`, lưu lỗi retryable; không auto-retry |
 
-Sau push, orchestrator vẫn pull nếu push trả kết quả per-mutation mà không throw. Chỉ đánh dấu đồng bộ thành công khi không còn pending/rejected/retryable unresolved. Chưa có luồng tổng quát để người dùng xử lý từng rejected mutation; nút sync không tự giải quyết được chúng.
+Pull chỉ chạy sau khi push hết queue. Chỉ hiển thị “Đã đồng bộ” khi không còn `pending` hoặc `blocked`, bootstrap đã ready và pull hoàn tất. Mutation terminal không tự retry nguyên payload; người dùng có thể sửa thành mutation ID mới hoặc khôi phục toàn bộ workspace từ server. Restore xóa thay đổi local chưa sync, reset cursor và pull lại từ `0`; nếu lỗi giữa chừng, cursor đã commit được giữ để tiếp tục.
 
 ## 7. Những gì đã có và chưa hoàn chỉnh
 
 **Đã có:** local transaction + outbox, phân trang pull, account-scoped sequence, dedupe mutation, tombstone, cookie/CSRF, PWA app-shell cache, health endpoints, migration và các unit/adapter tests.
 
-**Chưa hoàn chỉnh:** cold-start offline, guest-to-account merge, multi-tab synchronization, reconciliation khi còn local edits, rejected-item recovery, một bootstrap thống nhất cho mọi entity, email delivery/notification worker, Google OAuth, export/import.
+**Chưa hoàn chỉnh:** guest-to-account merge, email delivery/notification worker, Google OAuth, export/import. Cold-start offline, FIFO/blocked recovery, pull upper bound và bootstrap một pipeline đã được triển khai trong đợt này.
 
 `notification_deliveries` hiện chỉ là schema. Chưa có job server tính reminder và gửi email; trạng thái nhắc bảo dưỡng được tính phía client.
 
@@ -339,4 +337,4 @@ make dev
 
 Backend dùng PostgreSQL và Redis thật. `AUTO_MIGRATE=true` cho phép API chạy migration trước startup; mặc định tắt. API readiness kiểm tra cả hai dependency.
 
-Các lệnh kiểm tra: `make test`, `make lint`, `make build`. Kết quả và giới hạn của lần review này được ghi ở cuối [bản review](./structure-sync-review.md#8-kiểm-chứng-trong-lần-review-này).
+Các lệnh kiểm tra: `make test`, `make lint`, `make build`. Nếu dùng migration/schema mới trên database dev cũ, cần chủ động reset database và IndexedDB trước khi test; không tự động drop schema.

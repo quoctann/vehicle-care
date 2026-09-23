@@ -1,13 +1,12 @@
 package datasync
 
 import (
-	"context"
 	"time"
 
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-func (s *Service) validateMutation(ctx context.Context, accountID string, mutation domain.Mutation) (string, string) {
+func validateMutation(mutation domain.Mutation) (string, string) {
 	if mutation.MutationID == "" || mutation.EntityID == "" || len(mutation.MutationID) > 200 || len(mutation.EntityID) > 200 || mutation.Payload == nil {
 		return "validation_failed", "Mutation identifiers and payload are required and must not exceed 200 characters."
 	}
@@ -41,29 +40,8 @@ func (s *Service) validateMutation(ctx context.Context, accountID string, mutati
 			if code != mutation.EntityID {
 				return "validation_failed", "part_type code must equal its id for custom entries."
 			}
-			return "", ""
-		}
-		if !s.deps.EntityExists(ctx, accountID, "part_type", mutation.EntityID) {
-			return "ownership_invalid", "Part type does not belong to this account."
 		}
 		return "", ""
-	}
-	if mutation.EntityType != "vehicle" {
-		vehicleID, _ := mutation.Payload["vehicle_id"].(string)
-		if !s.deps.EntityExists(ctx, accountID, "vehicle", vehicleID) {
-			return "ownership_invalid", "Vehicle does not belong to this account."
-		}
-	}
-	if mutation.EntityType == "reminder_config" || mutation.EntityType == "service_log" {
-		partTypeID, _ := mutation.Payload["part_type_id"].(string)
-		if !s.deps.EntityExists(ctx, accountID, "part_type", partTypeID) {
-			return "ownership_invalid", "Part type does not belong to this account."
-		}
-		keepsExistingReference := mutation.Operation == "update" &&
-			s.deps.EntityReferencesPartType(ctx, accountID, mutation.EntityType, mutation.EntityID, partTypeID)
-		if !keepsExistingReference && !s.deps.PartTypeActive(ctx, accountID, partTypeID) {
-			return "validation_failed", "Part type is inactive."
-		}
 	}
 	return "", ""
 }

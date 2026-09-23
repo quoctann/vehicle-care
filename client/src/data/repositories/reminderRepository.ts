@@ -44,13 +44,14 @@ export async function createReminderConfig(input: {
     serverSeq: null,
   }
 
-  await db.transaction('rw', db.vehicles, db.partTypes, db.reminderConfigs, db.outbox, async () => {
+  await db.transaction('rw', [db.vehicles, db.partTypes, db.reminderConfigs, db.outbox, db.syncMeta], async () => {
     await assertVehicleOwned(input.accountId, input.vehicleId)
     const partType = await db.partTypes.get(input.partTypeId)
     if (!partType || partType.accountId !== input.accountId || !partType.active) throw new Error('Unknown or inactive part type.')
     await assertNoActiveDuplicate(input.vehicleId, input.partTypeId)
     await db.reminderConfigs.add(reminder)
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'reminder_config',
       operation: 'create',
       entityId: reminder.id,
@@ -61,7 +62,7 @@ export async function createReminderConfig(input: {
 }
 
 async function writeReminderPatch(accountId: string, id: string, patch: Partial<ReminderConfig>): Promise<void> {
-  await db.transaction('rw', db.reminderConfigs, db.outbox, async () => {
+  await db.transaction('rw', [db.reminderConfigs, db.outbox, db.syncMeta], async () => {
     const current = await db.reminderConfigs.get(id)
     if (!current || current.accountId !== accountId) throw new Error(`ReminderConfig not found: ${id}`)
     const updated: ReminderConfig = { ...current, ...patch }
@@ -75,6 +76,7 @@ async function writeReminderPatch(accountId: string, id: string, patch: Partial<
 
     await db.reminderConfigs.put(updated)
     await enqueueMutation({
+      accountId,
       entityType: 'reminder_config',
       operation: 'update',
       entityId: id,

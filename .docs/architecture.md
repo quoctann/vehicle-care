@@ -7,7 +7,7 @@ cmd/api                         composition root
 cmd/migrate                     go run ./cmd/migrate up|down|status|seed|create <name>
 internal/domain                 transport-independent data model
 internal/application            authentication, device, and sync use cases
-internal/ports                  persistence capabilities required by use cases (Store)
+application/*/port.go           persistence capabilities required by each use case
 internal/adapters/httpapi       Gin transport, cookies, CSRF, CORS
 internal/adapters/postgres      sqlc-generated queries + sqlx transaction orchestration
 internal/adapters/redis         session/token store
@@ -15,7 +15,7 @@ internal/platform               configuration and logging
 db/migrations/, db/queries/, sqlc.yaml
 ```
 
-The `postgres` adapter implements the `Store` port's account/sync methods and must
+The `postgres` adapter implements the application ports' account/sync methods and must
 preserve the invariant: sequence allocation, entity update, changefeed append, and
 processed-mutation recording happen atomically inside one database transaction.
 
@@ -27,6 +27,8 @@ processed-mutation recording happen atomically inside one database transaction.
 - Redis replaces only session/token capabilities. Account and sync data remain in PostgreSQL.
 - The migration command exposes `go run ./cmd/migrate up|down|status|create <name>` and uses source-controlled migrations under `db/migrations/`. Migration files are timestamp-prefixed (`<unix_timestamp>_<name>.up.sql`/`.down.sql`), not sequentially numbered, so migrations authored on parallel branches never collide on ordering; `create` generates the timestamp and a sanitized snake_case name automatically. `db/migrations.Up(db)` is the shared "apply everything pending" implementation — used by `cmd/migrate up`, `cmd/api`'s optional startup auto-migration, and `pgtest`.
 - API startup does not run migrations automatically by default. `AUTO_MIGRATE=true` (local dev only, default off) makes `cmd/api` call `db/migrations.Up` before it starts listening — a convenience so `make dev-be` never fails on a stale schema. Production/Kubernetes should leave it off and keep migrations a separate, explicit deploy step; `migrations.Up` is still safe to enable everywhere if ever needed, since golang-migrate's Postgres driver holds a session-level advisory lock for the run, so concurrent callers (e.g. several replicas racing on startup) serialize instead of corrupting state — the deploy-step preference is about change control, not a correctness requirement.
-- Known limitation: the Postgres adapter's `ApplyMutations` currently accepts exactly one mutation per call (matches the current `application.Service.Push` caller); the API-level batch of up to 100 mutations/request is still handled by looping this call once per mutation rather than in a single multi-row transaction. See `.docs/20260918-consolidate.md` §2.2 if this needs to become a true batch later.
+- Sync push is intentionally serialized one mutation at a time. The HTTP request keeps a batch envelope for compatibility, but processing stops at the first retryable or terminal result. This preserves FIFO dependency order and keeps partial success explicit.
+- Pull uses a stateless `until_seq` upper bound instead of persisted watermarks. The client applies a page and advances `last_seen_seq` only in one local transaction while the account outbox is clean.
+- The client outbox has account-scoped `local_seq`, immutable mutation envelopes, `pending` and `blocked` states. Retryable failures require explicit retry; terminal failures require repair or restore from server.
 
 Kubernetes injects configuration through environment variables. `godotenv` is a local convenience and does not override existing environment variables.
