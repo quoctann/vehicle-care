@@ -1,4 +1,4 @@
-import type { OdometerLog } from './types'
+import type { OdometerLog } from './types';
 
 /**
  * D-01: odometer hiện tại = log có `recordedAt` mới nhất; nếu trùng `recordedAt`,
@@ -9,22 +9,22 @@ import type { OdometerLog } from './types'
  * `id`/thời gian insert tăng dần), KHÔNG phải thứ tự ngẫu nhiên.
  */
 function isNewer(a: OdometerLog, b: OdometerLog, indexA: number, indexB: number): boolean {
-  if (a.recordedAt !== b.recordedAt) return a.recordedAt > b.recordedAt
-  if (a.receivedAtServer && b.receivedAtServer) return a.receivedAtServer > b.receivedAtServer
-  if (a.receivedAtServer && !b.receivedAtServer) return true
-  if (!a.receivedAtServer && b.receivedAtServer) return false
-  return indexA > indexB
+  if (a.recordedAt !== b.recordedAt) return a.recordedAt > b.recordedAt;
+  if (a.receivedAtServer && b.receivedAtServer) return a.receivedAtServer > b.receivedAtServer;
+  if (a.receivedAtServer && !b.receivedAtServer) return true;
+  if (!a.receivedAtServer && b.receivedAtServer) return false;
+  return indexA > indexB;
 }
 
 export function deriveLatestOdometerLog(logs: OdometerLog[]): OdometerLog | null {
-  if (logs.length === 0) return null
-  let bestIndex = 0
+  if (logs.length === 0) return null;
+  let bestIndex = 0;
   for (let i = 1; i < logs.length; i++) {
-    if (isNewer(logs[i], logs[bestIndex], i, bestIndex)) bestIndex = i
+    if (isNewer(logs[i], logs[bestIndex], i, bestIndex)) bestIndex = i;
   }
-  return logs[bestIndex]
+  return logs[bestIndex];
 }
 
 export function deriveCurrentOdometer(logs: OdometerLog[]): number | null {
-  return deriveLatestOdometerLog(logs)?.odometerKm ?? null
+  return deriveLatestOdometerLog(logs)?.odometerKm ?? null;
 }

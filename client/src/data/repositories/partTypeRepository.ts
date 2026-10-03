@@ -1,8 +1,8 @@
-import { generateId } from '@/lib/uuid'
-import type { PartType } from '@/domain/types'
-import { db } from '../db'
-import { partTypeToPayload } from '../mappers'
-import { enqueueMutation } from '../outbox'
+import { generateId } from '@/lib/uuid';
+import type { PartType } from '@/domain/types';
+import { db } from '../db';
+import { partTypeToPayload } from '../mappers';
+import { enqueueMutation } from '../outbox';
 
 /**
  * Tạo hạng mục bảo dưỡng tuỳ chỉnh (feedback Feature #2). `code` LUÔN bằng chính `id`
@@ -12,11 +12,12 @@ import { enqueueMutation } from '../outbox'
  * các custom type với nhau theo `createdAtClient` (không cần user sắp xếp thủ công).
  */
 export async function createPartType(accountId: string, displayName: string): Promise<PartType> {
-  const name = displayName.trim()
-  if (!name || name.length > 200) throw new Error('Part type name must contain 1 to 200 characters.')
+  const name = displayName.trim();
+  if (!name || name.length > 200)
+    throw new Error('Part type name must contain 1 to 200 characters.');
 
-  const id = generateId()
-  const now = new Date().toISOString()
+  const id = generateId();
+  const now = new Date().toISOString();
   const partType: PartType = {
     id,
     code: id,
@@ -28,44 +29,53 @@ export async function createPartType(accountId: string, displayName: string): Pr
     createdAtClient: now,
     receivedAtServer: null,
     serverSeq: null,
-  }
+  };
   await db.transaction('rw', [db.partTypes, db.outbox, db.syncMeta], async () => {
-    await db.partTypes.add(partType)
+    await db.partTypes.add(partType);
     await enqueueMutation({
       accountId,
       entityType: 'part_type',
       operation: 'create',
       entityId: id,
       payload: partTypeToPayload(partType),
-    })
-  })
-  return partType
+    });
+  });
+  return partType;
 }
 
-async function writePartTypePatch(accountId: string, id: string, patch: Partial<PartType>): Promise<void> {
+async function writePartTypePatch(
+  accountId: string,
+  id: string,
+  patch: Partial<PartType>,
+): Promise<void> {
   await db.transaction('rw', [db.partTypes, db.outbox, db.syncMeta], async () => {
-    const current = await db.partTypes.get(id)
-    if (!current || current.accountId !== accountId) throw new Error(`Part type not found: ${id}`)
-    const updated: PartType = { ...current, ...patch }
-    await db.partTypes.put(updated)
+    const current = await db.partTypes.get(id);
+    if (!current || current.accountId !== accountId) throw new Error(`Part type not found: ${id}`);
+    const updated: PartType = { ...current, ...patch };
+    await db.partTypes.put(updated);
     await enqueueMutation({
       accountId,
       entityType: 'part_type',
       operation: 'update',
       entityId: id,
       payload: partTypeToPayload(updated),
-    })
-  })
+    });
+  });
 }
 
 /** Chỉ đổi tên — `writePartTypePatch` tự từ chối nếu dòng không thuộc `accountId` này. */
-export function updatePartTypeName(accountId: string, id: string, displayName: string): Promise<void> {
-  const name = displayName.trim()
-  if (!name || name.length > 200) throw new Error('Part type name must contain 1 to 200 characters.')
-  return writePartTypePatch(accountId, id, { displayName: name })
+export function updatePartTypeName(
+  accountId: string,
+  id: string,
+  displayName: string,
+): Promise<void> {
+  const name = displayName.trim();
+  if (!name || name.length > 200)
+    throw new Error('Part type name must contain 1 to 200 characters.');
+  return writePartTypePatch(accountId, id, { displayName: name });
 }
 
 /** Soft-delete = `active: false` (khuyến nghị đã chốt ở Stage 1) — ẩn khỏi picker, giữ nguyên log/reminder đã tham chiếu. */
 export function setPartTypeActive(accountId: string, id: string, active: boolean): Promise<void> {
-  return writePartTypePatch(accountId, id, { active })
+  return writePartTypePatch(accountId, id, { active });
 }

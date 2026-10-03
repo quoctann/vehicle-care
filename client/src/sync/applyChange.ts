@@ -1,5 +1,5 @@
-import type { PullChange, SyncEntityType } from '@/api/contract.types'
-import { db } from '@/data/db'
+import type { PullChange, SyncEntityType } from '@/api/contract.types';
+import { db } from '@/data/db';
 import {
   fuelLogFieldsFromPayload,
   odometerLogFieldsFromPayload,
@@ -7,12 +7,12 @@ import {
   reminderConfigFieldsFromPayload,
   serviceLogFieldsFromPayload,
   vehicleFieldsFromPayload,
-} from '@/data/mappers'
+} from '@/data/mappers';
 
 async function assertReferencedVehicle(accountId: string, vehicleId: string): Promise<void> {
-  const vehicle = await db.vehicles.get(vehicleId)
+  const vehicle = await db.vehicles.get(vehicleId);
   if (!vehicle || vehicle.accountId !== accountId) {
-    throw new Error(`Sync payload references a vehicle outside account ${accountId}`)
+    throw new Error(`Sync payload references a vehicle outside account ${accountId}`);
   }
 }
 
@@ -37,9 +37,9 @@ async function applyEntityChange(
 ): Promise<void> {
   switch (entityType) {
     case 'vehicle': {
-      const existing = await db.vehicles.get(entityId)
+      const existing = await db.vehicles.get(entityId);
       if (!existing) {
-        const fields = vehicleFieldsFromPayload(payload)
+        const fields = vehicleFieldsFromPayload(payload);
         await db.vehicles.put({
           id: entityId,
           accountId,
@@ -47,22 +47,23 @@ async function applyEntityChange(
           createdAtClient: receivedAtServer,
           serverSeq,
           receivedAtServer,
-        })
+        });
       } else {
-        if (existing.accountId !== accountId) throw new Error(`Vehicle ${entityId} belongs to another account`)
-        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        if (existing.accountId !== accountId)
+          throw new Error(`Vehicle ${entityId} belongs to another account`);
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return;
         await db.vehicles.update(entityId, {
           ...vehicleFieldsFromPayload(payload),
           serverSeq,
           receivedAtServer,
-        })
+        });
       }
-      return
+      return;
     }
     case 'reminder_config': {
-      const existing = await db.reminderConfigs.get(entityId)
-      const fields = reminderConfigFieldsFromPayload(payload)
-      await assertReferencedVehicle(accountId, fields.vehicleId)
+      const existing = await db.reminderConfigs.get(entityId);
+      const fields = reminderConfigFieldsFromPayload(payload);
+      await assertReferencedVehicle(accountId, fields.vehicleId);
       if (!existing) {
         await db.reminderConfigs.put({
           id: entityId,
@@ -71,22 +72,24 @@ async function applyEntityChange(
           createdAtClient: receivedAtServer,
           serverSeq,
           receivedAtServer,
-        })
+        });
       } else {
-        if (existing.accountId !== accountId) throw new Error(`Reminder config ${entityId} belongs to another account`)
-        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        if (existing.accountId !== accountId)
+          throw new Error(`Reminder config ${entityId} belongs to another account`);
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return;
         await db.reminderConfigs.update(entityId, {
           ...fields,
           serverSeq,
           receivedAtServer,
-        })
+        });
       }
-      return
+      return;
     }
     case 'odometer_log': {
-      const existing = await db.odometerLogs.get(entityId)
+      const existing = await db.odometerLogs.get(entityId);
       if (existing) {
-        if (existing.accountId !== accountId) throw new Error(`Odometer log ${entityId} belongs to another account`)
+        if (existing.accountId !== accountId)
+          throw new Error(`Odometer log ${entityId} belongs to another account`);
         // Push ACK already set this version, but only pull carries the canonical
         // payload (e.g. PostgreSQL numeric rounding). Equal versions must apply.
         if (existing.serverSeq == null || existing.serverSeq <= serverSeq) {
@@ -94,12 +97,12 @@ async function applyEntityChange(
             ...odometerLogFieldsFromPayload(payload),
             serverSeq,
             receivedAtServer,
-          })
+          });
         }
-        return
+        return;
       }
-      const fields = odometerLogFieldsFromPayload(payload)
-      await assertReferencedVehicle(accountId, fields.vehicleId)
+      const fields = odometerLogFieldsFromPayload(payload);
+      await assertReferencedVehicle(accountId, fields.vehicleId);
       await db.odometerLogs.put({
         id: entityId,
         accountId,
@@ -107,13 +110,13 @@ async function applyEntityChange(
         createdAtClient: receivedAtServer,
         serverSeq,
         receivedAtServer,
-      })
-      return
+      });
+      return;
     }
     case 'fuel_log': {
-      const existing = await db.fuelLogs.get(entityId)
-      const fields = fuelLogFieldsFromPayload(payload)
-      await assertReferencedVehicle(accountId, fields.vehicleId)
+      const existing = await db.fuelLogs.get(entityId);
+      const fields = fuelLogFieldsFromPayload(payload);
+      await assertReferencedVehicle(accountId, fields.vehicleId);
       if (!existing) {
         await db.fuelLogs.put({
           id: entityId,
@@ -122,22 +125,23 @@ async function applyEntityChange(
           createdAtClient: receivedAtServer,
           serverSeq,
           receivedAtServer,
-        })
+        });
       } else {
-        if (existing.accountId !== accountId) throw new Error(`Fuel log ${entityId} belongs to another account`)
-        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        if (existing.accountId !== accountId)
+          throw new Error(`Fuel log ${entityId} belongs to another account`);
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return;
         await db.fuelLogs.update(entityId, {
           ...fields,
           serverSeq,
           receivedAtServer,
-        })
+        });
       }
-      return
+      return;
     }
     case 'service_log': {
-      const existing = await db.serviceLogs.get(entityId)
-      const fields = serviceLogFieldsFromPayload(payload)
-      await assertReferencedVehicle(accountId, fields.vehicleId)
+      const existing = await db.serviceLogs.get(entityId);
+      const fields = serviceLogFieldsFromPayload(payload);
+      await assertReferencedVehicle(accountId, fields.vehicleId);
       if (!existing) {
         await db.serviceLogs.put({
           id: entityId,
@@ -146,21 +150,22 @@ async function applyEntityChange(
           createdAtClient: receivedAtServer,
           serverSeq,
           receivedAtServer,
-        })
+        });
       } else {
-        if (existing.accountId !== accountId) throw new Error(`Service log ${entityId} belongs to another account`)
-        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        if (existing.accountId !== accountId)
+          throw new Error(`Service log ${entityId} belongs to another account`);
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return;
         await db.serviceLogs.update(entityId, {
           ...fields,
           serverSeq,
           receivedAtServer,
-        })
+        });
       }
-      return
+      return;
     }
     case 'part_type': {
-      const existing = await db.partTypes.get(entityId)
-      const fields = partTypeFieldsFromPayload(payload)
+      const existing = await db.partTypes.get(entityId);
+      const fields = partTypeFieldsFromPayload(payload);
       if (!existing) {
         await db.partTypes.put({
           id: entityId,
@@ -169,17 +174,18 @@ async function applyEntityChange(
           createdAtClient: receivedAtServer,
           serverSeq,
           receivedAtServer,
-        })
+        });
       } else {
-        if (existing.accountId !== accountId) throw new Error(`Part type ${entityId} belongs to another account`)
-        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return
+        if (existing.accountId !== accountId)
+          throw new Error(`Part type ${entityId} belongs to another account`);
+        if (existing.serverSeq != null && existing.serverSeq > serverSeq) return;
         await db.partTypes.update(entityId, {
           ...fields,
           serverSeq,
           receivedAtServer,
-        })
+        });
       }
-      return
+      return;
     }
   }
 }
@@ -190,7 +196,18 @@ async function applyEntityChange(
  * cập nhật `syncMeta` cùng lúc — xem ghi chú trong `outbox.ts`).
  */
 export async function applyPulledChange(change: PullChange, accountId: string): Promise<void> {
-  await db.transaction('rw', [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes], async () => {
-    await applyEntityChange(accountId, change.entity_type, change.entity_id, change.payload, change.server_seq, change.received_at_server)
-  })
+  await db.transaction(
+    'rw',
+    [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes],
+    async () => {
+      await applyEntityChange(
+        accountId,
+        change.entity_type,
+        change.entity_id,
+        change.payload,
+        change.server_seq,
+        change.received_at_server,
+      );
+    },
+  );
 }

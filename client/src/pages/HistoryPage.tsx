@@ -1,18 +1,18 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
-import { HistoryTimeline } from "@/components/history/HistoryTimeline";
-import type { HistoryEntry } from "@/data/queries/historyQueries";
-import { deleteFuelLog, deleteServiceLog } from "@/data/repositories";
-import { useHistoryEntries } from "@/hooks/useHistory";
-import { useSessionStore } from "@/stores/useSessionStore";
-import { useTranslation } from "react-i18next";
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { HistoryTimeline } from '@/components/history/HistoryTimeline';
+import type { HistoryEntry } from '@/data/queries/historyQueries';
+import { deleteFuelLog, deleteServiceLog } from '@/data/repositories';
+import { useHistoryEntries } from '@/hooks/useHistory';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { useTranslation } from 'react-i18next';
 
 export function HistoryPage() {
   const { t } = useTranslation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const account = useSessionStore((state) => state.account);
-  const timezone = account?.timezone ?? "UTC";
+  const timezone = account?.timezone ?? 'UTC';
   const entries = useHistoryEntries(account?.id, vehicleId);
 
   function handleEdit(entry: HistoryEntry) {
@@ -22,7 +22,7 @@ export function HistoryPage() {
   async function handleDelete(entry: HistoryEntry) {
     if (!account) return;
     try {
-      if (entry.kind === "fuel") await deleteFuelLog(account.id, entry.id);
+      if (entry.kind === 'fuel') await deleteFuelLog(account.id, entry.id);
       else await deleteServiceLog(account.id, entry.id);
       toast.success(t('history.deletedToast'));
     } catch (error) {
@@ -40,11 +40,14 @@ export function HistoryPage() {
           <p className="text-xs font-semibold tracking-[0.08em] text-primary uppercase">
             {t('history.eyebrow')}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">
-            {t('history.title')}
-          </h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">{t('history.title')}</h1>
         </header>
-        <HistoryTimeline entries={entries} timezone={timezone} onEdit={handleEdit} onDelete={handleDelete} />
+        <HistoryTimeline
+          entries={entries}
+          timezone={timezone}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       </div>
     </main>
   );

@@ -1,22 +1,18 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
-import { AccountCard } from "@/components/settings/AccountCard";
-import { AppSettings } from "@/components/settings/AppSettings";
-import { GarageList } from "@/components/settings/GarageList";
-import { Button } from "@/components/ui/button";
-import * as api from "@/api/client";
-import {
-  archiveVehicle,
-  deleteVehicle,
-  restoreVehicle,
-} from "@/data/repositories";
-import type { Vehicle } from "@/domain/types";
-import { useVehicles } from "@/hooks/useVehicles";
-import { getLastVehicleId, setLastVehicleId } from "@/lib/lastVehicle";
-import { useSessionStore } from "@/stores/useSessionStore";
-import { db } from "@/data/db";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { AccountCard } from '@/components/settings/AccountCard';
+import { AppSettings } from '@/components/settings/AppSettings';
+import { GarageList } from '@/components/settings/GarageList';
+import { Button } from '@/components/ui/button';
+import * as api from '@/api/client';
+import { archiveVehicle, deleteVehicle, restoreVehicle } from '@/data/repositories';
+import type { Vehicle } from '@/domain/types';
+import { useVehicles } from '@/hooks/useVehicles';
+import { getLastVehicleId, setLastVehicleId } from '@/lib/lastVehicle';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { db } from '@/data/db';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -29,12 +25,8 @@ export function SettingsPage() {
     account ? getLastVehicleId(account.id) : null,
   );
   const [signingOut, setSigningOut] = useState(false);
-  const activeVehicles = vehicles.filter(
-    (vehicle) => vehicle.archivedAt == null,
-  );
-  const activeVehicleId = activeVehicles.some(
-    (vehicle) => vehicle.id === preferredVehicleId,
-  )
+  const activeVehicles = vehicles.filter((vehicle) => vehicle.archivedAt == null);
+  const activeVehicleId = activeVehicles.some((vehicle) => vehicle.id === preferredVehicleId)
     ? preferredVehicleId
     : (activeVehicles[0]?.id ?? null);
 
@@ -47,7 +39,7 @@ export function SettingsPage() {
     } finally {
       await db.accountCache.delete('current');
       clear();
-      navigate("/sign-in", { replace: true });
+      navigate('/sign-in', { replace: true });
     }
   }
 
@@ -62,17 +54,13 @@ export function SettingsPage() {
       if (!account) return;
       await archiveVehicle(account.id, vehicle.id);
       if (vehicle.id === activeVehicleId) {
-        const replacement = activeVehicles.find(
-          (candidate) => candidate.id !== vehicle.id,
-        );
+        const replacement = activeVehicles.find((candidate) => candidate.id !== vehicle.id);
         if (replacement) selectVehicle(replacement.id);
-        else navigate("/onboarding/add-vehicle", { replace: true });
+        else navigate('/onboarding/add-vehicle', { replace: true });
       }
       toast.success(t('settings.archivedToast', { name: vehicle.name }));
     } catch (error) {
-      toast.error(
-        t('settings.archiveFailed'),
-      );
+      toast.error(t('settings.archiveFailed'));
       throw error;
     }
   }
@@ -84,9 +72,7 @@ export function SettingsPage() {
       if (!activeVehicleId) selectVehicle(vehicle.id);
       toast.success(t('settings.restoredToast', { name: vehicle.name }));
     } catch (error) {
-      toast.error(
-        t('settings.restoreFailed'),
-      );
+      toast.error(t('settings.restoreFailed'));
       throw error;
     }
   }
@@ -96,17 +82,13 @@ export function SettingsPage() {
       if (!account) return;
       await deleteVehicle(account.id, vehicle.id);
       if (vehicle.id === activeVehicleId) {
-        const replacement = activeVehicles.find(
-          (candidate) => candidate.id !== vehicle.id,
-        );
+        const replacement = activeVehicles.find((candidate) => candidate.id !== vehicle.id);
         if (replacement) selectVehicle(replacement.id);
-        else navigate("/onboarding/add-vehicle", { replace: true });
+        else navigate('/onboarding/add-vehicle', { replace: true });
       }
       toast.success(t('settings.deletedToast', { name: vehicle.name }));
     } catch (error) {
-      toast.error(
-        t('settings.deleteFailed'),
-      );
+      toast.error(t('settings.deleteFailed'));
       throw error;
     }
   }
@@ -114,7 +96,7 @@ export function SettingsPage() {
   if (!account) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
-        <Button variant="outline" onClick={() => navigate("/sign-in")}>
+        <Button variant="outline" onClick={() => navigate('/sign-in')}>
           {t('settings.returnSignIn')}
         </Button>
       </div>
@@ -130,9 +112,7 @@ export function SettingsPage() {
           <p className="text-xs font-semibold tracking-[0.08em] text-primary uppercase">
             {t('settings.eyebrow')}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">
-            {t('settings.title')}
-          </h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">{t('settings.title')}</h1>
         </header>
         <div className="space-y-5">
           <AccountCard
@@ -147,7 +127,7 @@ export function SettingsPage() {
             onOpen={(vehicle) => {
               if (vehicle.archivedAt == null) selectVehicle(vehicle.id);
             }}
-            onAdd={() => navigate("/onboarding/add-vehicle")}
+            onAdd={() => navigate('/onboarding/add-vehicle')}
             onArchive={handleArchive}
             onRestore={handleRestore}
             onDelete={handleDelete}

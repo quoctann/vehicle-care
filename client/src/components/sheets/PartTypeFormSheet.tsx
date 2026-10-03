@@ -1,49 +1,49 @@
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import { createPartType, updatePartTypeName } from '@/data/repositories/partTypeRepository'
-import type { PartType } from '@/domain/types'
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { createPartType, updatePartTypeName } from '@/data/repositories/partTypeRepository';
+import type { PartType } from '@/domain/types';
 
 type PartTypeFormSheetProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  accountId: string
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accountId: string;
   /** null = tạo mới; có giá trị = sửa tên hạng mục đã có. */
-  editingPartType?: PartType | null
-}
+  editingPartType?: PartType | null;
+};
 
-export function PartTypeFormSheet({ open, onOpenChange, accountId, editingPartType = null }: PartTypeFormSheetProps) {
-  const { t } = useTranslation()
-  const [name, setName] = useState(editingPartType?.displayName ?? '')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const isEditing = editingPartType != null
+export function PartTypeFormSheet({
+  open,
+  onOpenChange,
+  accountId,
+  editingPartType = null,
+}: PartTypeFormSheetProps) {
+  const { t } = useTranslation();
+  const [name, setName] = useState(editingPartType?.displayName ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const isEditing = editingPartType != null;
 
   async function save() {
-    const trimmed = name.trim()
+    const trimmed = name.trim();
     if (!trimmed || trimmed.length > 200) {
-      setError(t('partType.invalidName'))
-      return
+      setError(t('partType.invalidName'));
+      return;
     }
-    setSaving(true)
-    setError(null)
+    setSaving(true);
+    setError(null);
     try {
-      if (editingPartType) await updatePartTypeName(accountId, editingPartType.id, trimmed)
-      else await createPartType(accountId, trimmed)
-      onOpenChange(false)
-      toast.success(isEditing ? t('partType.updated') : t('partType.created'))
+      if (editingPartType) await updatePartTypeName(accountId, editingPartType.id, trimmed);
+      else await createPartType(accountId, trimmed);
+      onOpenChange(false);
+      toast.success(isEditing ? t('partType.updated') : t('partType.created'));
     } catch {
-      setError(t('partType.saveFailed'))
+      setError(t('partType.saveFailed'));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -58,11 +58,19 @@ export function PartTypeFormSheet({ open, onOpenChange, accountId, editingPartTy
         <SheetTitle className="mx-0.5 text-[15px] font-semibold tracking-[-0.01em]">
           {isEditing ? t('partType.editTitle') : t('partType.addTitle')}
         </SheetTitle>
-        <SheetDescription className="mx-0.5 mt-0.5 text-xs leading-5">{t('partType.formDescription')}</SheetDescription>
+        <SheetDescription className="mx-0.5 mt-0.5 text-xs leading-5">
+          {t('partType.formDescription')}
+        </SheetDescription>
 
         <div className="mt-4 flex flex-col gap-1.5">
           <Label htmlFor="part-type-name">{t('partType.nameLabel')}</Label>
-          <Input id="part-type-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={200} autoFocus />
+          <Input
+            id="part-type-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={200}
+            autoFocus
+          />
         </div>
 
         {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
@@ -77,5 +85,5 @@ export function PartTypeFormSheet({ open, onOpenChange, accountId, editingPartTy
         </button>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

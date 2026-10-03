@@ -1,52 +1,63 @@
-import { useEffect } from 'react'
-import { Plus, Settings } from 'lucide-react'
-import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet'
-import { useVehicle, useVehicles } from '@/hooks/useVehicles'
-import { setLastVehicleId, useLastVehicleId } from '@/lib/lastVehicle'
-import { useSessionStore } from '@/stores/useSessionStore'
-import { BottomTabBar } from './BottomTabBar'
-import { SidebarNav } from './SidebarNav'
-import { SyncStatusBadge } from './SyncStatusBadge'
-import { WorkspaceRecovery } from './WorkspaceRecovery'
-import { db } from '@/data/db'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { VehicleSwitcher } from './VehicleSwitcher'
+import { useEffect } from 'react';
+import { Plus, Settings } from 'lucide-react';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet';
+import { useVehicle, useVehicles } from '@/hooks/useVehicles';
+import { setLastVehicleId, useLastVehicleId } from '@/lib/lastVehicle';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { BottomTabBar } from './BottomTabBar';
+import { SidebarNav } from './SidebarNav';
+import { SyncStatusBadge } from './SyncStatusBadge';
+import { WorkspaceRecovery } from './WorkspaceRecovery';
+import { db } from '@/data/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { VehicleSwitcher } from './VehicleSwitcher';
 
 export function AppShell() {
-  const { t } = useTranslation()
-  const location = useLocation()
-  const accountId = useSessionStore((state) => state.account?.id)
-  const vehicles = useVehicles(accountId)
-  const routeVehicleId = location.pathname.match(/^\/v\/([^/]+)\//)?.[1]
-  const routeVehicleQuery = useVehicle(accountId, routeVehicleId)
-  const routeVehicleKey = accountId && routeVehicleId ? `${accountId}:${routeVehicleId}` : null
+  const { t } = useTranslation();
+  const location = useLocation();
+  const accountId = useSessionStore((state) => state.account?.id);
+  const vehicles = useVehicles(accountId);
+  const routeVehicleId = location.pathname.match(/^\/v\/([^/]+)\//)?.[1];
+  const routeVehicleQuery = useVehicle(accountId, routeVehicleId);
+  const routeVehicleKey = accountId && routeVehicleId ? `${accountId}:${routeVehicleId}` : null;
   // Reactive read (KHÔNG `getLastVehicleId` gọi thẳng) — AppShell không sở hữu "xe đang
   // chọn", chỉ đọc lại; nếu 1 trang khác (vd SettingsPage) đổi giá trị này mà không điều
   // hướng đi đâu, AppShell vẫn phải tự re-render theo. Xem lesson learned ở lastVehicle.ts.
-  const rememberedVehicleId = useLastVehicleId(accountId)
-  const vehicleId = routeVehicleId ?? rememberedVehicleId ?? undefined
-  const vehicle = routeVehicleId ? routeVehicleQuery.vehicle : vehicles?.find((candidate) => candidate.id === vehicleId)
-  const isOnboarding = location.pathname.startsWith('/onboarding/')
-  const isHome = location.pathname.endsWith('/home')
-  const syncMeta = useLiveQuery(async () => (accountId ? await db.syncMeta.get(accountId) : undefined), [accountId])
+  const rememberedVehicleId = useLastVehicleId(accountId);
+  const vehicleId = routeVehicleId ?? rememberedVehicleId ?? undefined;
+  const vehicle = routeVehicleId
+    ? routeVehicleQuery.vehicle
+    : vehicles?.find((candidate) => candidate.id === vehicleId);
+  const isOnboarding = location.pathname.startsWith('/onboarding/');
+  const isHome = location.pathname.endsWith('/home');
+  const syncMeta = useLiveQuery(
+    async () => (accountId ? await db.syncMeta.get(accountId) : undefined),
+    [accountId],
+  );
 
   useEffect(() => {
-    if (accountId && routeVehicleId && vehicle) setLastVehicleId(accountId, routeVehicleId)
-  }, [accountId, routeVehicleId, vehicle])
+    if (accountId && routeVehicleId && vehicle) setLastVehicleId(accountId, routeVehicleId);
+  }, [accountId, routeVehicleId, vehicle]);
 
   if (vehicles === undefined || routeVehicleQuery.queryKey !== routeVehicleKey) {
-    return <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">{t('navigation.loadingGarage')}</div>
+    return (
+      <div className="grid min-h-dvh place-items-center text-sm text-muted-foreground">
+        {t('navigation.loadingGarage')}
+      </div>
+    );
   }
 
   if (syncMeta?.operation === 'restoring' || syncMeta?.operation === 'restore_failed') {
-    return <WorkspaceRecovery failed={syncMeta.operation === 'restore_failed'} />
+    return <WorkspaceRecovery failed={syncMeta.operation === 'restore_failed'} />;
   }
 
   if (routeVehicleId && !vehicle) {
-    const fallback = vehicles[0]
-    return <Navigate to={fallback ? `/v/${fallback.id}/home` : '/onboarding/add-vehicle'} replace />
+    const fallback = vehicles[0];
+    return (
+      <Navigate to={fallback ? `/v/${fallback.id}/home` : '/onboarding/add-vehicle'} replace />
+    );
   }
 
   if (isOnboarding) {
@@ -57,7 +68,7 @@ export function AppShell() {
         </div>
         <Outlet />
       </div>
-    )
+    );
   }
 
   return (
@@ -111,5 +122,5 @@ export function AppShell() {
 
       <SwitchVehicleSheet currentVehicleId={vehicleId} />
     </div>
-  )
+  );
 }

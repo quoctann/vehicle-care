@@ -1,8 +1,8 @@
-import { type FormEvent, useState } from 'react'
-import { Check, LoaderCircle } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { type FormEvent, useState } from 'react';
+import { Check, LoaderCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,33 +10,33 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Switch } from '@/components/ui/switch'
-import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge'
-import { addFuelLog, updateFuelLog } from '@/data/repositories/fuelRepository'
-import { addServiceLog, updateServiceLog } from '@/data/repositories/serviceRepository'
-import { validateOdometerReading } from '@/domain/validation'
-import type { FuelLog, PartType, ServiceLog } from '@/domain/types'
-import { formatNumber } from '@/lib/formatters'
-import { EntryTypeSelector, type LogEntryType } from './EntryTypeSelector'
-import { LogEntryDetailsCard } from './LogEntryDetailsCard'
-import { OdometerInputCard } from './OdometerInputCard'
-import { PartTypeSelector } from './PartTypeSelector'
+} from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
+import { addFuelLog, updateFuelLog } from '@/data/repositories/fuelRepository';
+import { addServiceLog, updateServiceLog } from '@/data/repositories/serviceRepository';
+import { validateOdometerReading } from '@/domain/validation';
+import type { FuelLog, PartType, ServiceLog } from '@/domain/types';
+import { formatNumber } from '@/lib/formatters';
+import { EntryTypeSelector, type LogEntryType } from './EntryTypeSelector';
+import { LogEntryDetailsCard } from './LogEntryDetailsCard';
+import { OdometerInputCard } from './OdometerInputCard';
+import { PartTypeSelector } from './PartTypeSelector';
 
 /** Bản ghi đang sửa (feedback Feature #3) — kind quyết định loại form, không đổi được khi sửa. */
-export type EditingLogEntry = { kind: 'fuel'; log: FuelLog } | { kind: 'service'; log: ServiceLog }
+export type EditingLogEntry = { kind: 'fuel'; log: FuelLog } | { kind: 'service'; log: ServiceLog };
 
 type LogEntryFormProps = {
-  accountId: string
-  vehicleId: string
-  currentOdometerKm: number | null
-  partTypes: PartType[]
-  editingEntry?: EditingLogEntry | null
-  onCancel: () => void
-  onSaved: () => void
-}
+  accountId: string;
+  vehicleId: string;
+  currentOdometerKm: number | null;
+  partTypes: PartType[];
+  editingEntry?: EditingLogEntry | null;
+  onCancel: () => void;
+  onSaved: () => void;
+};
 
-type FormErrors = Record<string, string | undefined>
+type FormErrors = Record<string, string | undefined>;
 
 export function LogEntryForm({
   accountId,
@@ -47,24 +47,42 @@ export function LogEntryForm({
   onCancel,
   onSaved,
 }: LogEntryFormProps) {
-  const { t } = useTranslation()
-  const isEditing = editingEntry != null
-  const [entryType, setEntryType] = useState<LogEntryType>(editingEntry?.kind ?? 'fuel')
-  const [partTypeId, setPartTypeId] = useState<string | null>(editingEntry?.kind === 'service' ? editingEntry.log.partTypeId : null)
+  const { t } = useTranslation();
+  const isEditing = editingEntry != null;
+  const [entryType, setEntryType] = useState<LogEntryType>(editingEntry?.kind ?? 'fuel');
+  const [partTypeId, setPartTypeId] = useState<string | null>(
+    editingEntry?.kind === 'service' ? editingEntry.log.partTypeId : null,
+  );
   const [occurredAt, setOccurredAt] = useState(
     toLocalDateTimeInput(
-      editingEntry ? new Date(editingEntry.kind === 'fuel' ? editingEntry.log.recordedAt : editingEntry.log.servicedAt) : new Date(),
+      editingEntry
+        ? new Date(
+            editingEntry.kind === 'fuel'
+              ? editingEntry.log.recordedAt
+              : editingEntry.log.servicedAt,
+          )
+        : new Date(),
     ),
-  )
-  const [liters, setLiters] = useState(editingEntry?.kind === 'fuel' && editingEntry.log.liters != null ? String(editingEntry.log.liters) : '')
-  const [costVnd, setCostVnd] = useState(editingEntry?.log.costVnd != null ? String(editingEntry.log.costVnd) : '')
-  const [shop, setShop] = useState(editingEntry?.kind === 'fuel' ? (editingEntry.log.shop ?? '') : '')
-  const [note, setNote] = useState(editingEntry?.log.note ?? '')
-  const [odometerKm, setOdometerKm] = useState<string | null>(null)
-  const [isFullTank, setIsFullTank] = useState(editingEntry?.kind === 'fuel' ? editingEntry.log.isFullTank : false)
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [confirmLowerOdometer, setConfirmLowerOdometer] = useState(false)
+  );
+  const [liters, setLiters] = useState(
+    editingEntry?.kind === 'fuel' && editingEntry.log.liters != null
+      ? String(editingEntry.log.liters)
+      : '',
+  );
+  const [costVnd, setCostVnd] = useState(
+    editingEntry?.log.costVnd != null ? String(editingEntry.log.costVnd) : '',
+  );
+  const [shop, setShop] = useState(
+    editingEntry?.kind === 'fuel' ? (editingEntry.log.shop ?? '') : '',
+  );
+  const [note, setNote] = useState(editingEntry?.log.note ?? '');
+  const [odometerKm, setOdometerKm] = useState<string | null>(null);
+  const [isFullTank, setIsFullTank] = useState(
+    editingEntry?.kind === 'fuel' ? editingEntry.log.isFullTank : false,
+  );
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmLowerOdometer, setConfirmLowerOdometer] = useState(false);
 
   /**
    * Sửa mục ghi KHÔNG đụng vào odometer: với fuel log, KM đã gắn với 1
@@ -72,85 +90,97 @@ export function LogEntryForm({
    * `odometerKmSnapshot` chỉ là baseline hiển thị — đổi tuỳ tiện khi sửa dễ gây
    * lệch dữ liệu reminder hơn là hữu ích. Ẩn hẳn control này khi sửa.
    */
-  const displayedOdometerKm =
-    isEditing ? '' : (odometerKm ?? (entryType === 'service' && currentOdometerKm != null ? String(currentOdometerKm) : ''))
+  const displayedOdometerKm = isEditing
+    ? ''
+    : (odometerKm ??
+      (entryType === 'service' && currentOdometerKm != null ? String(currentOdometerKm) : ''));
 
   function handleTypeChange(nextType: LogEntryType) {
-    setEntryType(nextType)
-    setErrors({})
+    setEntryType(nextType);
+    setErrors({});
     if (nextType === 'service' && partTypeId == null && partTypes.length === 1) {
-      setPartTypeId(partTypes[0].id)
+      setPartTypeId(partTypes[0].id);
     }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    await prepareSave(false)
+    event.preventDefault();
+    await prepareSave(false);
   }
 
   async function prepareSave(lowerOdometerConfirmed: boolean) {
-    const nextErrors = validateForm()
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
+    const nextErrors = validateForm();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
 
     if (isEditing) {
-      await saveEntry(null)
-      return
+      await saveEntry(null);
+      return;
     }
 
-    const parsedOdometer = optionalNumber(displayedOdometerKm)
+    const parsedOdometer = optionalNumber(displayedOdometerKm);
     if (parsedOdometer != null) {
-      const validation = validateOdometerReading(parsedOdometer, currentOdometerKm)
+      const validation = validateOdometerReading(parsedOdometer, currentOdometerKm);
       if (!validation.valid) {
-        setErrors({ odometerKm: t('logEntry.negativeOdometer') })
-        return
+        setErrors({ odometerKm: t('logEntry.negativeOdometer') });
+        return;
       }
       if (validation.warning === 'lower_than_current' && !lowerOdometerConfirmed) {
-        setConfirmLowerOdometer(true)
-        return
+        setConfirmLowerOdometer(true);
+        return;
       }
     }
 
-    await saveEntry(parsedOdometer)
+    await saveEntry(parsedOdometer);
   }
 
   function validateForm(): FormErrors {
-    const nextErrors: FormErrors = {}
-    if (!occurredAt || Number.isNaN(new Date(occurredAt).getTime())) nextErrors.occurredAt = t('logEntry.invalidDate')
+    const nextErrors: FormErrors = {};
+    if (!occurredAt || Number.isNaN(new Date(occurredAt).getTime()))
+      nextErrors.occurredAt = t('logEntry.invalidDate');
 
     if (!isEditing) {
-      const parsedOdometer = optionalNumber(displayedOdometerKm)
-      if (displayedOdometerKm !== '' && (parsedOdometer == null || !Number.isFinite(parsedOdometer))) {
-        nextErrors.odometerKm = t('logEntry.invalidOdometer')
-      } else if (parsedOdometer != null && !validateOdometerReading(parsedOdometer, currentOdometerKm).valid) {
-        nextErrors.odometerKm = t('logEntry.negativeOdometer')
+      const parsedOdometer = optionalNumber(displayedOdometerKm);
+      if (
+        displayedOdometerKm !== '' &&
+        (parsedOdometer == null || !Number.isFinite(parsedOdometer))
+      ) {
+        nextErrors.odometerKm = t('logEntry.invalidOdometer');
+      } else if (
+        parsedOdometer != null &&
+        !validateOdometerReading(parsedOdometer, currentOdometerKm).valid
+      ) {
+        nextErrors.odometerKm = t('logEntry.negativeOdometer');
       }
     }
 
-    const parsedCost = optionalNumber(costVnd)
+    const parsedCost = optionalNumber(costVnd);
     if (costVnd !== '' && (parsedCost == null || !Number.isFinite(parsedCost) || parsedCost < 0)) {
-      nextErrors.costVnd = t('logEntry.invalidCost')
+      nextErrors.costVnd = t('logEntry.invalidCost');
     }
 
     if (entryType === 'fuel') {
-      const parsedLiters = optionalNumber(liters)
-      if (liters !== '' && (parsedLiters == null || !Number.isFinite(parsedLiters) || parsedLiters <= 0)) {
-        nextErrors.liters = t('logEntry.invalidLiters')
+      const parsedLiters = optionalNumber(liters);
+      if (
+        liters !== '' &&
+        (parsedLiters == null || !Number.isFinite(parsedLiters) || parsedLiters <= 0)
+      ) {
+        nextErrors.liters = t('logEntry.invalidLiters');
       }
     } else if (!partTypeId) {
-      nextErrors.partTypeId = t('logEntry.choosePart')
+      nextErrors.partTypeId = t('logEntry.choosePart');
     }
 
-    return nextErrors
+    return nextErrors;
   }
 
   async function saveEntry(parsedOdometer: number | null) {
-    const selectedPartTypeId = partTypeId
-    if (entryType === 'service' && !selectedPartTypeId) return
+    const selectedPartTypeId = partTypeId;
+    if (entryType === 'service' && !selectedPartTypeId) return;
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
-      const timestamp = new Date(occurredAt).toISOString()
+      const timestamp = new Date(occurredAt).toISOString();
       if (entryType === 'fuel') {
         if (isEditing && editingEntry?.kind === 'fuel') {
           await updateFuelLog(accountId, editingEntry.log.id, {
@@ -160,7 +190,7 @@ export function LogEntryForm({
             shop: optionalText(shop),
             note: optionalText(note),
             isFullTank,
-          })
+          });
         } else {
           await addFuelLog({
             accountId,
@@ -172,18 +202,18 @@ export function LogEntryForm({
             note: optionalText(note),
             odometerKm: parsedOdometer,
             isFullTank,
-          })
+          });
         }
-        toast.success(t('logEntry.fuelSaved'))
+        toast.success(t('logEntry.fuelSaved'));
       } else {
-        if (!selectedPartTypeId) return
+        if (!selectedPartTypeId) return;
         if (isEditing && editingEntry?.kind === 'service') {
           await updateServiceLog(accountId, editingEntry.log.id, {
             partTypeId: selectedPartTypeId,
             servicedAt: timestamp,
             costVnd: optionalNumber(costVnd),
             note: optionalText(note),
-          })
+          });
         } else {
           await addServiceLog({
             accountId,
@@ -193,28 +223,36 @@ export function LogEntryForm({
             odometerKmSnapshot: parsedOdometer,
             costVnd: optionalNumber(costVnd),
             note: optionalText(note),
-          })
+          });
         }
-        toast.success(t('logEntry.serviceSaved'))
+        toast.success(t('logEntry.serviceSaved'));
       }
-      onSaved()
+      onSaved();
     } catch {
-      toast.error(t('logEntry.saveFailed'))
-      setSubmitting(false)
+      toast.error(t('logEntry.saveFailed'));
+      setSubmitting(false);
     }
   }
 
-  const selectedPartType = partTypes.find((partType) => partType.id === partTypeId)
+  const selectedPartType = partTypes.find((partType) => partType.id === partTypeId);
 
   return (
     <>
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-2xl items-center justify-between">
-            <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting} className="-ml-2 text-muted-foreground">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onCancel}
+              disabled={submitting}
+              className="-ml-2 text-muted-foreground"
+            >
               {t('common.cancel')}
             </Button>
-            <h1 className="text-[15px] font-semibold tracking-tight">{isEditing ? t('logEntry.editTitle') : t('logEntry.title')}</h1>
+            <h1 className="text-[15px] font-semibold tracking-tight">
+              {isEditing ? t('logEntry.editTitle') : t('logEntry.title')}
+            </h1>
             <Button
               type="submit"
               variant="ghost"
@@ -236,7 +274,9 @@ export function LogEntryForm({
           {entryType === 'service' ? (
             <div>
               <PartTypeSelector partTypes={partTypes} value={partTypeId} onChange={setPartTypeId} />
-              {errors.partTypeId ? <p className="mt-2 px-0.5 text-xs text-destructive">{errors.partTypeId}</p> : null}
+              {errors.partTypeId ? (
+                <p className="mt-2 px-0.5 text-xs text-destructive">{errors.partTypeId}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -267,8 +307,12 @@ export function LogEntryForm({
           {entryType === 'fuel' ? (
             <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-card px-4 py-3.5">
               <div className="min-w-0 flex-1">
-                <label htmlFor="full-tank" className="text-sm font-medium">{t('logEntry.fullTank')}</label>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t('logEntry.fullTankDescription')}</p>
+                <label htmlFor="full-tank" className="text-sm font-medium">
+                  {t('logEntry.fullTank')}
+                </label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {t('logEntry.fullTankDescription')}
+                </p>
               </div>
               <Switch id="full-tank" checked={isFullTank} onCheckedChange={setIsFullTank} />
             </div>
@@ -283,7 +327,9 @@ export function LogEntryForm({
                     ? t('logEntry.resetPartReminder', { part: selectedPartType.displayName })
                     : t('logEntry.resetServiceReminders')}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t('logEntry.resetDescription')}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {t('logEntry.resetDescription')}
+                </p>
               </div>
             </div>
           )}
@@ -295,8 +341,14 @@ export function LogEntryForm({
             disabled={submitting || (entryType === 'service' && partTypes.length === 0)}
             className="mx-auto h-12 w-full max-w-2xl rounded-xl bg-primary font-display text-sm text-primary-foreground hover:bg-primary/90"
           >
-            {submitting ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {submitting ? t('common.saving') : isEditing ? t('common.save') : t('logEntry.saveEntry')}
+            {submitting ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {submitting
+              ? t('common.saving')
+              : isEditing
+                ? t('common.save')
+                : t('logEntry.saveEntry')}
           </Button>
         </footer>
       </form>
@@ -316,8 +368,8 @@ export function LogEntryForm({
             <Button
               type="button"
               onClick={() => {
-                setConfirmLowerOdometer(false)
-                void prepareSave(true)
+                setConfirmLowerOdometer(false);
+                void prepareSave(true);
               }}
             >
               {t('logEntry.saveAnyway')}
@@ -326,20 +378,20 @@ export function LogEntryForm({
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }
 
 function optionalNumber(value: string): number | null {
-  if (value.trim() === '') return null
-  return Number(value)
+  if (value.trim() === '') return null;
+  return Number(value);
 }
 
 function optionalText(value: string): string | null {
-  const trimmed = value.trim()
-  return trimmed === '' ? null : trimmed
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 function toLocalDateTimeInput(date: Date): string {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }

@@ -7,17 +7,18 @@
 export type OdometerValidationResult =
   | { valid: true; warning: null }
   | { valid: true; warning: 'lower_than_current' }
-  | { valid: false; error: 'negative' }
+  | { valid: false; error: 'negative' };
 
 export function validateOdometerReading(
   newReadingKm: number,
   currentOdometerKm: number | null,
 ): OdometerValidationResult {
-  if (!Number.isFinite(newReadingKm) || newReadingKm < 0) return { valid: false, error: 'negative' }
+  if (!Number.isFinite(newReadingKm) || newReadingKm < 0)
+    return { valid: false, error: 'negative' };
   if (currentOdometerKm != null && newReadingKm < currentOdometerKm) {
-    return { valid: true, warning: 'lower_than_current' }
+    return { valid: true, warning: 'lower_than_current' };
   }
-  return { valid: true, warning: null }
+  return { valid: true, warning: null };
 }
 
 /**
@@ -26,14 +27,20 @@ export function validateOdometerReading(
  */
 export type ReminderIntervalValidationResult =
   | { valid: true }
-  | { valid: false; error: 'missing_interval' | 'interval_km_not_positive' | 'interval_days_not_positive' }
+  | {
+      valid: false;
+      error: 'missing_interval' | 'interval_km_not_positive' | 'interval_days_not_positive';
+    };
 
 export function validateReminderInterval(
   intervalKm: number | null,
   intervalDays: number | null,
 ): ReminderIntervalValidationResult {
-  if (intervalKm != null && (!Number.isFinite(intervalKm) || intervalKm <= 0)) return { valid: false, error: 'interval_km_not_positive' }
-  if (intervalDays != null && (!Number.isSafeInteger(intervalDays) || intervalDays <= 0)) return { valid: false, error: 'interval_days_not_positive' }
-  if (intervalKm == null && intervalDays == null) return { valid: false, error: 'missing_interval' }
-  return { valid: true }
+  if (intervalKm != null && (!Number.isFinite(intervalKm) || intervalKm <= 0))
+    return { valid: false, error: 'interval_km_not_positive' };
+  if (intervalDays != null && (!Number.isSafeInteger(intervalDays) || intervalDays <= 0))
+    return { valid: false, error: 'interval_days_not_positive' };
+  if (intervalKm == null && intervalDays == null)
+    return { valid: false, error: 'missing_interval' };
+  return { valid: true };
 }

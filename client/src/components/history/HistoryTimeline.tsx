@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Fuel, History, Pencil, SlidersHorizontal, Trash2, Wrench } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { ConfirmActionDialog } from "@/components/settings/ConfirmActionDialog";
-import type { HistoryEntry } from "@/data/queries/historyQueries";
-import { formatDate, formatMonth, formatNumber } from "@/lib/formatters";
-import { formatVnd } from "@/lib/currency";
+import { useState } from 'react';
+import { Fuel, History, Pencil, SlidersHorizontal, Trash2, Wrench } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { ConfirmActionDialog } from '@/components/settings/ConfirmActionDialog';
+import type { HistoryEntry } from '@/data/queries/historyQueries';
+import { formatDate, formatMonth, formatNumber } from '@/lib/formatters';
+import { formatVnd } from '@/lib/currency';
 
-type EntryFilter = "all" | HistoryEntry["kind"];
+type EntryFilter = 'all' | HistoryEntry['kind'];
 
 export function HistoryTimeline({
   entries,
@@ -23,11 +23,11 @@ export function HistoryTimeline({
   const [pending, setPending] = useState<HistoryEntry | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const filters: Array<{ value: EntryFilter; label: string }> = [
-    { value: "all", label: t('history.all') },
-    { value: "service", label: t('history.service') },
-    { value: "fuel", label: t('history.fuel') },
+    { value: 'all', label: t('history.all') },
+    { value: 'service', label: t('history.service') },
+    { value: 'fuel', label: t('history.fuel') },
   ];
-  const [filter, setFilter] = useState<EntryFilter>("all");
+  const [filter, setFilter] = useState<EntryFilter>('all');
 
   async function confirmDelete() {
     if (!pending) return;
@@ -42,18 +42,17 @@ export function HistoryTimeline({
     }
   }
   const visibleEntries =
-    filter === "all"
-      ? entries
-      : entries.filter((entry) => entry.kind === filter);
-  const groups = visibleEntries.reduce<
-    Array<{ label: string; entries: HistoryEntry[] }>
-  >((result, entry) => {
-    const label = formatMonth(entry.occurredAt, "long", timezone);
-    const lastGroup = result.at(-1);
-    if (lastGroup?.label === label) lastGroup.entries.push(entry);
-    else result.push({ label, entries: [entry] });
-    return result;
-  }, []);
+    filter === 'all' ? entries : entries.filter((entry) => entry.kind === filter);
+  const groups = visibleEntries.reduce<Array<{ label: string; entries: HistoryEntry[] }>>(
+    (result, entry) => {
+      const label = formatMonth(entry.occurredAt, 'long', timezone);
+      const lastGroup = result.at(-1);
+      if (lastGroup?.label === label) lastGroup.entries.push(entry);
+      else result.push({ label, entries: [entry] });
+      return result;
+    },
+    [],
+  );
 
   return (
     <>
@@ -65,18 +64,15 @@ export function HistoryTimeline({
           className="flex items-center gap-1 rounded-xl border border-border-subtle bg-card p-1 shadow-sm"
           aria-label={t('history.filter')}
         >
-          <SlidersHorizontal
-            className="mx-1 size-4 text-muted-foreground"
-            aria-hidden="true"
-          />
+          <SlidersHorizontal className="mx-1 size-4 text-muted-foreground" aria-hidden="true" />
           {filters.map((option) => (
             <button
               key={option.value}
               type="button"
               className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 filter === option.value
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
               aria-pressed={filter === option.value}
               onClick={() => setFilter(option.value)}
@@ -93,7 +89,13 @@ export function HistoryTimeline({
             <History className="size-5" aria-hidden="true" />
           </div>
           <p className="font-semibold">
-            {t(filter === 'all' ? 'history.emptyAll' : filter === 'service' ? 'history.emptyService' : 'history.emptyFuel')}
+            {t(
+              filter === 'all'
+                ? 'history.emptyAll'
+                : filter === 'service'
+                  ? 'history.emptyService'
+                  : 'history.emptyFuel',
+            )}
           </p>
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
             {t('history.emptyDescription')}
@@ -104,27 +106,27 @@ export function HistoryTimeline({
           {groups.map((group) => (
             <section
               key={group.label}
-              aria-labelledby={`history-${group.label.replaceAll(" ", "-").toLowerCase()}`}
+              aria-labelledby={`history-${group.label.replaceAll(' ', '-').toLowerCase()}`}
             >
               <h2
-                id={`history-${group.label.replaceAll(" ", "-").toLowerCase()}`}
+                id={`history-${group.label.replaceAll(' ', '-').toLowerCase()}`}
                 className="mb-2 px-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase"
               >
                 {group.label}
               </h2>
               <div className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
                 {group.entries.map((entry, index) => {
-                  const Icon = entry.kind === "fuel" ? Fuel : Wrench;
+                  const Icon = entry.kind === 'fuel' ? Fuel : Wrench;
                   return (
                     <article
                       key={`${entry.kind}-${entry.id}`}
-                      className={`flex gap-3 px-4 py-3.5 ${index > 0 ? "border-t border-border-subtle" : ""}`}
+                      className={`flex gap-3 px-4 py-3.5 ${index > 0 ? 'border-t border-border-subtle' : ''}`}
                     >
                       <div
                         className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                          entry.kind === "fuel"
-                            ? "bg-primary/10 text-primary"
-                            : "bg-warn-bg text-warn-fg"
+                          entry.kind === 'fuel'
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-warn-bg text-warn-fg'
                         }`}
                       >
                         <Icon className="size-[18px]" aria-hidden="true" />
@@ -136,7 +138,9 @@ export function HistoryTimeline({
                               {entry.kind === 'fuel'
                                 ? entry.liters == null
                                   ? t('history.fuel')
-                                  : t('history.fuelWithLiters', { value: formatNumber(entry.liters) })
+                                  : t('history.fuelWithLiters', {
+                                      value: formatNumber(entry.liters),
+                                    })
                                 : entry.title || t('history.unknownService')}
                             </h3>
                             <p className="mt-0.5 text-xs text-muted-foreground">

@@ -1,15 +1,8 @@
-import { useState } from "react";
-import { toast } from "sonner";
-import { useTranslation } from "react-i18next";
-import {
-  BellRing,
-  CalendarDays,
-  Gauge,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
+import { BellRing, CalendarDays, Gauge, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,16 +10,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import type { ReminderWithStatus } from "@/data/queries/reminderQueries";
-import { formatNumber } from "@/lib/formatters";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import type { ReminderWithStatus } from '@/data/queries/reminderQueries';
+import { formatNumber } from '@/lib/formatters';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 
 function optionalPositiveNumber(value: string): number | null {
-  if (value.trim() === "") return null;
+  if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
@@ -34,11 +27,7 @@ function optionalPositiveNumber(value: string): number | null {
 export type ReminderManagementProps = {
   vehicleName: string;
   reminders: ReminderWithStatus[];
-  onUpdate: (
-    id: string,
-    intervalKm: number | null,
-    intervalDays: number | null,
-  ) => Promise<void>;
+  onUpdate: (id: string, intervalKm: number | null, intervalDays: number | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onToggle: (id: string, enabled: boolean) => Promise<void>;
   onAdd?: () => void;
@@ -61,15 +50,15 @@ export function ReminderManagement({
   } as const;
   const [editing, setEditing] = useState<ReminderWithStatus | null>(null);
   const [deleting, setDeleting] = useState<ReminderWithStatus | null>(null);
-  const [intervalKm, setIntervalKm] = useState("");
-  const [intervalDays, setIntervalDays] = useState("");
+  const [intervalKm, setIntervalKm] = useState('');
+  const [intervalDays, setIntervalDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function startEditing(reminder: ReminderWithStatus) {
     setEditing(reminder);
-    setIntervalKm(reminder.config.intervalKm?.toString() ?? "");
-    setIntervalDays(reminder.config.intervalDays?.toString() ?? "");
+    setIntervalKm(reminder.config.intervalKm?.toString() ?? '');
+    setIntervalDays(reminder.config.intervalDays?.toString() ?? '');
     setError(null);
   }
 
@@ -139,43 +128,50 @@ export function ReminderManagement({
           reminders.map((reminder, index) => (
             <div
               key={reminder.config.id}
-              className={`flex items-center gap-3 p-4 ${index > 0 ? "border-t border-border-subtle" : ""}`}
+              className={`flex items-center gap-3 p-4 ${index > 0 ? 'border-t border-border-subtle' : ''}`}
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warn-bg text-warn-fg">
                 <BellRing className="size-[18px]" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold">
-                    {reminder.partType.displayName}
-                  </p>
+                  <p className="truncate text-sm font-semibold">{reminder.partType.displayName}</p>
                   {!reminder.partType.active && (
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {t('partType.disabled')}
                     </span>
                   )}
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reminder.result.status === "overdue" ? "bg-destructive/10 text-destructive" : reminder.result.status === "due_soon" ? "bg-warn-bg text-warn-fg" : "bg-muted text-muted-foreground"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reminder.result.status === 'overdue' ? 'bg-destructive/10 text-destructive' : reminder.result.status === 'due_soon' ? 'bg-warn-bg text-warn-fg' : 'bg-muted text-muted-foreground'}`}
                   >
-                    {reminder.config.enabled ? statusLabels[reminder.result.status] : t('reminder.paused')}
+                    {reminder.config.enabled
+                      ? statusLabels[reminder.result.status]
+                      : t('reminder.paused')}
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {reminder.config.intervalKm != null && (
                     <span className="flex items-center gap-1">
-                      <Gauge className="size-3" /> {t('reminder.everyKm', { value: formatNumber(reminder.config.intervalKm) })}
+                      <Gauge className="size-3" />{' '}
+                      {t('reminder.everyKm', { value: formatNumber(reminder.config.intervalKm) })}
                     </span>
                   )}
                   {reminder.config.intervalDays != null && (
                     <span className="flex items-center gap-1">
-                      <CalendarDays className="size-3" /> {t('reminder.everyDays', { value: formatNumber(reminder.config.intervalDays) })}
+                      <CalendarDays className="size-3" />{' '}
+                      {t('reminder.everyDays', {
+                        value: formatNumber(reminder.config.intervalDays),
+                      })}
                     </span>
                   )}
                 </div>
               </div>
               <Switch
                 checked={reminder.config.enabled}
-                aria-label={t(reminder.config.enabled ? 'reminder.pauseAria' : 'reminder.enableAria', { part: reminder.partType.displayName })}
+                aria-label={t(
+                  reminder.config.enabled ? 'reminder.pauseAria' : 'reminder.enableAria',
+                  { part: reminder.partType.displayName },
+                )}
                 onCheckedChange={(enabled) => void onToggle(reminder.config.id, enabled)}
               />
               <Button
@@ -200,16 +196,13 @@ export function ReminderManagement({
         )}
       </div>
 
-      <Dialog
-        open={editing != null}
-        onOpenChange={(open) => !open && setEditing(null)}
-      >
+      <Dialog open={editing != null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('reminder.editTitle', { part: editing?.partType.displayName ?? '' })}</DialogTitle>
-            <DialogDescription>
-              {t('reminder.intervalDescription')}
-            </DialogDescription>
+            <DialogTitle>
+              {t('reminder.editTitle', { part: editing?.partType.displayName ?? '' })}
+            </DialogTitle>
+            <DialogDescription>{t('reminder.intervalDescription')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -243,11 +236,7 @@ export function ReminderManagement({
             </p>
           )}
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditing(null)}
-              disabled={busy}
-            >
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={busy}>
               {t('common.cancel')}
             </Button>
             <Button onClick={() => void save()} disabled={busy}>

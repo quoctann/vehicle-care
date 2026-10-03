@@ -1,12 +1,12 @@
-import { type ComponentProps, useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
+import { type ComponentProps, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export function PasswordInput({ className, ...props }: ComponentProps<typeof Input>) {
-  const { t } = useTranslation()
-  const [visible, setVisible] = useState(false)
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(false);
 
   return (
     <div className="relative">
@@ -20,5 +20,5 @@ export function PasswordInput({ className, ...props }: ComponentProps<typeof Inp
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       </button>
     </div>
-  )
+  );
 }

@@ -1,5 +1,12 @@
-import type { PartTypeDto } from '@/api/contract.types'
-import type { FuelLog, OdometerLog, PartType, ReminderConfig, ServiceLog, Vehicle } from '@/domain/types'
+import type { PartTypeDto } from '@/api/contract.types';
+import type {
+  FuelLog,
+  OdometerLog,
+  PartType,
+  ReminderConfig,
+  ServiceLog,
+  Vehicle,
+} from '@/domain/types';
 
 /**
  * Domain object (camelCase, dùng nội bộ app/Dexie) → wire payload (snake_case,
@@ -16,7 +23,7 @@ export function vehicleToPayload(v: Vehicle): Record<string, unknown> {
     archived_at: v.archivedAt,
     deleted_at: v.deletedAt,
     due_soon_ratio: v.dueSoonRatio,
-  }
+  };
 }
 
 export function reminderConfigToPayload(r: ReminderConfig): Record<string, unknown> {
@@ -29,7 +36,7 @@ export function reminderConfigToPayload(r: ReminderConfig): Record<string, unkno
     baseline_date: r.baselineDate,
     enabled: r.enabled,
     deleted_at: r.deletedAt,
-  }
+  };
 }
 
 export function odometerLogToPayload(o: OdometerLog): Record<string, unknown> {
@@ -39,7 +46,7 @@ export function odometerLogToPayload(o: OdometerLog): Record<string, unknown> {
     recorded_at: o.recordedAt,
     note: o.note,
     source: o.source,
-  }
+  };
 }
 
 export function fuelLogToPayload(f: FuelLog): Record<string, unknown> {
@@ -53,7 +60,7 @@ export function fuelLogToPayload(f: FuelLog): Record<string, unknown> {
     odometer_log_id: f.odometerLogId,
     is_full_tank: f.isFullTank,
     deleted_at: f.deletedAt,
-  }
+  };
 }
 
 export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
@@ -65,7 +72,7 @@ export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
     cost_vnd: s.costVnd,
     note: s.note,
     deleted_at: s.deletedAt,
-  }
+  };
 }
 
 /**
@@ -78,53 +85,59 @@ export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
  */
 
 function requiredString(payload: Record<string, unknown>, field: string): string {
-  const value = payload[field]
-  if (typeof value !== 'string' || value.length === 0) throw new Error(`Invalid sync payload field: ${field}`)
-  return value
+  const value = payload[field];
+  if (typeof value !== 'string' || value.length === 0)
+    throw new Error(`Invalid sync payload field: ${field}`);
+  return value;
 }
 
 function nullableString(payload: Record<string, unknown>, field: string): string | null {
-  const value = payload[field]
-  if (value == null) return null
-  if (typeof value !== 'string') throw new Error(`Invalid sync payload field: ${field}`)
-  return value
+  const value = payload[field];
+  if (value == null) return null;
+  if (typeof value !== 'string') throw new Error(`Invalid sync payload field: ${field}`);
+  return value;
 }
 
-function nullableNumber(payload: Record<string, unknown>, field: string, minimum = 0): number | null {
-  const value = payload[field]
-  if (value == null) return null
+function nullableNumber(
+  payload: Record<string, unknown>,
+  field: string,
+  minimum = 0,
+): number | null {
+  const value = payload[field];
+  if (value == null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum) {
-    throw new Error(`Invalid sync payload field: ${field}`)
+    throw new Error(`Invalid sync payload field: ${field}`);
   }
-  return value
+  return value;
 }
 
 /** Tỉ lệ trong (0,1] — dùng cho `vehicle.due_soon_ratio`. */
 function nullableRatio(payload: Record<string, unknown>, field: string): number | null {
-  const value = payload[field]
-  if (value == null) return null
+  const value = payload[field];
+  if (value == null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1) {
-    throw new Error(`Invalid sync payload field: ${field}`)
+    throw new Error(`Invalid sync payload field: ${field}`);
   }
-  return value
+  return value;
 }
 
 function requiredNumber(payload: Record<string, unknown>, field: string, minimum = 0): number {
-  const value = nullableNumber(payload, field, minimum)
-  if (value == null) throw new Error(`Invalid sync payload field: ${field}`)
-  return value
+  const value = nullableNumber(payload, field, minimum);
+  if (value == null) throw new Error(`Invalid sync payload field: ${field}`);
+  return value;
 }
 
 function isoDateTime(payload: Record<string, unknown>, field: string): string {
-  const value = requiredString(payload, field)
-  if (Number.isNaN(Date.parse(value))) throw new Error(`Invalid sync payload field: ${field}`)
-  return value
+  const value = requiredString(payload, field);
+  if (Number.isNaN(Date.parse(value))) throw new Error(`Invalid sync payload field: ${field}`);
+  return value;
 }
 
 function nullableIsoDateTime(payload: Record<string, unknown>, field: string): string | null {
-  const value = nullableString(payload, field)
-  if (value != null && Number.isNaN(Date.parse(value))) throw new Error(`Invalid sync payload field: ${field}`)
-  return value
+  const value = nullableString(payload, field);
+  if (value != null && Number.isNaN(Date.parse(value)))
+    throw new Error(`Invalid sync payload field: ${field}`);
+  return value;
 }
 
 export function vehicleFieldsFromPayload(
@@ -136,19 +149,21 @@ export function vehicleFieldsFromPayload(
     archivedAt: nullableIsoDateTime(payload, 'archived_at'),
     deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
     dueSoonRatio: nullableRatio(payload, 'due_soon_ratio'),
-  }
+  };
 }
 
 export function reminderConfigFieldsFromPayload(
   payload: Record<string, unknown>,
 ): Omit<ReminderConfig, 'id' | 'accountId' | 'createdAtClient' | 'serverSeq' | 'receivedAtServer'> {
-  const intervalKm = nullableNumber(payload, 'interval_km', Number.EPSILON)
-  const intervalDays = nullableNumber(payload, 'interval_days', Number.EPSILON)
-  const enabled = payload.enabled
-  const baselineDate = nullableString(payload, 'baseline_date')
-  if (intervalKm == null && intervalDays == null) throw new Error('Invalid sync reminder without an interval')
-  if (typeof enabled !== 'boolean') throw new Error('Invalid sync payload field: enabled')
-  if (baselineDate != null && !/^\d{4}-\d{2}-\d{2}$/.test(baselineDate)) throw new Error('Invalid sync payload field: baseline_date')
+  const intervalKm = nullableNumber(payload, 'interval_km', Number.EPSILON);
+  const intervalDays = nullableNumber(payload, 'interval_days', Number.EPSILON);
+  const enabled = payload.enabled;
+  const baselineDate = nullableString(payload, 'baseline_date');
+  if (intervalKm == null && intervalDays == null)
+    throw new Error('Invalid sync reminder without an interval');
+  if (typeof enabled !== 'boolean') throw new Error('Invalid sync payload field: enabled');
+  if (baselineDate != null && !/^\d{4}-\d{2}-\d{2}$/.test(baselineDate))
+    throw new Error('Invalid sync payload field: baseline_date');
   return {
     vehicleId: requiredString(payload, 'vehicle_id'),
     partTypeId: requiredString(payload, 'part_type_id'),
@@ -158,7 +173,7 @@ export function reminderConfigFieldsFromPayload(
     baselineDate,
     enabled,
     deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
-  }
+  };
 }
 
 export function odometerLogFieldsFromPayload(
@@ -169,8 +184,13 @@ export function odometerLogFieldsFromPayload(
     odometerKm: requiredNumber(payload, 'odometer_km'),
     recordedAt: isoDateTime(payload, 'recorded_at'),
     note: nullableString(payload, 'note'),
-    source: payload.source === 'manual' || payload.source === 'fuel' ? payload.source : (() => { throw new Error('Invalid sync payload field: source') })(),
-  }
+    source:
+      payload.source === 'manual' || payload.source === 'fuel'
+        ? payload.source
+        : (() => {
+            throw new Error('Invalid sync payload field: source');
+          })(),
+  };
 }
 
 export function fuelLogFieldsFromPayload(
@@ -186,7 +206,7 @@ export function fuelLogFieldsFromPayload(
     odometerLogId: nullableString(payload, 'odometer_log_id'),
     isFullTank: typeof payload.is_full_tank === 'boolean' ? payload.is_full_tank : false,
     deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
-  }
+  };
 }
 
 /**
@@ -204,7 +224,7 @@ export function fuelLogFieldsFromPayload(
  * `contract.types.ts` (`PartTypeDto`) và `refreshPartTypesFromServer` (merge logic).
  */
 export function partTypeFromDto(dto: PartTypeDto): PartType {
-  const seedVersion = Number(dto.seed_version.replace(/^v/, ''))
+  const seedVersion = Number(dto.seed_version.replace(/^v/, ''));
   return {
     id: dto.id,
     code: dto.code,
@@ -216,7 +236,7 @@ export function partTypeFromDto(dto: PartTypeDto): PartType {
     createdAtClient: new Date().toISOString(),
     receivedAtServer: dto.received_at_server,
     serverSeq: dto.server_seq,
-  }
+  };
 }
 
 export function partTypeToPayload(p: PartType): Record<string, unknown> {
@@ -226,7 +246,7 @@ export function partTypeToPayload(p: PartType): Record<string, unknown> {
     display_order: p.displayOrder,
     active: p.active,
     seed_version: String(p.seedVersion),
-  }
+  };
 }
 
 export function partTypeFieldsFromPayload(
@@ -236,13 +256,18 @@ export function partTypeFieldsFromPayload(
     code: requiredString(payload, 'code'),
     displayName: requiredString(payload, 'name_vi'),
     displayOrder: requiredNumber(payload, 'display_order'),
-    active: typeof payload.active === 'boolean' ? payload.active : (() => { throw new Error('Invalid sync payload field: active') })(),
+    active:
+      typeof payload.active === 'boolean'
+        ? payload.active
+        : (() => {
+            throw new Error('Invalid sync payload field: active');
+          })(),
     seedVersion: (() => {
-      const value = requiredString(payload, 'seed_version')
-      const parsed = Number(value.replace(/^v/, ''))
-      return Number.isFinite(parsed) ? parsed : 1
+      const value = requiredString(payload, 'seed_version');
+      const parsed = Number(value.replace(/^v/, ''));
+      return Number.isFinite(parsed) ? parsed : 1;
     })(),
-  }
+  };
 }
 
 export function serviceLogFieldsFromPayload(
@@ -256,5 +281,5 @@ export function serviceLogFieldsFromPayload(
     costVnd: nullableNumber(payload, 'cost_vnd'),
     note: nullableString(payload, 'note'),
     deletedAt: nullableIsoDateTime(payload, 'deleted_at'),
-  }
+  };
 }

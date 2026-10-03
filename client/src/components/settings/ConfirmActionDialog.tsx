@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { useTranslation } from "react-i18next";
+import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogClose,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 export function ConfirmActionDialog({
   open,
@@ -44,7 +44,7 @@ export function ConfirmActionDialog({
             </Button>
           </DialogClose>
           <Button
-            variant={destructive ? "destructive" : "default"}
+            variant={destructive ? 'destructive' : 'default'}
             disabled={busy}
             onClick={onConfirm}
           >

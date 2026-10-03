@@ -1,24 +1,19 @@
-import { useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import { addOdometerLog } from '@/data/repositories/odometerRepository'
-import { validateOdometerReading } from '@/domain/validation'
-import { formatNumber } from '@/lib/formatters'
+import { useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
+import { addOdometerLog } from '@/data/repositories/odometerRepository';
+import { validateOdometerReading } from '@/domain/validation';
+import { formatNumber } from '@/lib/formatters';
 
 type UpdateOdometerSheetProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  accountId?: string
-  vehicleId?: string
-  currentOdometerKm: number | null
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accountId?: string;
+  vehicleId?: string;
+  currentOdometerKm: number | null;
+};
 
 export function UpdateOdometerSheet({
   open,
@@ -27,55 +22,55 @@ export function UpdateOdometerSheet({
   vehicleId,
   currentOdometerKm,
 }: UpdateOdometerSheetProps) {
-  const { t } = useTranslation()
-  const [value, setValue] = useState(currentOdometerKm == null ? '' : String(currentOdometerKm))
-  const [error, setError] = useState<string | null>(null)
-  const [confirmLower, setConfirmLower] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const { t } = useTranslation();
+  const [value, setValue] = useState(currentOdometerKm == null ? '' : String(currentOdometerKm));
+  const [error, setError] = useState<string | null>(null);
+  const [confirmLower, setConfirmLower] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   function updateValue(nextValue: string) {
-    setValue(nextValue)
-    setError(null)
-    setConfirmLower(false)
+    setValue(nextValue);
+    setError(null);
+    setConfirmLower(false);
   }
 
   function step(amount: number) {
-    const parsed = Number(value)
-    const base = Number.isFinite(parsed) ? parsed : (currentOdometerKm ?? 0)
-    updateValue(String(Math.max(0, base + amount)))
+    const parsed = Number(value);
+    const base = Number.isFinite(parsed) ? parsed : (currentOdometerKm ?? 0);
+    updateValue(String(Math.max(0, base + amount)));
   }
 
   async function saveReading(forceLower = false) {
-    const reading = Number(value)
+    const reading = Number(value);
     if (value.trim() === '' || !Number.isFinite(reading)) {
-      setError(t('logEntry.invalidOdometer'))
-      return
+      setError(t('logEntry.invalidOdometer'));
+      return;
     }
 
-    const validation = validateOdometerReading(reading, currentOdometerKm)
+    const validation = validateOdometerReading(reading, currentOdometerKm);
     if (!validation.valid) {
-      setError(t('logEntry.negativeOdometer'))
-      return
+      setError(t('logEntry.negativeOdometer'));
+      return;
     }
     if (validation.warning === 'lower_than_current' && !forceLower) {
-      setConfirmLower(true)
-      return
+      setConfirmLower(true);
+      return;
     }
     if (!accountId || !vehicleId) {
-      setError(t('odometer.vehicleUnavailable'))
-      return
+      setError(t('odometer.vehicleUnavailable'));
+      return;
     }
 
-    setSaving(true)
-    setError(null)
+    setSaving(true);
+    setError(null);
     try {
-      await addOdometerLog({ accountId, vehicleId, odometerKm: reading, source: 'manual' })
-      onOpenChange(false)
-      toast.success(t('odometer.saved'))
+      await addOdometerLog({ accountId, vehicleId, odometerKm: reading, source: 'manual' });
+      onOpenChange(false);
+      toast.success(t('odometer.saved'));
     } catch {
-      setError(t('odometer.saveFailed'))
+      setError(t('odometer.saveFailed'));
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -87,7 +82,9 @@ export function UpdateOdometerSheet({
         className="gap-0 rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:inset-x-0 md:mx-auto md:max-w-[600px] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[440px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
       >
         <div className="mx-auto mb-3.5 h-1 w-9 rounded-full bg-border lg:hidden" />
-        <SheetTitle className="mx-0.5 text-[15px] font-semibold tracking-[-0.01em]">{t('odometer.update')}</SheetTitle>
+        <SheetTitle className="mx-0.5 text-[15px] font-semibold tracking-[-0.01em]">
+          {t('odometer.update')}
+        </SheetTitle>
         <SheetDescription className="mx-0.5 mt-0.5 text-xs leading-5">
           {currentOdometerKm == null
             ? t('odometer.firstReading')
@@ -116,7 +113,9 @@ export function UpdateOdometerSheet({
               className="h-12 w-full rounded-xl border bg-card px-10 text-center text-2xl font-bold tracking-[-0.035em] outline-none transition focus:border-ring focus:ring-3 focus:ring-ring/20"
               placeholder="0"
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">km</span>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              km
+            </span>
           </div>
           <button
             type="button"
@@ -163,5 +162,5 @@ export function UpdateOdometerSheet({
         )}
       </SheetContent>
     </Sheet>
-  )
+  );
 }

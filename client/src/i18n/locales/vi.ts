@@ -41,8 +41,10 @@ export const vi = {
       resetting: 'Đang đặt lại...',
       backToSignIn: 'Quay lại đăng nhập',
       checkEmail: 'Kiểm tra email',
-      verificationSent: 'Đã gửi email xác thực tới <1>{{email}}</1>. Mở email và bấm vào liên kết để xác thực tài khoản.',
-      resetSent: 'Nếu <1>{{email}}</1> có tồn tại trong hệ thống, chúng tôi đã gửi liên kết đặt lại mật khẩu. Liên kết có hiệu lực trong thời gian giới hạn.',
+      verificationSent:
+        'Đã gửi email xác thực tới <1>{{email}}</1>. Mở email và bấm vào liên kết để xác thực tài khoản.',
+      resetSent:
+        'Nếu <1>{{email}}</1> có tồn tại trong hệ thống, chúng tôi đã gửi liên kết đặt lại mật khẩu. Liên kết có hiệu lực trong thời gian giới hạn.',
       resendEmail: 'Gửi lại email',
       resendCountdown: 'Gửi lại sau {{count}} giây',
       resent: 'Đã gửi lại email xác thực.',
@@ -209,7 +211,8 @@ export const vi = {
       invalidLiters: 'Số lít phải lớn hơn 0.',
       choosePart: 'Vui lòng chọn hạng mục đã bảo dưỡng.',
       lowerTitle: 'Số công-tơ-mét thấp hơn',
-      lowerDescription: 'Số này thấp hơn mức hiện tại là {{value}} km. Bạn vẫn có thể lưu nếu số liệu chính xác.',
+      lowerDescription:
+        'Số này thấp hơn mức hiện tại là {{value}} km. Bạn vẫn có thể lưu nếu số liệu chính xác.',
       review: 'Kiểm tra lại',
       saveAnyway: 'Vẫn lưu',
     },
@@ -224,7 +227,8 @@ export const vi = {
       saved: 'Đã lưu số công-tơ-mét. Dữ liệu sẽ đồng bộ khi có kết nối.',
       saveFailed: 'Không thể lưu số công-tơ-mét.',
       lowerWarning: 'Số này thấp hơn số công-tơ-mét hiện tại.',
-      lowerExplanation: 'Bạn vẫn có thể lưu bản ghi ngoại tuyến hoặc không theo thứ tự. Hãy xác nhận để tiếp tục.',
+      lowerExplanation:
+        'Bạn vẫn có thể lưu bản ghi ngoại tuyến hoặc không theo thứ tự. Hãy xác nhận để tiếp tục.',
       goBack: 'Quay lại',
       saveReading: 'Lưu số km',
     },
@@ -242,8 +246,10 @@ export const vi = {
       deleteVehicleLabel: 'Xóa xe {{name}}',
       deleteVehicleTitle: 'Xóa {{name}}?',
       archiveVehicleTitle: 'Lưu trữ {{name}}?',
-      deleteVehicleDescription: 'Xe sẽ bị xóa khỏi gara trên mọi thiết bị đã đồng bộ. Lịch sử chỉ ghi thêm sẽ không bị chỉnh sửa.',
-      archiveVehicleDescription: 'Xe đã lưu trữ sẽ bị ẩn khỏi điều hướng thông thường. Bạn có thể khôi phục xe sau.',
+      deleteVehicleDescription:
+        'Xe sẽ bị xóa khỏi gara trên mọi thiết bị đã đồng bộ. Lịch sử chỉ ghi thêm sẽ không bị chỉnh sửa.',
+      archiveVehicleDescription:
+        'Xe đã lưu trữ sẽ bị ẩn khỏi điều hướng thông thường. Bạn có thể khôi phục xe sau.',
       deleteVehicle: 'Xóa xe',
       archiveVehicle: 'Lưu trữ xe',
       archivedToast: 'Đã lưu trữ {{name}}.',
@@ -292,18 +298,21 @@ export const vi = {
       editAria: 'Sửa nhắc {{part}}',
       deleteAria: 'Xóa nhắc {{part}}',
       editTitle: 'Sửa {{part}}',
-      intervalDescription: 'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Nhắc nhở đến hạn khi một trong hai chu kỳ đạt ngưỡng.',
+      intervalDescription:
+        'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Nhắc nhở đến hạn khi một trong hai chu kỳ đạt ngưỡng.',
       distanceInterval: 'Chu kỳ quãng đường (km)',
       dayInterval: 'Chu kỳ thời gian (ngày)',
       positiveInterval: 'Vui lòng nhập chu kỳ quãng đường hoặc số ngày lớn hơn 0.',
       updateFailed: 'Không thể cập nhật nhắc nhở.',
       saveChanges: 'Lưu thay đổi',
       deleteTitle: 'Xóa nhắc {{part}}?',
-      deleteDescription: 'Thao tác này dừng việc tính hạn cho nhắc nhở. Lịch sử bảo dưỡng hiện có không thay đổi.',
+      deleteDescription:
+        'Thao tác này dừng việc tính hạn cho nhắc nhở. Lịch sử bảo dưỡng hiện có không thay đổi.',
       delete: 'Xóa nhắc nhở',
       deleteFailed: 'Không thể xóa nhắc nhở.',
       addTitle: 'Thêm nhắc bảo dưỡng',
-      addDescription: 'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Ứng dụng không tự điền thông số của nhà sản xuất.',
+      addDescription:
+        'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Ứng dụng không tự điền thông số của nhà sản xuất.',
       allConfigured: 'Mọi hạng mục hiện có đều đã được tạo nhắc nhở.',
       part: 'Hạng mục',
       choosePart: 'Chọn hạng mục',
@@ -329,16 +338,20 @@ export const vi = {
       never: 'Chưa từng đồng bộ',
       errorDetail: 'Đã xảy ra lỗi khi đồng bộ. Hãy thử lại.',
       recoveryTitle: 'Xử lý dữ liệu chưa đồng bộ',
-      recoveryDescription: 'Hệ thống dừng tại thay đổi lỗi để không ghi đè dữ liệu local. Bạn có thể sửa payload hoặc khôi phục toàn bộ từ server.',
+      recoveryDescription:
+        'Hệ thống dừng tại thay đổi lỗi để không ghi đè dữ liệu local. Bạn có thể sửa payload hoặc khôi phục toàn bộ từ server.',
       blockedReason: 'Thay đổi này bị server từ chối.',
       repairPayload: 'Payload đã sửa',
       repair: 'Sửa và tiếp tục',
       restoreFromServer: 'Khôi phục từ server',
-      restoreConfirm: 'Các thay đổi local chưa đồng bộ sẽ bị xóa và dữ liệu sẽ được tải lại từ server. Tiếp tục?',
+      restoreConfirm:
+        'Các thay đổi local chưa đồng bộ sẽ bị xóa và dữ liệu sẽ được tải lại từ server. Tiếp tục?',
       restoringTitle: 'Đang khôi phục dữ liệu',
-      restoringDescription: 'Workspace đang được tải lại từ server. Không thể chỉnh sửa dữ liệu trong lúc này.',
+      restoringDescription:
+        'Workspace đang được tải lại từ server. Không thể chỉnh sửa dữ liệu trong lúc này.',
       restoreFailedTitle: 'Khôi phục chưa hoàn tất',
-      restoreFailedDescription: 'Dữ liệu đã tải được giữ lại. Hãy thử tiếp tục từ trang gần nhất khi có kết nối.',
+      restoreFailedDescription:
+        'Dữ liệu đã tải được giữ lại. Hãy thử tiếp tục từ trang gần nhất khi có kết nối.',
       resumeRestore: 'Tiếp tục khôi phục',
     },
     errors: {
@@ -351,4 +364,4 @@ export const vi = {
       internal_error: 'Máy chủ gặp sự cố. Vui lòng thử lại sau.',
     },
   },
-} as const
+} as const;
