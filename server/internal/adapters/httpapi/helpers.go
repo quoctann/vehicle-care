@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/quoctann/vehicle-care/server/internal/application"
+	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 	"go.uber.org/zap"
 )
@@ -24,7 +24,7 @@ func (s *Server) bind(c *gin.Context, destination any) bool {
 }
 
 func (s *Server) writeError(c *gin.Context, err error) {
-	appErr, ok := application.AsError(err)
+	appErr, ok := app.AsError(err)
 	if !ok {
 		s.logger.Error("request failed", zap.Error(err), zap.String("request_id", c.GetString(requestIDKey)))
 		s.writeAPIError(c, http.StatusInternalServerError, "internal_error", "Internal server error.", true)
@@ -33,20 +33,38 @@ func (s *Server) writeError(c *gin.Context, err error) {
 	status := http.StatusBadRequest
 	retryable := false
 	switch appErr.Code {
-	case "auth_invalid", "session_expired":
+	case app.ECAuthInvalid, app.ECSessionExpired:
 		status = http.StatusUnauthorized
-	case "ownership_invalid":
+
+	case app.ECOwnershipInvalid:
 		status = http.StatusForbidden
-	case "conflict":
+
+	case app.ECConflict:
 		status = http.StatusConflict
 		appErr.Code = "validation_failed"
+
+	case app.ECValidationFailed:
+		status = http.StatusBadRequest
+
+	case app.ECInternalError:
+		status = http.StatusInternalServerError
+
+	default:
+		s.logger.Error("request failed with unknown error code", zap.String("code", appErr.Code), zap.String("request_id", c.GetString(requestIDKey)))
+		status = http.StatusInternalServerError
+		appErr.Code = "internal_error"
+		appErr.Message = "Internal server error."
 	}
+
 	s.writeAPIError(c, status, appErr.Code, appErr.Message, retryable)
 }
 
 func (s *Server) writeAPIError(c *gin.Context, status int, code, message string, retryable bool) {
 	c.JSON(status, gin.H{"error": gin.H{
-		"code": code, "message": message, "retryable": retryable, "request_id": c.GetString(requestIDKey),
+		"code":       code,
+		"message":    message,
+		"retryable":  retryable,
+		"request_id": c.GetString(requestIDKey),
 	}})
 }
 

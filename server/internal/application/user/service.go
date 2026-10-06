@@ -29,24 +29,28 @@ func NewService(deps IDependencies, sessionTTL time.Duration) *Service {
 	return &Service{deps: deps, sessionTTL: sessionTTL, now: time.Now}
 }
 
-// Login validates credentials and creates a new session.
 func (s *Service) Login(ctx context.Context, email, password string) (domain.Account, string, string, error) {
-	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
-		return domain.Account{}, "", "", &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+		if errors.Is(err, ErrAccountNotFound) {
+			return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
+		}
+		return domain.Account{}, "", "", &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
-	if !found || bcrypt.CompareHashAndPassword(account.PasswordHash, []byte(password)) != nil {
-		return domain.Account{}, "", "", &app.Error{Code: "auth_invalid", Message: "Invalid email or password."}
+
+	if account == nil || bcrypt.CompareHashAndPassword(account.PasswordHash, []byte(password)) != nil {
+		return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
 	}
+
 	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
-	return account, sessionID, csrfToken, err
+
+	return *account, sessionID, csrfToken, err
 }
 
-// VerifyEmail consumes a verification token and marks its account verified.
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	accountID, ok, err := s.deps.ConsumeToken(ctx, "verification", token, s.now())
 	if err != nil {
-		return &app.Error{Code: "internal_error", Message: "Token store is unavailable."}
+		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
 		return validation("Verification token is invalid or expired.")
@@ -58,56 +62,71 @@ func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 func (s *Service) Signup(ctx context.Context, email, password string, name *string) (domain.Account, string, string, string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !validEmail(email) || !validPassword(password) {
-		return domain.Account{}, "", "", "", validation("Invalid email or password (password must be 8 to 72 bytes).")
+		return domain.Account{}, "", "", "", validation("Invalid email or password")
 	}
-	if _, found, err := s.deps.AccountByEmail(ctx, email); err != nil {
-		return domain.Account{}, "", "", "", &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
-	} else if found {
-		return domain.Account{}, "", "", "", &app.Error{Code: "conflict", Message: "Email is already registered."}
+
+	existing, err := s.deps.AccountByEmail(ctx, email)
+	if err == nil && existing != nil {
+		return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
 	}
+	if err != nil && !errors.Is(err, ErrAccountNotFound) {
+		return domain.Account{}, "", "", "", &app.Error{Code: app.ECInternalError, Message: "Store is unavailable."}
+	}
+
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return domain.Account{}, "", "", "", err
 	}
-	account := domain.Account{ID: uuid.NewString(), Email: email, Name: name, Timezone: "Asia/Ho_Chi_Minh", PasswordHash: passwordHash}
+
+	account := domain.Account{
+		ID:           uuid.NewString(),
+		Email:        email,
+		Name:         name,
+		Timezone:     "Asia/Ho_Chi_Minh",
+		PasswordHash: passwordHash,
+	}
 	if err := s.deps.CreateAccount(ctx, account); err != nil {
 		if errors.Is(err, ErrAccountExists) {
-			return domain.Account{}, "", "", "", &app.Error{Code: "conflict", Message: "Email is already registered."}
+			return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
 		}
 		return domain.Account{}, "", "", "", err
 	}
+
 	verificationToken := uuid.NewString()
 	if err := s.deps.CreateToken(ctx, "verification", verificationToken, account.ID, s.now().Add(verificationTokenTTL)); err != nil {
 		return domain.Account{}, "", "", "", err
 	}
 	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
+
 	return account, sessionID, csrfToken, verificationToken, err
 }
 
 // CreateVerificationToken creates a token when an account exists.
 func (s *Service) CreateVerificationToken(ctx context.Context, email string) (string, bool, error) {
-	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
-		return "", false, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+		if errors.Is(err, ErrAccountNotFound) {
+			return "", false, nil
+		}
+		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
-	if !found {
-		return "", false, nil
-	}
+
 	token := uuid.NewString()
-	return token, true, s.deps.CreateToken(ctx, "verification", token, account.ID, s.now().Add(verificationTokenTTL))
+	return token, true, s.deps.CreateToken(ctx, TokenKindVerification, token, account.ID, s.now().Add(verificationTokenTTL))
 }
 
 // CreateResetToken creates a password reset token when an account exists.
 func (s *Service) CreateResetToken(ctx context.Context, email string) (string, bool, error) {
-	account, found, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
-		return "", false, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+		if errors.Is(err, ErrAccountNotFound) {
+			return "", false, nil
+		}
+		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
-	if !found {
-		return "", false, nil
-	}
+
 	token := uuid.NewString()
-	return token, true, s.deps.CreateToken(ctx, "reset", token, account.ID, s.now().Add(resetTokenTTL))
+	return token, true, s.deps.CreateToken(ctx, TokenKindReset, token, account.ID, s.now().Add(resetTokenTTL))
 }
 
 // ResetPassword consumes a token, changes the password, and revokes all sessions.
@@ -115,20 +134,24 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	if !validPassword(password) {
 		return validation("Password must be 8 to 72 bytes.")
 	}
+
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	accountID, ok, err := s.deps.ConsumeToken(ctx, "reset", token, s.now())
+
+	accountID, ok, err := s.deps.ConsumeToken(ctx, TokenKindReset, token, s.now())
 	if err != nil {
-		return &app.Error{Code: "internal_error", Message: "Token store is unavailable."}
+		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
 		return validation("Password reset token is invalid or expired.")
 	}
+
 	if err := s.deps.SetPassword(ctx, accountID, passwordHash); err != nil {
 		return err
 	}
+
 	return s.deps.DeleteAccountSessions(ctx, accountID)
 }
 
@@ -136,19 +159,20 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.Session, domain.Account, error) {
 	session, found, err := s.deps.GetAndRefreshSession(ctx, sessionID, s.now(), s.now().Add(s.sessionTTL))
 	if err != nil {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: "internal_error", Message: "Session store is unavailable."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Session store is unavailable."}
 	}
 	if !found {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
 	}
-	account, found, err := s.deps.AccountByID(ctx, session.AccountID)
+	account, err := s.deps.AccountByID(ctx, session.AccountID)
 	if err != nil {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: "internal_error", Message: "Account store is unavailable."}
+		if !found {
+			return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
+		}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
-	if !found {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
-	}
-	return session, account, nil
+
+	return session, *account, nil
 }
 
 // Logout deletes the current session.
@@ -183,5 +207,5 @@ func validPassword(value string) bool {
 }
 
 func validation(message string) error {
-	return &app.Error{Code: "validation_failed", Message: message}
+	return &app.Error{Code: app.ECValidationFailed, Message: message}
 }

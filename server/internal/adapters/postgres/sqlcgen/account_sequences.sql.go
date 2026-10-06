@@ -9,32 +9,33 @@ import (
 	"context"
 )
 
-const currentSeq = `-- name: CurrentSeq :one
+const createAccountSequence = `-- name: CreateAccountSequence :exec
+INSERT INTO account_sequences (account_id, current_seq) VALUES ($1, 0)
+`
+
+func (q *Queries) CreateAccountSequence(ctx context.Context, accountID string) error {
+	_, err := q.db.ExecContext(ctx, createAccountSequence, accountID)
+	return err
+}
+
+const currentAccountSequence = `-- name: CurrentAccountSequence :one
 SELECT current_seq FROM account_sequences WHERE account_id = $1
 `
 
-func (q *Queries) CurrentSeq(ctx context.Context, accountID string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, currentSeq, accountID)
+func (q *Queries) CurrentAccountSequence(ctx context.Context, accountID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, currentAccountSequence, accountID)
 	var current_seq int64
 	err := row.Scan(&current_seq)
 	return current_seq, err
 }
 
-const insertAccountSequenceRow = `-- name: InsertAccountSequenceRow :exec
-INSERT INTO account_sequences (account_id, current_seq) VALUES ($1, 0)
-`
-
-func (q *Queries) InsertAccountSequenceRow(ctx context.Context, accountID string) error {
-	_, err := q.db.ExecContext(ctx, insertAccountSequenceRow, accountID)
-	return err
-}
-
-const nextSeq = `-- name: NextSeq :one
+const nextAccountSequence = `-- name: NextAccountSequence :one
 UPDATE account_sequences SET current_seq = current_seq + 1 WHERE account_id = $1 RETURNING current_seq
 `
 
-func (q *Queries) NextSeq(ctx context.Context, accountID string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, nextSeq, accountID)
+// Increase current sequence and return the new value
+func (q *Queries) NextAccountSequence(ctx context.Context, accountID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, nextAccountSequence, accountID)
 	var current_seq int64
 	err := row.Scan(&current_seq)
 	return current_seq, err

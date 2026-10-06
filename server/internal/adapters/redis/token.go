@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -23,7 +24,7 @@ func tokenHash(token string) string {
 // the next ConsumeToken call (mirrors CreateToken(kind, "expired", ...)
 // composed with an immediate ConsumeToken in the memory-store contract
 // tests, which expect no error and ok=false).
-func (s *Store) CreateToken(ctx context.Context, kind, token, accountID string, expiresAt time.Time) error {
+func (s *Store) CreateToken(ctx context.Context, kind user.TokenKind, token, accountID string, expiresAt time.Time) error {
 	ttl := time.Until(expiresAt)
 	if ttl <= 0 {
 		return nil
@@ -33,7 +34,7 @@ func (s *Store) CreateToken(ctx context.Context, kind, token, accountID string, 
 		ttlSeconds = 1
 	}
 
-	indexKey := tokenIndexKey(kind, accountID)
+	indexKey := tokenIndexKey(string(kind), accountID)
 	if err := createTokenScript.Run(ctx, s.client, []string{indexKey}, kind, accountID, tokenHash(token), ttlSeconds).Err(); err != nil {
 		return wrapErr("create token", err)
 	}
@@ -46,8 +47,8 @@ func (s *Store) CreateToken(ctx context.Context, kind, token, accountID string, 
 // kind-mismatch check. Redis's own TTL is the source of truth for
 // expiration, so now is unused here — it stays in the signature only to
 // satisfy user.TokenStore.
-func (s *Store) ConsumeToken(ctx context.Context, kind, token string, _ time.Time) (string, bool, error) {
-	key := tokenKey(kind, tokenHash(token))
+func (s *Store) ConsumeToken(ctx context.Context, kind user.TokenKind, token string, _ time.Time) (string, bool, error) {
+	key := tokenKey(string(kind), tokenHash(token))
 	accountID, err := s.client.GetDel(ctx, key).Result()
 	if errors.Is(err, goredis.Nil) {
 		return "", false, nil

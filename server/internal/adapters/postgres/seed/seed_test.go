@@ -13,9 +13,6 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 )
 
-// TestSeedAccountPartTypesInsertsManifestForAccount asserts a single call
-// inserts exactly the manifest's rows for the given account, and that two
-// different accounts get disjoint ids for the same codes.
 func TestSeedAccountPartTypesInsertsManifestForAccount(t *testing.T) {
 	t.Parallel()
 	db := pgtest.StartDB(t)

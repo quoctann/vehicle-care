@@ -176,7 +176,7 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 		return domain.MutationResult{}, fmt.Errorf("lock current %s: %w", mutation.EntityType, err)
 	}
 
-	newSeq, err := queries.NextSeq(ctx, accountID)
+	newSeq, err := queries.NextAccountSequence(ctx, accountID)
 	if err != nil {
 		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
 	}
@@ -296,7 +296,7 @@ func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Qu
 		return result, nil
 	}
 
-	newSeq, err := queries.NextSeq(ctx, accountID)
+	newSeq, err := queries.NextAccountSequence(ctx, accountID)
 	if err != nil {
 		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
 	}

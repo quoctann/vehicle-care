@@ -11,19 +11,12 @@ import (
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/seed"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
-	"github.com/quoctann/vehicle-care/server/internal/application/user"
+	app_user "github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
 const pgUniqueViolation = "23505"
 
-// CreateAccount inserts the account, its account_sequences row (current_seq
-// = 0), and its own copy of the default part_types catalog, all in one
-// transaction. The account and account_sequences rows must always exist
-// together: NextSeq (used by ApplyMutations) locks and updates the
-// account_sequences row and has nothing to lock if it is missing. part_types
-// seeding is bundled into the same transaction so a brand-new account never
-// exists without its default catalog.
 func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -32,6 +25,7 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 	defer func() { _ = tx.Rollback() }()
 
 	queries := sqlcgen.New(tx)
+
 	if err := queries.InsertAccount(ctx, sqlcgen.InsertAccountParams{
 		ID:            account.ID,
 		Email:         account.Email,
@@ -41,54 +35,74 @@ func (s *Store) CreateAccount(ctx context.Context, account domain.Account) error
 		PasswordHash:  account.PasswordHash,
 	}); err != nil {
 		if isUniqueViolation(err, "accounts_email_unique") {
-			return user.ErrAccountExists
+			return app_user.ErrAccountExists
 		}
 		return fmt.Errorf("postgres: insert account: %w", err)
 	}
-	if err := queries.InsertAccountSequenceRow(ctx, account.ID); err != nil {
-		return fmt.Errorf("postgres: insert account sequence row: %w", err)
+
+	if err := queries.CreateAccountSequence(ctx, account.ID); err != nil {
+		return fmt.Errorf("postgres: create account sequence: %w", err)
 	}
+
 	if err := seed.SeedAccountPartTypes(ctx, queries, account.ID, time.Now().UTC()); err != nil {
 		return fmt.Errorf("postgres: seed account part types: %w", err)
 	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("postgres: commit create account: %w", err)
 	}
+
 	return nil
 }
 
-// AccountByEmail looks up an account using citext's built-in
-// case-insensitive comparison.
-//
-// This method's signature does not carry an error return (the in-memory
-// reference adapter never fails), so an unexpected database error is
-// reported the same way as "not found": callers cannot tell the two apart
-// through this method. That is an existing limitation of the interface,
-// not something introduced by this adapter.
-func (s *Store) AccountByEmail(ctx context.Context, email string) (domain.Account, bool, error) {
+func (s *Store) AccountByEmail(ctx context.Context, email string) (*domain.Account, error) {
 	row, err := s.queries.AccountByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Account{}, false, nil
+			return nil, app_user.ErrAccountNotFound
 		}
-		return domain.Account{}, false, fmt.Errorf("postgres: find account by email: %w", err)
+		return nil, fmt.Errorf("postgres: find account by email: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
+
+	account := domain.Account{
+		ID:            row.ID,
+		Email:         row.Email,
+		Timezone:      row.Timezone,
+		EmailVerified: row.EmailVerified,
+		PasswordHash:  row.PasswordHash,
+	}
+	if row.Name.Valid {
+		value := row.Name.String
+		account.Name = &value
+	}
+
+	return &account, nil
 }
 
-// AccountByID looks up an account by primary key.
-func (s *Store) AccountByID(ctx context.Context, id string) (domain.Account, bool, error) {
+func (s *Store) AccountByID(ctx context.Context, id string) (*domain.Account, error) {
 	row, err := s.queries.AccountByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Account{}, false, nil
+			return nil, app_user.ErrAccountNotFound
 		}
-		return domain.Account{}, false, fmt.Errorf("postgres: find account by id: %w", err)
+		return nil, fmt.Errorf("postgres: find account by id: %w", err)
 	}
-	return accountFromRow(row.ID, row.Email, row.Name, row.Timezone, row.EmailVerified, row.PasswordHash), true, nil
+
+	account := domain.Account{
+		ID:            row.ID,
+		Email:         row.Email,
+		Timezone:      row.Timezone,
+		EmailVerified: row.EmailVerified,
+		PasswordHash:  row.PasswordHash,
+	}
+	if row.Name.Valid {
+		value := row.Name.String
+		account.Name = &value
+	}
+
+	return &account, nil
 }
 
-// SetEmailVerified marks an account email as verified.
 func (s *Store) SetEmailVerified(ctx context.Context, accountID string) error {
 	if err := s.queries.SetEmailVerified(ctx, accountID); err != nil {
 		return fmt.Errorf("postgres: set email verified: %w", err)
@@ -96,27 +110,11 @@ func (s *Store) SetEmailVerified(ctx context.Context, accountID string) error {
 	return nil
 }
 
-// SetPassword replaces an account password hash.
 func (s *Store) SetPassword(ctx context.Context, accountID string, passwordHash []byte) error {
 	if err := s.queries.SetPassword(ctx, sqlcgen.SetPasswordParams{ID: accountID, PasswordHash: passwordHash}); err != nil {
 		return fmt.Errorf("postgres: set password: %w", err)
 	}
 	return nil
-}
-
-func accountFromRow(id, email string, name sql.NullString, timezone string, emailVerified bool, passwordHash []byte) domain.Account {
-	account := domain.Account{
-		ID:            id,
-		Email:         email,
-		Timezone:      timezone,
-		EmailVerified: emailVerified,
-		PasswordHash:  passwordHash,
-	}
-	if name.Valid {
-		value := name.String
-		account.Name = &value
-	}
-	return account
 }
 
 func nullableString(value *string) sql.NullString {

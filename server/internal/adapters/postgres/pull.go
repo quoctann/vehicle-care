@@ -19,7 +19,7 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 	defer func() { _ = tx.Rollback() }()
 	queries := sqlcgen.New(tx)
 
-	currentSeq, err := queries.CurrentSeq(ctx, accountID)
+	currentSeq, err := queries.CurrentAccountSequence(ctx, accountID)
 	if err != nil {
 		return domain.PullPage{}, fmt.Errorf("postgres: read current seq: %w", err)
 	}

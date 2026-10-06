@@ -8,20 +8,27 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-// ErrAccountExists is returned by AccountStore.CreateAccount when an email
-// uniqueness constraint is violated.
 var ErrAccountExists = errors.New("account already exists")
+
+var ErrAccountNotFound = errors.New("account not found")
 
 // IAccountStore persists account identity and credentials. It is owned by the
 // PostgreSQL adapter.
 type IAccountStore interface {
 	CreateAccount(ctx context.Context, account domain.Account) error
-	AccountByEmail(ctx context.Context, email string) (domain.Account, bool, error)
-	AccountByID(ctx context.Context, id string) (domain.Account, bool, error)
+	AccountByEmail(ctx context.Context, email string) (*domain.Account, error)
+	AccountByID(ctx context.Context, id string) (*domain.Account, error)
 	SetEmailVerified(ctx context.Context, accountID string) error
 	SetPassword(ctx context.Context, accountID string, passwordHash []byte) error
 	RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error)
 }
+
+type TokenKind string
+
+const (
+	TokenKindVerification TokenKind = "verification"
+	TokenKindReset        TokenKind = "reset"
+)
 
 // ISessionStore persists login sessions. It is owned by the Redis adapter.
 //
@@ -44,8 +51,8 @@ type ISessionStore interface {
 // ITokenStore persists one-time auth tokens (email verification, password
 // reset). It is owned by the Redis adapter.
 type ITokenStore interface {
-	CreateToken(ctx context.Context, kind, token, accountID string, expiresAt time.Time) error
-	ConsumeToken(ctx context.Context, kind, token string, now time.Time) (string, bool, error)
+	CreateToken(ctx context.Context, kind TokenKind, token, accountID string, expiresAt time.Time) error
+	ConsumeToken(ctx context.Context, kind TokenKind, token string, now time.Time) (string, bool, error)
 }
 
 // IDependencies is the full storage port user.Service requires, composed from

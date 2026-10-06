@@ -96,9 +96,6 @@ func main() {
 	}
 }
 
-// runAutoMigrate opens a short-lived, separate *sql.DB (independent of the
-// long-lived pool buildDatasource creates) and applies pending migrations
-// through it, closing it before the API's own connections are opened.
 func runAutoMigrate(cfg config.Config) error {
 	db, err := sql.Open("pgx", cfg.Database.DSN())
 	if err != nil {

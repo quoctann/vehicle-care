@@ -11,23 +11,14 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 )
 
-// SeedAccountPartTypes inserts the manifest as accountID's own part_types
-// rows: a fresh id per row (never reused across accounts, since every
-// account needs its own row), same code/name/display_order
-// as the manifest. Seed rows are regular changefeed entries so a new device
-// can rebuild the complete account through the normal pull pipeline.
-//
-// Must run inside the same transaction as account creation (see
-// postgres.Store.CreateAccount) — it is not idempotent by itself (each call
-// mints new ids), so calling it twice for the same account would duplicate
-// rows. That's fine because it only ever runs once, at signup.
 func SeedAccountPartTypes(ctx context.Context, q *sqlcgen.Queries, accountID string, now time.Time) error {
 	for _, item := range Manifest {
 		id := uuid.NewString()
-		seq, err := q.NextSeq(ctx, accountID)
+		seq, err := q.NextAccountSequence(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("allocate part_type sequence for %s: %w", item.Code, err)
 		}
+
 		rowsAffected, err := q.UpsertPartType(ctx, sqlcgen.UpsertPartTypeParams{
 			ID:             id,
 			AccountID:      accountID,
@@ -44,13 +35,17 @@ func SeedAccountPartTypes(ctx context.Context, q *sqlcgen.Queries, accountID str
 		if rowsAffected != 1 {
 			return fmt.Errorf("seed part_type %s for account %s: ownership conflict", item.Code, accountID)
 		}
+
 		payload, err := json.Marshal(map[string]any{
-			"code": item.Code, "name": item.Name, "display_order": item.DisplayOrder,
-			"active": true,
+			"code":          item.Code,
+			"name":          item.Name,
+			"display_order": item.DisplayOrder,
+			"active":        true,
 		})
 		if err != nil {
 			return fmt.Errorf("marshal seed part_type %s: %w", item.Code, err)
 		}
+
 		if err := q.InsertChange(ctx, sqlcgen.InsertChangeParams{
 			AccountID: accountID, ServerSeq: seq, EntityType: "part_type", EntityID: id,
 			Operation: "create", Payload: payload, ServerSyncedAt: now,
@@ -58,5 +53,6 @@ func SeedAccountPartTypes(ctx context.Context, q *sqlcgen.Queries, accountID str
 			return fmt.Errorf("append seed part_type %s: %w", item.Code, err)
 		}
 	}
+
 	return nil
 }
