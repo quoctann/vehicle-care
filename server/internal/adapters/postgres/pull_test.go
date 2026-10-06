@@ -19,11 +19,11 @@ func TestPullKeepsStableUpperBound(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1") // follows signup seed entries
+	vehicleID := createVehicle(t, store, accountID, deviceOne) // follows signup seed entries
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
 	for index := 1; index <= 2; index++ {
-		store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+		store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 			MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 			Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(index * 100), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
 		}}, now)
@@ -33,7 +33,7 @@ func TestPullKeepsStableUpperBound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first pull: %v", err)
 	}
-	store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 		Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(300), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
 	}}, now)

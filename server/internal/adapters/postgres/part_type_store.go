@@ -17,15 +17,14 @@ func (s *Store) ListPartTypes(ctx context.Context, accountID string) ([]domain.P
 	partTypes := make([]domain.PartType, 0, len(rows))
 	for _, row := range rows {
 		partTypes = append(partTypes, domain.PartType{
-			ID:               row.ID,
-			Code:             row.Code,
-			NameVI:           row.NameVi,
-			DisplayOrder:     row.DisplayOrder,
-			Active:           row.Active,
-			SeedVersion:      row.SeedVersion,
-			AccountID:        row.AccountID,
-			ServerSeq:        row.ServerSeq,
-			ReceivedAtServer: row.ReceivedAtServer,
+			ID:             row.ID,
+			Code:           row.Code,
+			Name:           row.Name,
+			DisplayOrder:   row.DisplayOrder,
+			Active:         row.Active,
+			AccountID:      row.AccountID,
+			ServerSeq:      row.ServerSeq,
+			ServerSyncedAt: row.ServerSyncedAt,
 		})
 	}
 	return partTypes, nil

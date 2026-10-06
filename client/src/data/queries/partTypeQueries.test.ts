@@ -8,9 +8,8 @@ const basePartType: Omit<PartType, 'id' | 'accountId' | 'displayOrder'> = {
   code: 'engine_oil',
   displayName: 'Dầu động cơ',
   active: true,
-  seedVersion: 1,
   createdAtClient: '2026-09-22T00:00:00.000Z',
-  receivedAtServer: '2026-09-22T00:00:00.000Z',
+  serverSyncedAt: '2026-09-22T00:00:00.000Z',
   serverSeq: 1,
 };
 

@@ -15,6 +15,13 @@ import (
 
 var initialAccountSeq = int64(len(seed.Manifest))
 
+const (
+	deviceOne = "00000000-0000-4000-8000-000000000001"
+	deviceTwo = "00000000-0000-4000-8000-000000000002"
+	deviceA   = "00000000-0000-4000-8000-00000000000a"
+	deviceB   = "00000000-0000-4000-8000-00000000000b"
+)
+
 // newTestStore starts an ephemeral, migrated PostgreSQL container and opens
 // a Store against it. It skips the test (via pgtest.StartDSN) when Docker
 // is unavailable. The DSN is also returned for tests that need a second,
@@ -41,7 +48,7 @@ func newAccount(t *testing.T, store *postgres.Store) string {
 	if err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	for _, deviceID := range []string{"device-1", "device-2", "device-a", "device-b"} {
+	for _, deviceID := range []string{deviceOne, deviceTwo, deviceA, deviceB} {
 		registerTestDevice(t, store, id, deviceID)
 	}
 	return id

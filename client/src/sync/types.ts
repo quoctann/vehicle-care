@@ -51,26 +51,26 @@ export async function updateEntitySyncMeta(
   entityType: SyncEntityType,
   entityId: string,
   serverSeq: number,
-  receivedAtServer: string,
+  serverSyncedAt: string,
 ): Promise<void> {
   switch (entityType) {
     case 'vehicle':
-      await db.vehicles.update(entityId, { serverSeq, receivedAtServer });
+      await db.vehicles.update(entityId, { serverSeq, serverSyncedAt });
       return;
     case 'reminder_config':
-      await db.reminderConfigs.update(entityId, { serverSeq, receivedAtServer });
+      await db.reminderConfigs.update(entityId, { serverSeq, serverSyncedAt });
       return;
     case 'odometer_log':
-      await db.odometerLogs.update(entityId, { serverSeq, receivedAtServer });
+      await db.odometerLogs.update(entityId, { serverSeq, serverSyncedAt });
       return;
     case 'fuel_log':
-      await db.fuelLogs.update(entityId, { serverSeq, receivedAtServer });
+      await db.fuelLogs.update(entityId, { serverSeq, serverSyncedAt });
       return;
     case 'service_log':
-      await db.serviceLogs.update(entityId, { serverSeq, receivedAtServer });
+      await db.serviceLogs.update(entityId, { serverSeq, serverSyncedAt });
       return;
     case 'part_type':
-      await db.partTypes.update(entityId, { serverSeq, receivedAtServer });
+      await db.partTypes.update(entityId, { serverSeq, serverSyncedAt });
       return;
   }
 }

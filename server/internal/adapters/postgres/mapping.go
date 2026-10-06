@@ -179,15 +179,15 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 		return sqlcgen.UpsertVehicleParams{}, err
 	}
 	return sqlcgen.UpsertVehicleParams{
-		AccountID:        accountID,
-		ID:               entityID,
-		Name:             stringValue(payload, "name"),
-		PlateNumber:      nullString(payload, "plate_number"),
-		ArchivedAt:       archivedAt,
-		DeletedAt:        deletedAt,
-		DueSoonRatio:     nullNumericString(payload, "due_soon_ratio"),
-		ServerSeq:        seq,
-		ReceivedAtServer: receivedAt,
+		AccountID:      accountID,
+		ID:             entityID,
+		Name:           stringValue(payload, "name"),
+		PlateNumber:    nullString(payload, "plate_number"),
+		ArchivedAt:     archivedAt,
+		DeletedAt:      deletedAt,
+		DueSoonRatio:   nullNumericString(payload, "due_soon_ratio"),
+		ServerSeq:      seq,
+		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
@@ -199,15 +199,14 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 // .docs/20260919-feedback.md Feature #2).
 func buildUpsertPartTypeParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertPartTypeParams, error) {
 	return sqlcgen.UpsertPartTypeParams{
-		ID:               entityID,
-		AccountID:        accountID,
-		Code:             stringValue(payload, "code"),
-		NameVi:           stringValue(payload, "name_vi"),
-		DisplayOrder:     int32(numberValue(payload, "display_order")),
-		Active:           boolValue(payload, "active"),
-		SeedVersion:      stringValue(payload, "seed_version"),
-		ServerSeq:        seq,
-		ReceivedAtServer: receivedAt,
+		ID:             entityID,
+		AccountID:      accountID,
+		Code:           stringValue(payload, "code"),
+		Name:           stringValue(payload, "name"),
+		DisplayOrder:   int32(numberValue(payload, "display_order")),
+		Active:         boolValue(payload, "active"),
+		ServerSeq:      seq,
+		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
@@ -234,7 +233,7 @@ func buildUpsertReminderConfigParams(accountID, entityID string, payload map[str
 		Enabled:            boolValue(payload, "enabled"),
 		DeletedAt:          deletedAt,
 		ServerSeq:          seq,
-		ReceivedAtServer:   receivedAt,
+		ServerSyncedAt:     receivedAt,
 	}, nil
 }
 
@@ -246,15 +245,15 @@ func buildInsertOdometerLogParams(accountID, entityID string, payload map[string
 		return sqlcgen.InsertOdometerLogParams{}, err
 	}
 	return sqlcgen.InsertOdometerLogParams{
-		AccountID:        accountID,
-		ID:               entityID,
-		VehicleID:        stringValue(payload, "vehicle_id"),
-		OdometerKm:       requiredNumericString(payload, "odometer_km"),
-		RecordedAt:       recordedAt,
-		Source:           stringValue(payload, "source"),
-		Note:             nullString(payload, "note"),
-		ServerSeq:        seq,
-		ReceivedAtServer: receivedAt,
+		AccountID:      accountID,
+		ID:             entityID,
+		VehicleID:      stringValue(payload, "vehicle_id"),
+		OdometerKm:     requiredNumericString(payload, "odometer_km"),
+		RecordedAt:     recordedAt,
+		Source:         stringValue(payload, "source"),
+		Note:           nullString(payload, "note"),
+		ServerSeq:      seq,
+		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
@@ -270,19 +269,18 @@ func buildUpsertFuelLogParams(accountID, entityID string, payload map[string]any
 		return sqlcgen.UpsertFuelLogParams{}, err
 	}
 	return sqlcgen.UpsertFuelLogParams{
-		AccountID:        accountID,
-		ID:               entityID,
-		VehicleID:        stringValue(payload, "vehicle_id"),
-		RecordedAt:       recordedAt,
-		Liters:           nullNumericString(payload, "liters"),
-		CostVnd:          nullInt64FromNumber(payload, "cost_vnd"),
-		Shop:             nullString(payload, "shop"),
-		Note:             nullString(payload, "note"),
-		OdometerLogID:    nullStringPtr(payload, "odometer_log_id"),
-		IsFullTank:       boolValue(payload, "is_full_tank"),
-		DeletedAt:        deletedAt,
-		ServerSeq:        seq,
-		ReceivedAtServer: receivedAt,
+		AccountID:      accountID,
+		ID:             entityID,
+		VehicleID:      stringValue(payload, "vehicle_id"),
+		RecordedAt:     recordedAt,
+		Liters:         nullNumericString(payload, "liters"),
+		Cost:           nullNumericString(payload, "cost"),
+		Note:           nullString(payload, "note"),
+		OdometerLogID:  nullStringPtr(payload, "odometer_log_id"),
+		IsFullTank:     boolValue(payload, "is_full_tank"),
+		DeletedAt:      deletedAt,
+		ServerSeq:      seq,
+		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
@@ -304,11 +302,11 @@ func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]
 		PartTypeID:         stringValue(payload, "part_type_id"),
 		ServicedAt:         servicedAt,
 		OdometerKmSnapshot: nullNumericString(payload, "odometer_km_snapshot"),
-		CostVnd:            nullInt64FromNumber(payload, "cost_vnd"),
+		Cost:               nullNumericString(payload, "cost"),
 		Note:               nullString(payload, "note"),
 		DeletedAt:          deletedAt,
 		ServerSeq:          seq,
-		ReceivedAtServer:   receivedAt,
+		ServerSyncedAt:     receivedAt,
 	}, nil
 }
 

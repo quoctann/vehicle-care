@@ -38,7 +38,7 @@ LIMIT 1;
 -- name: UpsertReminderConfig :exec
 INSERT INTO reminder_configs (
     account_id, id, vehicle_id, part_type_id, interval_km, interval_days,
-    baseline_odometer_km, baseline_date, enabled, deleted_at, server_seq, received_at_server
+    baseline_odometer_km, baseline_date, enabled, deleted_at, server_seq, server_synced_at
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (account_id, id) DO UPDATE
@@ -51,4 +51,4 @@ ON CONFLICT (account_id, id) DO UPDATE
       enabled = EXCLUDED.enabled,
       deleted_at = EXCLUDED.deleted_at,
       server_seq = EXCLUDED.server_seq,
-      received_at_server = EXCLUDED.received_at_server;
+       server_synced_at = EXCLUDED.server_synced_at;

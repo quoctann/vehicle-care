@@ -30,7 +30,7 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 		go func() {
 			ready.Done()
 			<-start
-			results <- store.ApplyMutation(ctx, accountID, "device-1", mutation, time.Now())
+			results <- store.ApplyMutation(ctx, accountID, deviceOne, mutation, time.Now())
 		}()
 	}
 	ready.Wait()
@@ -40,13 +40,13 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 	for range workers {
 		result := <-results
 		counts[result.Status]++
-		if result.ServerSeq == nil || *result.ServerSeq != initialAccountSeq+1 || result.ReceivedAtServer == nil {
+		if result.ServerSeq == nil || *result.ServerSeq != initialAccountSeq+1 || result.ServerSyncedAt == nil {
 			t.Fatalf("retry did not return original ACK: %#v", result)
 		}
-		if receivedAt != nil && !receivedAt.Equal(*result.ReceivedAtServer) {
-			t.Fatalf("retry changed received_at_server: %#v", result)
+		if receivedAt != nil && !receivedAt.Equal(*result.ServerSyncedAt) {
+			t.Fatalf("retry changed server_synced_at: %#v", result)
 		}
-		receivedAt = result.ReceivedAtServer
+		receivedAt = result.ServerSyncedAt
 	}
 	if counts["applied"] != 1 || counts["duplicate"] != workers-1 {
 		t.Fatalf("expected one apply and only duplicates, got %v", counts)
@@ -70,9 +70,9 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 
 	first := domain.Mutation{MutationID: "mutation-1", EntityType: "vehicle", Operation: "create", EntityID: vehicleID, Payload: map[string]any{"name": "First"}}
 
-	firstResult := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{first}, baseTime)[0]
-	duplicate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{first}, baseTime.Add(time.Minute))[0]
-	conflict := store.ApplyMutations(ctx, accountID, "device-2", []domain.Mutation{{
+	firstResult := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{first}, baseTime)[0]
+	duplicate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{first}, baseTime.Add(time.Minute))[0]
+	conflict := store.ApplyMutations(ctx, accountID, deviceTwo, []domain.Mutation{{
 		MutationID: "mutation-2", EntityType: "vehicle", Operation: "update", EntityID: vehicleID,
 		Payload: map[string]any{"name": "Second"},
 	}}, baseTime.Add(2*time.Minute))[0]
@@ -80,7 +80,7 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 	if firstResult.Status != "applied" || firstResult.ServerSeq == nil || *firstResult.ServerSeq != initialAccountSeq+1 {
 		t.Fatalf("unexpected first result: %#v", firstResult)
 	}
-	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || *duplicate.ServerSeq != initialAccountSeq+1 || !duplicate.ReceivedAtServer.Equal(*firstResult.ReceivedAtServer) {
+	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || *duplicate.ServerSeq != initialAccountSeq+1 || !duplicate.ServerSyncedAt.Equal(*firstResult.ServerSyncedAt) {
 		t.Fatalf("duplicate did not preserve original acknowledgment: %#v", duplicate)
 	}
 	if conflict.Status != "applied" || conflict.ServerSeq == nil || *conflict.ServerSeq != initialAccountSeq+2 {
@@ -99,15 +99,15 @@ func TestAppendOnlyDuplicateReturnsOriginalAcknowledgment(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1")
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 	logID := uuid.NewString()
 	payload := map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(100), "recorded_at": now.Format(time.RFC3339), "source": "manual"}
 
-	first := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	first := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "mutation-1", EntityType: "odometer_log", Operation: "create", EntityID: logID, Payload: payload,
 	}}, now)[0]
-	second := store.ApplyMutations(ctx, accountID, "device-2", []domain.Mutation{{
+	second := store.ApplyMutations(ctx, accountID, deviceTwo, []domain.Mutation{{
 		MutationID: "mutation-2", EntityType: "odometer_log", Operation: "create", EntityID: logID, Payload: payload,
 	}}, now.Add(time.Minute))[0]
 
@@ -124,17 +124,17 @@ func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1")
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	now := time.Date(2026, 9, 17, 10, 0, 0, 123000000, time.UTC)
 
-	result := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	result := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "canonical-fuel",
 		EntityType: "fuel_log",
 		Operation:  "create",
 		EntityID:   uuid.NewString(),
 		Payload: map[string]any{
 			"vehicle_id": vehicleID, "recorded_at": now.Format(time.RFC3339Nano),
-			"liters": 1.239, "cost_vnd": float64(123), "is_full_tank": true,
+			"liters": 1.239, "cost": float64(123.45), "is_full_tank": true,
 		},
 	}}, now)[0]
 	if result.Status != "applied" {
@@ -149,7 +149,7 @@ func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
 		t.Fatalf("expected vehicle and fuel changes, got %#v", page.Changes)
 	}
 	fuelPayload := page.Changes[1].Payload
-	if fuelPayload["liters"] != 1.24 || fuelPayload["cost_vnd"] != float64(123) {
+	if fuelPayload["liters"] != 1.24 || fuelPayload["cost"] != float64(123.45) {
 		t.Fatalf("change feed did not use persisted numeric values: %#v", fuelPayload)
 	}
 }
@@ -159,7 +159,7 @@ func TestDuplicateIsReturnedBeforeStatefulValidation(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1")
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	partTypes := seedPartTypes(t, store, accountID)
 	partTypeID := partTypes["engine_oil"]
 	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
@@ -168,20 +168,20 @@ func TestDuplicateIsReturnedBeforeStatefulValidation(t *testing.T) {
 		"serviced_at": now.Format(time.RFC3339),
 	}
 	mutation := domain.Mutation{MutationID: "service-retry", EntityType: "service_log", Operation: "create", EntityID: uuid.NewString(), Payload: payload}
-	first := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{mutation}, now)[0]
+	first := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{mutation}, now)[0]
 	if first.Status != "applied" {
 		t.Fatalf("unexpected first service result: %#v", first)
 	}
 
-	deactivate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	deactivate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "part-type-deactivate", EntityType: "part_type", Operation: "update", EntityID: partTypeID,
-		Payload: map[string]any{"code": "engine_oil", "name_vi": "Dau may", "display_order": float64(1), "active": false, "seed_version": "1"},
+		Payload: map[string]any{"code": "engine_oil", "name": "Dau may", "display_order": float64(1), "active": false},
 	}}, now.Add(time.Minute))[0]
 	if deactivate.Status != "applied" {
 		t.Fatalf("unexpected deactivation result: %#v", deactivate)
 	}
 
-	duplicate := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{mutation}, now.Add(2*time.Minute))[0]
+	duplicate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{mutation}, now.Add(2*time.Minute))[0]
 	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || first.ServerSeq == nil || *duplicate.ServerSeq != *first.ServerSeq {
 		t.Fatalf("retry was statefully revalidated instead of deduplicated: %#v", duplicate)
 	}
@@ -196,7 +196,7 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1")
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	partTypes := seedPartTypes(t, store, accountID)
 	partTypeID := partTypes["engine_oil"]
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
@@ -204,7 +204,7 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	results := make(chan domain.MutationResult, 2)
 	for index := 1; index <= 2; index++ {
 		index := index
-		deviceID := "device-" + uuid.NewString()
+		deviceID := uuid.NewString()
 		registerTestDevice(t, store, accountID, deviceID)
 		go func() {
 			result := store.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{{
@@ -238,10 +238,10 @@ func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
 	sharedVehicleID := uuid.NewString()
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
-	resultA := store.ApplyMutations(ctx, accountA, "device-1", []domain.Mutation{{
+	resultA := store.ApplyMutations(ctx, accountA, deviceOne, []domain.Mutation{{
 		MutationID: "mutation-a", EntityType: "vehicle", Operation: "create", EntityID: sharedVehicleID, Payload: map[string]any{"name": "Account A vehicle"},
 	}}, now)[0]
-	resultB := store.ApplyMutations(ctx, accountB, "device-1", []domain.Mutation{{
+	resultB := store.ApplyMutations(ctx, accountB, deviceOne, []domain.Mutation{{
 		MutationID: "mutation-b", EntityType: "vehicle", Operation: "create", EntityID: sharedVehicleID, Payload: map[string]any{"name": "Account B vehicle"},
 	}}, now)[0]
 
@@ -285,7 +285,7 @@ func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1") // follows signup seed entries
+	vehicleID := createVehicle(t, store, accountID, deviceOne) // follows signup seed entries
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
 	const goroutines = 8
@@ -300,7 +300,7 @@ func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
 	for g := 0; g < goroutines; g++ {
 		go func(g int) {
 			for m := 0; m < perGoroutine; m++ {
-				results := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+				results := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 					MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 					Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(m), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
 				}}, now)
@@ -347,17 +347,16 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 	partTypeID := partTypes["engine_oil"]
 	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
 
-	result := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	result := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "part-type-update",
 		EntityType: "part_type",
 		Operation:  "update",
 		EntityID:   partTypeID,
 		Payload: map[string]any{
 			"code":          "engine_oil",
-			"name_vi":       "Dầu máy",
+			"name":          "Dầu máy",
 			"display_order": float64(1),
 			"active":        false,
-			"seed_version":  "1",
 		},
 	}}, now)[0]
 	if result.Status != "applied" || result.ServerSeq == nil {
@@ -368,7 +367,7 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pull part type change: %v", err)
 	}
-	if len(page.Changes) != 1 || page.Changes[0].EntityType != "part_type" || page.Changes[0].Payload["name_vi"] != "Dầu máy" {
+	if len(page.Changes) != 1 || page.Changes[0].EntityType != "part_type" || page.Changes[0].Payload["name"] != "Dầu máy" {
 		t.Fatalf("part type change missing from feed: %#v", page.Changes)
 	}
 }
@@ -383,16 +382,15 @@ func TestPartTypeUpsertCannotCrossAccountBoundary(t *testing.T) {
 	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
 	payload := map[string]any{
 		"code":          entityID,
-		"name_vi":       "Hạng mục A",
+		"name":          "Hạng mục A",
 		"display_order": float64(999),
 		"active":        true,
-		"seed_version":  "0",
 	}
 
-	first := store.ApplyMutations(ctx, accountA, "device-a", []domain.Mutation{{
+	first := store.ApplyMutations(ctx, accountA, deviceA, []domain.Mutation{{
 		MutationID: "part-type-a", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
 	}}, now)[0]
-	second := store.ApplyMutations(ctx, accountB, "device-b", []domain.Mutation{{
+	second := store.ApplyMutations(ctx, accountB, deviceB, []domain.Mutation{{
 		MutationID: "part-type-b", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
 	}}, now)[0]
 
@@ -417,7 +415,7 @@ func TestServiceLogUpdateChangesPartType(t *testing.T) {
 	store, _ := newTestStore(t)
 	ctx := context.Background()
 	accountID := newAccount(t, store)
-	vehicleID := createVehicle(t, store, accountID, "device-1")
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	partTypes := seedPartTypes(t, store, accountID)
 	firstPartTypeID := partTypes["engine_oil"]
 	secondPartTypeID := partTypes["battery"]
@@ -428,7 +426,7 @@ func TestServiceLogUpdateChangesPartType(t *testing.T) {
 		"serviced_at": now.Format(time.RFC3339), "odometer_km_snapshot": float64(1000),
 	}
 
-	created := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	created := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "service-create", EntityType: "service_log", Operation: "create", EntityID: serviceID, Payload: payload,
 	}}, now)[0]
 	if created.Status != "applied" || created.ServerSeq == nil {
@@ -436,7 +434,7 @@ func TestServiceLogUpdateChangesPartType(t *testing.T) {
 	}
 
 	payload["part_type_id"] = secondPartTypeID
-	updated := store.ApplyMutations(ctx, accountID, "device-1", []domain.Mutation{{
+	updated := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
 		MutationID: "service-update", EntityType: "service_log", Operation: "update", EntityID: serviceID,
 		Payload: payload,
 	}}, now.Add(time.Minute))[0]

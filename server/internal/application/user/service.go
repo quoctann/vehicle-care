@@ -158,8 +158,8 @@ func (s *Service) Logout(ctx context.Context, sessionID string) error {
 
 // RegisterDevice associates a validated device with the current account.
 func (s *Service) RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error) {
-	if strings.TrimSpace(deviceID) == "" {
-		return time.Time{}, validation("device_id is required.")
+	if _, err := uuid.Parse(deviceID); err != nil {
+		return time.Time{}, validation("device_id must be a UUID.")
 	}
 	return s.deps.RegisterDevice(ctx, accountID, deviceID)
 }

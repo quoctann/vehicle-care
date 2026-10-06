@@ -8,7 +8,7 @@ import "time"
 // itself (feedback Feature #2) — both are fully owned and mutable by that
 // account through the same sync/push pipeline as Vehicle.
 //
-// ServerSeq/ReceivedAtServer are included in GET /part-types (not just
+// ServerSeq/ServerSyncedAt are included in GET /part-types (not just
 // change-feed rows) so the client can learn the real server_seq for a row it
 // bootstraps this way — omitting them here previously made the client treat
 // every bootstrapped row as "never seen from server" (server_seq == nil),
@@ -17,13 +17,12 @@ import "time"
 // for a seeded row (code like "engine_oil", id a random uuid) — so every
 // edit to a seeded part_type was silently rejected by the server, forever.
 type PartType struct {
-	ID               string    `json:"id"`
-	Code             string    `json:"code"`
-	NameVI           string    `json:"name_vi"`
-	DisplayOrder     int32     `json:"display_order"`
-	Active           bool      `json:"active"`
-	SeedVersion      string    `json:"seed_version"`
-	AccountID        string    `json:"account_id"`
-	ServerSeq        int64     `json:"server_seq"`
-	ReceivedAtServer time.Time `json:"received_at_server"`
+	ID             string    `json:"id"`
+	Code           string    `json:"code"`
+	Name           string    `json:"name"`
+	DisplayOrder   int32     `json:"display_order"`
+	Active         bool      `json:"active"`
+	AccountID      string    `json:"account_id"`
+	ServerSeq      int64     `json:"server_seq"`
+	ServerSyncedAt time.Time `json:"server_synced_at"`
 }

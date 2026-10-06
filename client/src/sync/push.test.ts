@@ -36,7 +36,7 @@ function vehicle(id: string, name: string, serverSeq: number | null = null) {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: '2026-09-17T09:00:00.000Z',
-    receivedAtServer: serverSeq == null ? null : '2026-09-17T10:00:00.000Z',
+    serverSyncedAt: serverSeq == null ? null : '2026-09-17T10:00:00.000Z',
     serverSeq,
   };
 }
@@ -73,7 +73,7 @@ describe('pushOutbox', () => {
           mutation_id: mutations[0].mutation_id,
           status: 'applied',
           server_seq: mutations[0].mutation_id === 'mutation-1' ? 7 : 8,
-          received_at_server: '2026-09-17T10:01:00.000Z',
+          server_synced_at: '2026-09-17T10:01:00.000Z',
         },
       ],
     }));
@@ -170,7 +170,7 @@ describe('pushOutbox', () => {
             mutation_id: 'mutation-old',
             status: 'duplicate',
             server_seq: 7,
-            received_at_server: '2026-09-17T10:01:00.000Z',
+            server_synced_at: '2026-09-17T10:01:00.000Z',
           },
         ],
       })
@@ -180,7 +180,7 @@ describe('pushOutbox', () => {
             mutation_id: 'mutation-new',
             status: 'applied',
             server_seq: 11,
-            received_at_server: '2026-09-17T10:02:00.000Z',
+            server_synced_at: '2026-09-17T10:02:00.000Z',
           },
         ],
       });
@@ -205,7 +205,7 @@ describe('pushOutbox', () => {
             mutation_id: 'mutation-1',
             status: 'applied',
             server_seq: 7,
-            received_at_server: '2026-09-17T10:01:00.000Z',
+            server_synced_at: '2026-09-17T10:01:00.000Z',
           },
         ],
       };

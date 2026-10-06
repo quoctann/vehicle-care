@@ -286,7 +286,7 @@ func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Qu
 	}
 
 	if hasCurrent {
-		result := domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate", ServerSeq: &existing.ServerSeq, ReceivedAtServer: &existing.ReceivedAtServer}
+		result := domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate", ServerSeq: &existing.ServerSeq, ServerSyncedAt: &existing.ServerSyncedAt}
 		if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
 			return domain.MutationResult{}, fmt.Errorf("record duplicate %s: %w", mutation.EntityType, err)
 		}
@@ -372,12 +372,12 @@ func (s *Store) finishApplied(ctx context.Context, queries *sqlcgen.Queries, acc
 	}
 	if err := queries.InsertChange(ctx, sqlcgen.InsertChangeParams{
 		AccountID: accountID, ServerSeq: seq, EntityType: mutation.EntityType, EntityID: mutation.EntityID,
-		Operation: mutation.Operation, Payload: changePayload, ReceivedAtServer: receivedAt,
+		Operation: mutation.Operation, Payload: changePayload, ServerSyncedAt: receivedAt,
 	}); err != nil {
 		return domain.MutationResult{}, fmt.Errorf("insert change_feed row: %w", err)
 	}
 
-	result := domain.MutationResult{MutationID: mutation.MutationID, Status: status, ServerSeq: &seq, ReceivedAtServer: &receivedAt}
+	result := domain.MutationResult{MutationID: mutation.MutationID, Status: status, ServerSeq: &seq, ServerSyncedAt: &receivedAt}
 	if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
 		return domain.MutationResult{}, fmt.Errorf("record processed mutation: %w", err)
 	}
@@ -412,9 +412,9 @@ func resultFromProcessedRow(mutationID string, row sqlcgen.FindProcessedMutation
 		seq := row.ServerSeq.Int64
 		result.ServerSeq = &seq
 	}
-	if row.ReceivedAtServer.Valid {
-		receivedAt := row.ReceivedAtServer.Time
-		result.ReceivedAtServer = &receivedAt
+	if row.ServerSyncedAt.Valid {
+		receivedAt := row.ServerSyncedAt.Time
+		result.ServerSyncedAt = &receivedAt
 	}
 	if row.ErrorCode.Valid {
 		result.ErrorCode = row.ErrorCode.String
@@ -441,8 +441,8 @@ func insertProcessedMutation(ctx context.Context, queries *sqlcgen.Queries, acco
 	if result.ServerSeq != nil {
 		params.ServerSeq = sql.NullInt64{Int64: *result.ServerSeq, Valid: true}
 	}
-	if result.ReceivedAtServer != nil {
-		params.ReceivedAtServer = sql.NullTime{Time: *result.ReceivedAtServer, Valid: true}
+	if result.ServerSyncedAt != nil {
+		params.ServerSyncedAt = sql.NullTime{Time: *result.ServerSyncedAt, Valid: true}
 	}
 	if result.ErrorCode != "" {
 		params.ErrorCode = sql.NullString{String: result.ErrorCode, Valid: true}

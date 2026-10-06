@@ -52,7 +52,7 @@ export async function createReminderConfig(input: {
     enabled: true,
     deletedAt: null,
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   };
 

@@ -11,15 +11,13 @@ vi.mock('./pull', () => ({ pullChanges: vi.fn() }));
 const accountId = 'account-1';
 
 beforeEach(async () => {
-  useSessionStore
-    .getState()
-    .setAuthenticated({
-      id: accountId,
-      email: 'a@example.com',
-      name: null,
-      timezone: 'UTC',
-      emailVerified: true,
-    });
+  useSessionStore.getState().setAuthenticated({
+    id: accountId,
+    email: 'a@example.com',
+    name: null,
+    timezone: 'UTC',
+    emailVerified: true,
+  });
   await db.syncMeta.put({
     accountId,
     deviceId: 'device-1',
@@ -51,7 +49,7 @@ it('persists restore failure and resumes without clearing committed pages again'
         deletedAt: null,
         dueSoonRatio: null,
         createdAtClient: new Date().toISOString(),
-        receivedAtServer: new Date().toISOString(),
+        serverSyncedAt: new Date().toISOString(),
         serverSeq: 1,
       });
       await db.syncMeta.update(accountId, { lastSeenSeq: 1 });
@@ -96,7 +94,7 @@ it('resumes an interrupted restore without clearing pages already committed', as
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
-    receivedAtServer: new Date().toISOString(),
+    serverSyncedAt: new Date().toISOString(),
     serverSeq: 1,
   });
   vi.mocked(pullChanges).mockImplementationOnce(async () => {

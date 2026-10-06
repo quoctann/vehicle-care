@@ -23,7 +23,7 @@ async function assertReferencedVehicle(accountId: string, vehicleId: string): Pr
  * (không dùng cho LWW/dedupe — xem `domain/types.ts`) và KHÔNG có mặt trong wire
  * payload (không hàm `*ToPayload` nào gửi field này). Khi insert 1 entity MỚI do
  * thiết bị khác tạo (mình chưa từng thấy), không có cách nào biết giá trị gốc — dùng
- * `receivedAtServer` làm giá trị thay thế hợp lý nhất. Khi entity đã tồn tại cục bộ,
+ * `serverSyncedAt` làm giá trị thay thế hợp lý nhất. Khi entity đã tồn tại cục bộ,
  * luôn giữ nguyên `createdAtClient`/`id`/`accountId` hiện có (chỉ `update()` phần
  * field đổi được, không bao giờ `put()` đè toàn bộ record đã tồn tại).
  */
@@ -33,7 +33,7 @@ async function applyEntityChange(
   entityId: string,
   payload: Record<string, unknown>,
   serverSeq: number,
-  receivedAtServer: string,
+  serverSyncedAt: string,
 ): Promise<void> {
   switch (entityType) {
     case 'vehicle': {
@@ -44,9 +44,9 @@ async function applyEntityChange(
           id: entityId,
           accountId,
           ...fields,
-          createdAtClient: receivedAtServer,
+          createdAtClient: serverSyncedAt,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       } else {
         if (existing.accountId !== accountId)
@@ -55,7 +55,7 @@ async function applyEntityChange(
         await db.vehicles.update(entityId, {
           ...vehicleFieldsFromPayload(payload),
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       }
       return;
@@ -69,9 +69,9 @@ async function applyEntityChange(
           id: entityId,
           accountId,
           ...fields,
-          createdAtClient: receivedAtServer,
+          createdAtClient: serverSyncedAt,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       } else {
         if (existing.accountId !== accountId)
@@ -80,7 +80,7 @@ async function applyEntityChange(
         await db.reminderConfigs.update(entityId, {
           ...fields,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       }
       return;
@@ -96,7 +96,7 @@ async function applyEntityChange(
           await db.odometerLogs.update(entityId, {
             ...odometerLogFieldsFromPayload(payload),
             serverSeq,
-            receivedAtServer,
+            serverSyncedAt,
           });
         }
         return;
@@ -107,9 +107,9 @@ async function applyEntityChange(
         id: entityId,
         accountId,
         ...fields,
-        createdAtClient: receivedAtServer,
+        createdAtClient: serverSyncedAt,
         serverSeq,
-        receivedAtServer,
+        serverSyncedAt,
       });
       return;
     }
@@ -122,9 +122,9 @@ async function applyEntityChange(
           id: entityId,
           accountId,
           ...fields,
-          createdAtClient: receivedAtServer,
+          createdAtClient: serverSyncedAt,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       } else {
         if (existing.accountId !== accountId)
@@ -133,7 +133,7 @@ async function applyEntityChange(
         await db.fuelLogs.update(entityId, {
           ...fields,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       }
       return;
@@ -147,9 +147,9 @@ async function applyEntityChange(
           id: entityId,
           accountId,
           ...fields,
-          createdAtClient: receivedAtServer,
+          createdAtClient: serverSyncedAt,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       } else {
         if (existing.accountId !== accountId)
@@ -158,7 +158,7 @@ async function applyEntityChange(
         await db.serviceLogs.update(entityId, {
           ...fields,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       }
       return;
@@ -171,9 +171,9 @@ async function applyEntityChange(
           id: entityId,
           accountId,
           ...fields,
-          createdAtClient: receivedAtServer,
+          createdAtClient: serverSyncedAt,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       } else {
         if (existing.accountId !== accountId)
@@ -182,7 +182,7 @@ async function applyEntityChange(
         await db.partTypes.update(entityId, {
           ...fields,
           serverSeq,
-          receivedAtServer,
+          serverSyncedAt,
         });
       }
       return;
@@ -206,7 +206,7 @@ export async function applyPulledChange(change: PullChange, accountId: string): 
         change.entity_id,
         change.payload,
         change.server_seq,
-        change.received_at_server,
+        change.server_synced_at,
       );
     },
   );

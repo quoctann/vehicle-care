@@ -41,7 +41,7 @@ export type Vehicle = {
   dueSoonRatio: number | null;
   createdAtClient: IsoDateTime;
   /** Chỉ có giá trị sau khi đã sync — null nghĩa là chưa từng push lên server. */
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 
@@ -59,10 +59,9 @@ export type PartType = {
   displayName: string;
   displayOrder: number;
   active: boolean;
-  seedVersion: number;
   accountId: string;
   createdAtClient: IsoDateTime;
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 
@@ -85,7 +84,7 @@ export type ReminderConfig = {
   enabled: boolean;
   deletedAt: IsoDateTime | null;
   createdAtClient: IsoDateTime;
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 
@@ -100,7 +99,7 @@ export type OdometerLog = {
   /** Log tạo thủ công hay đi kèm 1 lần đổ xăng (xem FuelLog.odometerLogId). */
   source: 'manual' | 'fuel';
   createdAtClient: IsoDateTime;
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 
@@ -111,15 +110,15 @@ export type FuelLog = {
   vehicleId: string;
   recordedAt: IsoDateTime;
   liters: number | null;
-  costVnd: number | null;
-  shop: string | null;
+  /** Hiện hiển thị bằng VND; currency riêng sẽ được thêm ở giai đoạn sau. */
+  cost: number | null;
   note: string | null;
   odometerLogId: string | null;
   /** Giữ cho tương lai (fuel efficiency) — KHÔNG dùng để tính toán gì ở MVP này. */
   isFullTank: boolean;
   deletedAt: IsoDateTime | null;
   createdAtClient: IsoDateTime;
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 
@@ -133,11 +132,12 @@ export type ServiceLog = {
   /** Snapshot odometer tại thời điểm service, để tính reminder ổn định về sau. */
   odometerKmSnapshot: number | null;
   /** Không thuộc scope quyết định ở decision.md nhưng cần cho màn Costs — optional, không ảnh hưởng domain reminder logic. */
-  costVnd: number | null;
+  /** Hiện hiển thị bằng VND; currency riêng sẽ được thêm ở giai đoạn sau. */
+  cost: number | null;
   note: string | null;
   deletedAt: IsoDateTime | null;
   createdAtClient: IsoDateTime;
-  receivedAtServer: IsoDateTime | null;
+  serverSyncedAt: IsoDateTime | null;
   serverSeq: number | null;
 };
 

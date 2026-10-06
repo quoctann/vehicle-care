@@ -16,6 +16,7 @@ import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 import { addFuelLog, updateFuelLog } from '@/data/repositories/fuelRepository';
 import { addServiceLog, updateServiceLog } from '@/data/repositories/serviceRepository';
 import { validateOdometerReading } from '@/domain/validation';
+import { isValidCost } from '@/domain/cost';
 import type { FuelLog, PartType, ServiceLog } from '@/domain/types';
 import { formatNumber } from '@/lib/formatters';
 import { EntryTypeSelector, type LogEntryType } from './EntryTypeSelector';
@@ -69,11 +70,8 @@ export function LogEntryForm({
       ? String(editingEntry.log.liters)
       : '',
   );
-  const [costVnd, setCostVnd] = useState(
-    editingEntry?.log.costVnd != null ? String(editingEntry.log.costVnd) : '',
-  );
-  const [shop, setShop] = useState(
-    editingEntry?.kind === 'fuel' ? (editingEntry.log.shop ?? '') : '',
+  const [cost, setCost] = useState(
+    editingEntry?.log.cost != null ? String(editingEntry.log.cost) : '',
   );
   const [note, setNote] = useState(editingEntry?.log.note ?? '');
   const [odometerKm, setOdometerKm] = useState<string | null>(null);
@@ -154,9 +152,9 @@ export function LogEntryForm({
       }
     }
 
-    const parsedCost = optionalNumber(costVnd);
-    if (costVnd !== '' && (parsedCost == null || !Number.isFinite(parsedCost) || parsedCost < 0)) {
-      nextErrors.costVnd = t('logEntry.invalidCost');
+    const parsedCost = optionalNumber(cost);
+    if (cost !== '' && (parsedCost == null || !isValidCost(parsedCost))) {
+      nextErrors.cost = t('logEntry.invalidCost');
     }
 
     if (entryType === 'fuel') {
@@ -186,8 +184,7 @@ export function LogEntryForm({
           await updateFuelLog(accountId, editingEntry.log.id, {
             recordedAt: timestamp,
             liters: optionalNumber(liters),
-            costVnd: optionalNumber(costVnd),
-            shop: optionalText(shop),
+            cost: optionalNumber(cost),
             note: optionalText(note),
             isFullTank,
           });
@@ -197,8 +194,7 @@ export function LogEntryForm({
             vehicleId,
             recordedAt: timestamp,
             liters: optionalNumber(liters),
-            costVnd: optionalNumber(costVnd),
-            shop: optionalText(shop),
+            cost: optionalNumber(cost),
             note: optionalText(note),
             odometerKm: parsedOdometer,
             isFullTank,
@@ -211,7 +207,7 @@ export function LogEntryForm({
           await updateServiceLog(accountId, editingEntry.log.id, {
             partTypeId: selectedPartTypeId,
             servicedAt: timestamp,
-            costVnd: optionalNumber(costVnd),
+            cost: optionalNumber(cost),
             note: optionalText(note),
           });
         } else {
@@ -221,7 +217,7 @@ export function LogEntryForm({
             partTypeId: selectedPartTypeId,
             servicedAt: timestamp,
             odometerKmSnapshot: parsedOdometer,
-            costVnd: optionalNumber(costVnd),
+            cost: optionalNumber(cost),
             note: optionalText(note),
           });
         }
@@ -293,14 +289,12 @@ export function LogEntryForm({
             entryType={entryType}
             occurredAt={occurredAt}
             liters={liters}
-            costVnd={costVnd}
-            shop={shop}
+            cost={cost}
             note={note}
             errors={errors}
             onOccurredAtChange={setOccurredAt}
             onLitersChange={setLiters}
-            onCostVndChange={setCostVnd}
-            onShopChange={setShop}
+            onCostChange={setCost}
             onNoteChange={setNote}
           />
 

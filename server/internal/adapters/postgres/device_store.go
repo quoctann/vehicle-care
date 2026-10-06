@@ -16,7 +16,7 @@ import (
 func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error) {
 	registeredAt, err := s.queries.RegisterDeviceIfAbsent(ctx, sqlcgen.RegisterDeviceIfAbsentParams{
 		AccountID:    accountID,
-		DeviceID:     deviceID,
+		ID:           deviceID,
 		RegisteredAt: time.Now().UTC(),
 	})
 	if err == nil {
@@ -27,7 +27,7 @@ func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) 
 	}
 	registeredAt, err = s.queries.FindDeviceRegisteredAt(ctx, sqlcgen.FindDeviceRegisteredAtParams{
 		AccountID: accountID,
-		DeviceID:  deviceID,
+		ID:        deviceID,
 	})
 	if err != nil {
 		return time.Time{}, fmt.Errorf("postgres: find registered device: %w", err)
@@ -39,7 +39,7 @@ func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) 
 func (s *Store) DeviceRegistered(ctx context.Context, accountID, deviceID string) (bool, error) {
 	registered, err := s.queries.DeviceRegistered(ctx, sqlcgen.DeviceRegisteredParams{
 		AccountID: accountID,
-		DeviceID:  deviceID,
+		ID:        deviceID,
 	})
 	if err != nil {
 		return false, fmt.Errorf("postgres: check registered device: %w", err)

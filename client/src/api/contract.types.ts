@@ -68,7 +68,7 @@ export type MutationResult = {
   mutation_id: string;
   status: MutationResultStatus;
   server_seq?: number;
-  received_at_server?: string;
+  server_synced_at?: string;
   error_code?: ApiErrorCode;
   error_message?: string;
   retryable?: boolean;
@@ -82,7 +82,7 @@ export type PullChange = {
   entity_id: string;
   operation: SyncOperation;
   payload: Record<string, unknown>;
-  received_at_server: string;
+  server_synced_at: string;
 };
 
 export type PullResponse = {
@@ -103,13 +103,12 @@ export type PullResponse = {
 export type PartTypeDto = {
   id: string;
   code: string;
-  name_vi: string;
+  name: string;
   display_order: number;
   active: boolean;
-  seed_version: string;
   account_id: string;
   server_seq: number;
-  received_at_server: string;
+  server_synced_at: string;
 };
 
 export type PartTypesResponse = { part_types: PartTypeDto[] };

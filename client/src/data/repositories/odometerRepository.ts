@@ -34,7 +34,7 @@ export async function addOdometerLog(input: {
     note: input.note ?? null,
     source: input.source ?? 'manual',
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   };
   await db.transaction('rw', [db.vehicles, db.odometerLogs, db.outbox, db.syncMeta], async () => {

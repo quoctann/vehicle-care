@@ -53,7 +53,7 @@ func TestPushStopsAtFirstTerminalResult(t *testing.T) {
 		return domain.MutationResult{MutationID: mutation.MutationID, Status: "applied"}
 	}}
 
-	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "device-1", "1", []domain.Mutation{
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", "1", []domain.Mutation{
 		validMutation("first"), validMutation("second"), validMutation("third"),
 	})
 	if err != nil {
@@ -71,7 +71,7 @@ func TestPushLeavesStatefulDedupeToStorage(t *testing.T) {
 	deps := &testDependencies{result: func(mutation domain.Mutation) domain.MutationResult {
 		return domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate"}
 	}}
-	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "device-1", "1", []domain.Mutation{validMutation("retry")})
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", "1", []domain.Mutation{validMutation("retry")})
 	if err != nil || len(results) != 1 || results[0].Status != "duplicate" {
 		t.Fatalf("expected duplicate result without stateful validation, results=%#v err=%v", results, err)
 	}

@@ -193,7 +193,6 @@ export const vi = {
       dateTime: 'Ngày và giờ',
       liters: 'Số lít',
       cost: 'Chi phí (VND)',
-      shop: 'Cửa hàng hoặc trạm xăng',
       note: 'Ghi chú',
       fullTank: 'Ghi nhận là đổ đầy bình',
       fullTankDescription: 'Dữ liệu này dùng để tính mức tiêu thụ nhiên liệu sau này.',

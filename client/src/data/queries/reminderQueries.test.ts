@@ -20,7 +20,7 @@ async function seedVehicle() {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: '2026-01-01T00:00:00.000Z',
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   });
 }
@@ -32,10 +32,9 @@ async function seedPartType() {
     displayName: 'Dầu nhớt động cơ',
     displayOrder: 1,
     active: true,
-    seedVersion: 1,
     accountId: ACCOUNT_ID,
     createdAtClient: '2026-01-01T00:00:00.000Z',
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   });
 }
@@ -58,7 +57,7 @@ describe('getCurrentOdometer', () => {
         note: null,
         source: 'manual',
         createdAtClient: '2026-01-01T00:00:00.000Z',
-        receivedAtServer: null,
+        serverSyncedAt: null,
         serverSeq: null,
       },
       {
@@ -70,7 +69,7 @@ describe('getCurrentOdometer', () => {
         note: null,
         source: 'manual',
         createdAtClient: '2026-02-01T00:00:00.000Z',
-        receivedAtServer: null,
+        serverSyncedAt: null,
         serverSeq: null,
       },
     ]);
@@ -100,7 +99,7 @@ describe('listReminderStatusesForVehicle', () => {
       note: null,
       source: 'manual',
       createdAtClient: '2026-01-01T00:00:00.000Z',
-      receivedAtServer: null,
+      serverSyncedAt: null,
       serverSeq: null,
     });
 

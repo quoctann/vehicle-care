@@ -23,16 +23,33 @@ func TestValidateMutationRejectsInvalidUUIDsAndNumbers(t *testing.T) {
 	}
 
 	part := domain.Mutation{MutationID: uuid.NewString(), EntityType: "part_type", Operation: "create", EntityID: uuid.NewString(), Payload: map[string]any{
-		"code": "custom", "name_vi": "Custom", "display_order": math.NaN(), "active": true, "seed_version": "1",
+		"code": "custom", "name": "Custom", "display_order": math.NaN(), "active": true,
 	}}
 	if code, _ := validateMutation(part); code != "validation_failed" {
 		t.Fatal("NaN display_order was accepted")
 	}
 
 	fuel := domain.Mutation{MutationID: uuid.NewString(), EntityType: "fuel_log", Operation: "create", EntityID: uuid.NewString(), Payload: map[string]any{
-		"vehicle_id": uuid.NewString(), "recorded_at": "2026-09-23T00:00:00Z", "cost_vnd": 123.5, "is_full_tank": true,
+		"vehicle_id": uuid.NewString(), "recorded_at": "2026-09-23T00:00:00Z", "cost": 100000000.0, "is_full_tank": true,
 	}}
 	if code, _ := validateMutation(fuel); code != "validation_failed" {
-		t.Fatal("fractional cost_vnd was accepted")
+		t.Fatal("out-of-range cost was accepted")
+	}
+	fuel.Payload["cost"] = 123.45
+	if code, message := validateMutation(fuel); code != "" {
+		t.Fatalf("valid fractional cost was rejected: %s %s", code, message)
+	}
+	fuel.Payload["cost"] = 123.456
+	if code, _ := validateMutation(fuel); code != "validation_failed" {
+		t.Fatal("cost with more than two decimals was accepted")
+	}
+	fuel.Payload["cost"] = 0.000000001
+	if code, _ := validateMutation(fuel); code != "validation_failed" {
+		t.Fatal("sub-cent cost was accepted")
+	}
+	fuel.Payload["cost"] = 123.45
+	fuel.Payload["cost_vnd"] = 123.0
+	if code, _ := validateMutation(fuel); code != "validation_failed" {
+		t.Fatal("legacy cost_vnd was silently ignored")
 	}
 }

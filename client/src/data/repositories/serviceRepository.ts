@@ -4,6 +4,7 @@ import { db } from '../db';
 import { serviceLogToPayload } from '../mappers';
 import { enqueueMutation } from '../outbox';
 import { assertVehicleOwned } from './ownership';
+import { isValidCost } from '@/domain/cost';
 
 /**
  * Mỗi lần hoàn tất bảo dưỡng tạo 1 ServiceLog mới — KHÔNG sửa trực tiếp
@@ -20,7 +21,7 @@ export async function addServiceLog(input: {
   partTypeId: string;
   servicedAt?: string;
   odometerKmSnapshot: number | null;
-  costVnd?: number | null;
+  cost?: number | null;
   note?: string | null;
 }): Promise<ServiceLog> {
   if (
@@ -29,8 +30,8 @@ export async function addServiceLog(input: {
   ) {
     throw new Error('Service odometer cannot be negative.');
   }
-  if (input.costVnd != null && (!Number.isSafeInteger(input.costVnd) || input.costVnd < 0))
-    throw new Error('Service cost must be a non-negative integer.');
+  if (input.cost != null && !isValidCost(input.cost))
+    throw new Error('Service cost must be between 0 and 99999999.99 with at most two decimals.');
   if (input.servicedAt && Number.isNaN(Date.parse(input.servicedAt)))
     throw new Error('Service time is invalid.');
   const now = new Date().toISOString();
@@ -41,11 +42,11 @@ export async function addServiceLog(input: {
     partTypeId: input.partTypeId,
     servicedAt: input.servicedAt ?? now,
     odometerKmSnapshot: input.odometerKmSnapshot,
-    costVnd: input.costVnd ?? null,
+    cost: input.cost ?? null,
     note: input.note ?? null,
     deletedAt: null,
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   };
   await db.transaction(
@@ -100,7 +101,7 @@ export function updateServiceLog(
   accountId: string,
   id: string,
   patch: Partial<
-    Pick<ServiceLog, 'partTypeId' | 'servicedAt' | 'odometerKmSnapshot' | 'costVnd' | 'note'>
+    Pick<ServiceLog, 'partTypeId' | 'servicedAt' | 'odometerKmSnapshot' | 'cost' | 'note'>
   >,
 ): Promise<void> {
   if (
@@ -109,8 +110,8 @@ export function updateServiceLog(
   ) {
     throw new Error('Service odometer cannot be negative.');
   }
-  if (patch.costVnd != null && (!Number.isSafeInteger(patch.costVnd) || patch.costVnd < 0))
-    throw new Error('Service cost must be a non-negative integer.');
+  if (patch.cost != null && !isValidCost(patch.cost))
+    throw new Error('Service cost must be between 0 and 99999999.99 with at most two decimals.');
   if (patch.servicedAt && Number.isNaN(Date.parse(patch.servicedAt)))
     throw new Error('Service time is invalid.');
   return writeServiceLogPatch(accountId, id, patch);

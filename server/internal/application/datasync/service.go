@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
@@ -24,6 +25,9 @@ func NewService(deps IDependencies, batchLimit, pageLimit int) *Service {
 func (s *Service) Push(ctx context.Context, accountID, deviceID, apiVersion string, mutations []domain.Mutation) ([]domain.MutationResult, error) {
 	if apiVersion != "1" {
 		return nil, &app.Error{Code: "unsupported_version", Message: "Unsupported API version."}
+	}
+	if _, err := uuid.Parse(deviceID); err != nil {
+		return nil, validation("device_id must be a UUID.")
 	}
 	registered, err := s.deps.DeviceRegistered(ctx, accountID, deviceID)
 	if err != nil {

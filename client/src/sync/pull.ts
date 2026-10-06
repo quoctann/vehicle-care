@@ -37,7 +37,7 @@ function validatePage(
       change.entity_id.length === 0 ||
       typeof change.payload !== 'object' ||
       change.payload == null ||
-      Number.isNaN(Date.parse(change.received_at_server))
+      Number.isNaN(Date.parse(change.server_synced_at))
     ) {
       throw new Error('Sync pull returned changes out of sequence');
     }

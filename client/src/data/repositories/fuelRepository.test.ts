@@ -17,7 +17,7 @@ beforeEach(async () => {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   });
 });
@@ -28,8 +28,7 @@ describe('fuelRepository.addFuelLog', () => {
       accountId: 'acc-1',
       vehicleId: VEHICLE_ID,
       liters: 3.2,
-      costVnd: 85000,
-      shop: null,
+      cost: 85000,
       note: null,
       odometerKm: null,
       isFullTank: false,
@@ -41,6 +40,8 @@ describe('fuelRepository.addFuelLog', () => {
     const outboxRows = await db.outbox.toArray();
     expect(outboxRows).toHaveLength(1);
     expect(outboxRows[0].entityType).toBe('fuel_log');
+    expect(outboxRows[0].payload).toMatchObject({ cost: 85000 });
+    expect(outboxRows[0].payload).not.toHaveProperty('shop');
   });
 
   it('có nhập KM: tạo FuelLog + OdometerLog ATOMIC, liên kết đúng odometerLogId, 2 outbox mutation', async () => {
@@ -48,8 +49,7 @@ describe('fuelRepository.addFuelLog', () => {
       accountId: 'acc-1',
       vehicleId: VEHICLE_ID,
       liters: 3.2,
-      costVnd: 85000,
-      shop: 'Cây xăng A',
+      cost: 85000,
       note: null,
       odometerKm: 42180,
       isFullTank: true,
@@ -72,8 +72,7 @@ describe('fuelRepository.addFuelLog', () => {
         accountId: 'acc-1',
         vehicleId: VEHICLE_ID,
         liters: null,
-        costVnd: null,
-        shop: null,
+        cost: null,
         note: null,
         odometerKm: -10,
         isFullTank: false,

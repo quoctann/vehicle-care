@@ -24,10 +24,9 @@ export async function createPartType(accountId: string, displayName: string): Pr
     displayName: name,
     displayOrder: 999,
     active: true,
-    seedVersion: 0,
     accountId,
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   };
   await db.transaction('rw', [db.partTypes, db.outbox, db.syncMeta], async () => {

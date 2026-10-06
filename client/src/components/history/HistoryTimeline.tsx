@@ -148,7 +148,7 @@ export function HistoryTimeline({
                             </p>
                           </div>
                           <span className="shrink-0 text-sm font-semibold tabular-nums">
-                            {entry.costVnd == null ? t('history.noCost') : formatVnd(entry.costVnd)}
+                            {entry.cost == null ? t('history.noCost') : formatVnd(entry.cost)}
                           </span>
                         </div>
                         {entry.note && (

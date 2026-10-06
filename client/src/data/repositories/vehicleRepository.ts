@@ -24,7 +24,7 @@ export async function createVehicle(input: {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   };
   await db.transaction('rw', [db.vehicles, db.outbox, db.syncMeta], async () => {

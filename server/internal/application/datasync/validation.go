@@ -75,19 +75,36 @@ func validatePayload(entityType string, payload map[string]any) string {
 			return "Odometer log payload is invalid."
 		}
 	case "fuel_log":
-		if !requiredUUID(payload, "vehicle_id") || !requiredTime(payload, "recorded_at") || !nullableNumber(payload, "liters", true, 9999.99) || !nullableInteger(payload, "cost_vnd", 0, 9007199254740991) || !nullableString(payload, "shop") || !nullableString(payload, "note") || !nullableUUID(payload, "odometer_log_id") || !requiredBool(payload, "is_full_tank") || !nullableTime(payload, "deleted_at") {
+		if hasAnyKey(payload, "cost_vnd", "shop") || !requiredUUID(payload, "vehicle_id") || !requiredTime(payload, "recorded_at") || !nullableNumber(payload, "liters", true, 9999.99) || !nullableMoney(payload, "cost") || !nullableString(payload, "note") || !nullableUUID(payload, "odometer_log_id") || !requiredBool(payload, "is_full_tank") || !nullableTime(payload, "deleted_at") {
 			return "Fuel log payload is invalid."
 		}
 	case "service_log":
-		if !requiredUUID(payload, "vehicle_id") || !requiredUUID(payload, "part_type_id") || !requiredTime(payload, "serviced_at") || !nullableNumber(payload, "odometer_km_snapshot", false, 99999999.99) || !nullableInteger(payload, "cost_vnd", 0, 9007199254740991) || !nullableString(payload, "note") || !nullableTime(payload, "deleted_at") {
+		if hasAnyKey(payload, "cost_vnd") || !requiredUUID(payload, "vehicle_id") || !requiredUUID(payload, "part_type_id") || !requiredTime(payload, "serviced_at") || !nullableNumber(payload, "odometer_km_snapshot", false, 99999999.99) || !nullableMoney(payload, "cost") || !nullableString(payload, "note") || !nullableTime(payload, "deleted_at") {
 			return "Service log payload is invalid."
 		}
 	case "part_type":
-		if !requiredString(payload, "code") || !requiredString(payload, "name_vi") || !requiredInteger(payload, "display_order", 0, math.MaxInt32) || !requiredBool(payload, "active") || !requiredString(payload, "seed_version") {
+		if hasAnyKey(payload, "name_vi", "seed_version") || !requiredString(payload, "code") || !requiredString(payload, "name") || !requiredInteger(payload, "display_order", 0, math.MaxInt32) || !requiredBool(payload, "active") {
 			return "Part type payload is invalid."
 		}
 	}
 	return ""
+}
+
+func hasAnyKey(payload map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if _, exists := payload[key]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func nullableMoney(payload map[string]any, key string) bool {
+	if payload[key] == nil {
+		return true
+	}
+	value, ok := payload[key].(float64)
+	return ok && finiteRange(value, 0, 99999999.99) && value == math.Round(value*100)/100
 }
 
 func requiredString(payload map[string]any, key string) bool {

@@ -12,7 +12,7 @@ function log(overrides: Partial<OdometerLog>): OdometerLog {
     note: null,
     source: 'manual',
     createdAtClient: '2026-01-01T00:00:00.000Z',
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
     ...overrides,
   };
@@ -38,13 +38,13 @@ describe('deriveCurrentOdometer', () => {
         id: 'a',
         recordedAt: '2026-01-01T00:00:00.000Z',
         odometerKm: 50,
-        receivedAtServer: '2026-01-02T00:00:00.000Z',
+        serverSyncedAt: '2026-01-02T00:00:00.000Z',
       }),
       log({
         id: 'b',
         recordedAt: '2026-01-10T00:00:00.000Z',
         odometerKm: 200,
-        receivedAtServer: '2026-01-01T00:00:00.000Z',
+        serverSyncedAt: '2026-01-01T00:00:00.000Z',
       }),
     ];
     expect(deriveCurrentOdometer(logs)).toBe(200);
@@ -56,13 +56,13 @@ describe('deriveCurrentOdometer', () => {
         id: 'a',
         recordedAt: '2026-01-05T00:00:00.000Z',
         odometerKm: 100,
-        receivedAtServer: '2026-01-05T10:00:00.000Z',
+        serverSyncedAt: '2026-01-05T10:00:00.000Z',
       }),
       log({
         id: 'b',
         recordedAt: '2026-01-05T00:00:00.000Z',
         odometerKm: 105,
-        receivedAtServer: '2026-01-05T11:00:00.000Z',
+        serverSyncedAt: '2026-01-05T11:00:00.000Z',
       }),
     ];
     expect(deriveCurrentOdometer(logs)).toBe(105);
@@ -76,14 +76,14 @@ describe('deriveCurrentOdometer', () => {
     expect(deriveCurrentOdometer(logs)).toBe(110);
   });
 
-  it('log đã sync (có receivedAtServer) thắng log cùng recordedAt nhưng chưa sync', () => {
+  it('log đã sync (có serverSyncedAt) thắng log cùng recordedAt nhưng chưa sync', () => {
     const logs = [
       log({ id: 'a', recordedAt: '2026-01-05T00:00:00.000Z', odometerKm: 999 }), // chưa sync, tạo sau trong mảng
       log({
         id: 'b',
         recordedAt: '2026-01-05T00:00:00.000Z',
         odometerKm: 100,
-        receivedAtServer: '2026-01-05T10:00:00.000Z',
+        serverSyncedAt: '2026-01-05T10:00:00.000Z',
       }),
     ];
     expect(deriveLatestOdometerLog(logs)?.id).toBe('b');

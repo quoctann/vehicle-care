@@ -23,7 +23,7 @@ beforeEach(async () => {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   });
   await db.partTypes.put({
@@ -32,10 +32,9 @@ beforeEach(async () => {
     displayName: 'Dầu nhớt động cơ',
     displayOrder: 1,
     active: true,
-    seedVersion: 1,
     accountId: ACCOUNT_ID,
     createdAtClient: '2026-01-01T00:00:00.000Z',
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
   });
 });

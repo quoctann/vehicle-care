@@ -132,7 +132,7 @@ describe('runSync', () => {
       deletedAt: null,
       dueSoonRatio: null,
       createdAtClient: '2026-09-17T09:00:00.000Z',
-      receivedAtServer: null,
+      serverSyncedAt: null,
       serverSeq: null,
     });
     await db.outbox.put({

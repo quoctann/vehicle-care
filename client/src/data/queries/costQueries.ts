@@ -40,16 +40,16 @@ export async function getMonthlyCosts(
   }
 
   for (const f of fuelLogs) {
-    if (f.costVnd == null) continue;
+    if (f.cost == null) continue;
     const entry = ensure(monthKey(f.recordedAt, accountTimezone));
-    entry.fuelVnd += f.costVnd;
-    entry.totalVnd += f.costVnd;
+    entry.fuelVnd += f.cost;
+    entry.totalVnd += f.cost;
   }
   for (const s of serviceLogs) {
-    if (s.costVnd == null) continue;
+    if (s.cost == null) continue;
     const entry = ensure(monthKey(s.servicedAt, accountTimezone));
-    entry.serviceVnd += s.costVnd;
-    entry.totalVnd += s.costVnd;
+    entry.serviceVnd += s.cost;
+    entry.totalVnd += s.cost;
   }
 
   return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
@@ -90,12 +90,8 @@ export async function getCostPerKm(
   ]);
 
   const totalCost =
-    fuelLogs
-      .filter((f) => f.recordedAt >= cutoffIso)
-      .reduce((sum, f) => sum + (f.costVnd ?? 0), 0) +
-    serviceLogs
-      .filter((s) => s.servicedAt >= cutoffIso)
-      .reduce((sum, s) => sum + (s.costVnd ?? 0), 0);
+    fuelLogs.filter((f) => f.recordedAt >= cutoffIso).reduce((sum, f) => sum + (f.cost ?? 0), 0) +
+    serviceLogs.filter((s) => s.servicedAt >= cutoffIso).reduce((sum, s) => sum + (s.cost ?? 0), 0);
 
   const inWindow = odometerLogs.filter((o) => o.recordedAt >= cutoffIso);
   if (inWindow.length < 2) return null;

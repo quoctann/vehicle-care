@@ -23,15 +23,13 @@ const vehicleId = 'vehicle-1';
 const timestamp = '2026-09-23T10:00:00.000Z';
 
 beforeEach(async () => {
-  useSessionStore
-    .getState()
-    .setAuthenticated({
-      id: accountId,
-      email: 'a@example.com',
-      name: null,
-      timezone: 'UTC',
-      emailVerified: true,
-    });
+  useSessionStore.getState().setAuthenticated({
+    id: accountId,
+    email: 'a@example.com',
+    name: null,
+    timezone: 'UTC',
+    emailVerified: true,
+  });
   await db.syncMeta.put({
     accountId,
     deviceId: 'stable-device',
@@ -52,7 +50,7 @@ beforeEach(async () => {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: timestamp,
-    receivedAtServer: timestamp,
+    serverSyncedAt: timestamp,
     serverSeq: 10,
   });
   vi.mocked(api.registerDevice).mockResolvedValue({
@@ -82,7 +80,7 @@ it('applies canonical odometer fields after the ACK set the same server version'
         mutation_id: mutations[0].mutation_id,
         status: 'applied',
         server_seq: 11,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
   }));
@@ -98,7 +96,7 @@ it('applies canonical odometer fields after the ACK set the same server version'
       note: null,
     },
     server_seq: 11,
-    received_at_server: timestamp,
+    server_synced_at: timestamp,
   };
   vi.mocked(api.pullChanges).mockResolvedValue({
     changes: [change],
@@ -131,7 +129,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
           entity_id: vehicleId,
           payload: { name: 'Remote edit' },
           server_seq: 11,
-          received_at_server: timestamp,
+          server_synced_at: timestamp,
         },
       ],
       next_cursor: 11,
@@ -157,7 +155,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
         mutation_id: mutations[0].mutation_id,
         status: 'applied',
         server_seq: 12,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
   }));
@@ -169,7 +167,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
         entity_id: vehicleId,
         payload: { name: 'New local edit' },
         server_seq: 12,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
     next_cursor: 12,
@@ -195,7 +193,7 @@ it('leaves new work after the push high watermark pending without recording a fa
           mutation_id: mutations[0].mutation_id,
           status: 'applied',
           server_seq: 11,
-          received_at_server: timestamp,
+          server_synced_at: timestamp,
         },
       ],
     };
@@ -231,7 +229,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
         mutation_id: fixed.mutationId,
         status: 'applied',
         server_seq: 11,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
   });
@@ -243,7 +241,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
         entity_id: vehicleId,
         payload: { name: 'Fixed' },
         server_seq: 11,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
     next_cursor: 11,
@@ -275,13 +273,12 @@ it('restores a blocked workspace from cursor zero through the real pull pipeline
         entity_id: 'seed-part',
         payload: {
           code: 'engine_oil',
-          name_vi: 'Dầu nhớt',
+          name: 'Dầu nhớt',
           display_order: 1,
           active: true,
-          seed_version: '1',
         },
         server_seq: 1,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
       {
         entity_type: 'vehicle',
@@ -289,7 +286,7 @@ it('restores a blocked workspace from cursor zero through the real pull pipeline
         entity_id: vehicleId,
         payload: { name: 'Server truth' },
         server_seq: 2,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
     next_cursor: 2,
@@ -323,7 +320,7 @@ it('retries the same device and envelope after a lost response and changed local
           mutation_id: item.mutationId,
           status: 'duplicate',
           server_seq: 11,
-          received_at_server: timestamp,
+          server_synced_at: timestamp,
         },
       ],
     });
@@ -337,7 +334,7 @@ it('retries the same device and envelope after a lost response and changed local
         entity_id: vehicleId,
         payload: { name: 'Committed before timeout' },
         server_seq: 11,
-        received_at_server: timestamp,
+        server_synced_at: timestamp,
       },
     ],
     next_cursor: 11,

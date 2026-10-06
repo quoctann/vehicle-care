@@ -8,7 +8,7 @@ export type HistoryEntry = {
   occurredAt: IsoDateTime;
   title: string;
   liters: number | null;
-  costVnd: number | null;
+  cost: number | null;
   note: string | null;
 };
 
@@ -40,7 +40,7 @@ export async function listHistoryEntries(
     occurredAt: f.recordedAt,
     title: '',
     liters: f.liters,
-    costVnd: f.costVnd,
+    cost: f.cost,
     note: f.note,
   }));
 
@@ -50,7 +50,7 @@ export async function listHistoryEntries(
     occurredAt: s.servicedAt,
     title: partTypeById.get(s.partTypeId)?.displayName ?? '',
     liters: null,
-    costVnd: s.costVnd,
+    cost: s.cost,
     note: s.note,
   }));
 

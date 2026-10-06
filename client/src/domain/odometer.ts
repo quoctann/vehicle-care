@@ -3,16 +3,16 @@ import type { OdometerLog } from './types';
 /**
  * D-01: odometer hiện tại = log có `recordedAt` mới nhất; nếu trùng `recordedAt`,
  * log được SERVER tiếp nhận sau cùng thắng. Với 2 log cùng `recordedAt` mà cả 2
- * đều CHƯA sync (`receivedAtServer` null — chưa có thứ tự server để phân định),
+ * đều CHƯA sync (`serverSyncedAt` null — chưa có thứ tự server để phân định),
  * dùng vị trí trong mảng làm proxy cho "tạo cục bộ sau" — vì vậy hàm này giả định
  * `logs` được truyền vào theo đúng thứ tự tạo cục bộ (vd thứ tự Dexie trả về theo
  * `id`/thời gian insert tăng dần), KHÔNG phải thứ tự ngẫu nhiên.
  */
 function isNewer(a: OdometerLog, b: OdometerLog, indexA: number, indexB: number): boolean {
   if (a.recordedAt !== b.recordedAt) return a.recordedAt > b.recordedAt;
-  if (a.receivedAtServer && b.receivedAtServer) return a.receivedAtServer > b.receivedAtServer;
-  if (a.receivedAtServer && !b.receivedAtServer) return true;
-  if (!a.receivedAtServer && b.receivedAtServer) return false;
+  if (a.serverSyncedAt && b.serverSyncedAt) return a.serverSyncedAt > b.serverSyncedAt;
+  if (a.serverSyncedAt && !b.serverSyncedAt) return true;
+  if (!a.serverSyncedAt && b.serverSyncedAt) return false;
   return indexA > indexB;
 }
 

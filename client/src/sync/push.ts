@@ -36,7 +36,7 @@ function validateResult(item: OutboxItem, result: MutationResult | undefined): M
     throw new Error('Sync push returned an invalid mutation result');
   if (
     (result.status === 'applied' || result.status === 'duplicate') &&
-    (result.server_seq == null || result.received_at_server == null)
+    (result.server_seq == null || result.server_synced_at == null)
   ) {
     throw new Error(`Sync push omitted acknowledgment metadata for ${item.mutationId}`);
   }
@@ -44,8 +44,8 @@ function validateResult(item: OutboxItem, result: MutationResult | undefined): M
     result.server_seq != null &&
     (!Number.isSafeInteger(result.server_seq) ||
       result.server_seq <= 0 ||
-      !result.received_at_server ||
-      Number.isNaN(Date.parse(result.received_at_server)))
+      !result.server_synced_at ||
+      Number.isNaN(Date.parse(result.server_synced_at)))
   ) {
     throw new Error(`Sync push returned invalid acknowledgment metadata for ${item.mutationId}`);
   }
@@ -79,7 +79,7 @@ async function applyMutationResult(
             item.entityType,
             item.entityId,
             result.server_seq!,
-            result.received_at_server!,
+            result.server_synced_at!,
           );
         }
       });

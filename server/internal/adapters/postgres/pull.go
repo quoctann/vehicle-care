@@ -48,12 +48,12 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 			return domain.PullPage{}, err
 		}
 		changes = append(changes, domain.Change{
-			ServerSeq:        row.ServerSeq,
-			EntityType:       row.EntityType,
-			EntityID:         row.EntityID,
-			Operation:        row.Operation,
-			Payload:          payload,
-			ReceivedAtServer: row.ReceivedAtServer,
+			ServerSeq:      row.ServerSeq,
+			EntityType:     row.EntityType,
+			EntityID:       row.EntityID,
+			Operation:      row.Operation,
+			Payload:        payload,
+			ServerSyncedAt: row.ServerSyncedAt,
 		})
 	}
 

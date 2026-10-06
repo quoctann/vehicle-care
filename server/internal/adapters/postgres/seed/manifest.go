@@ -9,24 +9,23 @@ package seed
 // account (see SeedAccountPartTypes), never taken from this struct.
 type PartTypeSeed struct {
 	Code         string
-	NameVI       string
+	Name         string
 	DisplayOrder int
-	SeedVersion  string
 }
 
 // Manifest is the MVP part_types template approved in
 // .docs/implementation-plan-section-5.md §7 (workstream C). Adding a new
-// entry later means appending a new row with a bumped SeedVersion, never
-// editing an existing row's Code.
+// entry later means adding a new template code without changing existing
+// codes; accounts already created are not automatically reseeded.
 var Manifest = []PartTypeSeed{
-	{Code: "engine_oil", NameVI: "Dầu nhớt động cơ", DisplayOrder: 1, SeedVersion: "v1"},
-	{Code: "front_tire", NameVI: "Lốp trước", DisplayOrder: 2, SeedVersion: "v1"},
-	{Code: "rear_tire", NameVI: "Lốp sau", DisplayOrder: 3, SeedVersion: "v1"},
-	{Code: "front_brake_pad", NameVI: "Má phanh trước", DisplayOrder: 4, SeedVersion: "v1"},
-	{Code: "rear_brake_pad", NameVI: "Má phanh sau", DisplayOrder: 5, SeedVersion: "v1"},
-	{Code: "spark_plug", NameVI: "Bugi", DisplayOrder: 6, SeedVersion: "v1"},
-	{Code: "air_filter", NameVI: "Lọc gió", DisplayOrder: 7, SeedVersion: "v1"},
-	{Code: "drive_belt", NameVI: "Dây curoa", DisplayOrder: 8, SeedVersion: "v1"},
-	{Code: "chain_sprocket_set", NameVI: "Nhông, sên, đĩa", DisplayOrder: 9, SeedVersion: "v1"},
-	{Code: "battery", NameVI: "Ắc quy", DisplayOrder: 10, SeedVersion: "v1"},
+	{Code: "engine_oil", Name: "Dầu nhớt động cơ", DisplayOrder: 1},
+	{Code: "front_tire", Name: "Lốp trước", DisplayOrder: 2},
+	{Code: "rear_tire", Name: "Lốp sau", DisplayOrder: 3},
+	{Code: "front_brake_pad", Name: "Má phanh trước", DisplayOrder: 4},
+	{Code: "rear_brake_pad", Name: "Má phanh sau", DisplayOrder: 5},
+	{Code: "spark_plug", Name: "Bugi", DisplayOrder: 6},
+	{Code: "air_filter", Name: "Lọc gió", DisplayOrder: 7},
+	{Code: "drive_belt", Name: "Dây curoa", DisplayOrder: 8},
+	{Code: "chain_sprocket_set", Name: "Nhông, sên, đĩa", DisplayOrder: 9},
+	{Code: "battery", Name: "Ắc quy", DisplayOrder: 10},
 }

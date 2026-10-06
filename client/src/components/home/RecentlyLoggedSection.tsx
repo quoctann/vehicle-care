@@ -66,8 +66,8 @@ export function RecentlyLoggedSection({
                     {entry.note ? ` · ${entry.note}` : ''}
                   </span>
                 </span>
-                {entry.costVnd != null ? (
-                  <span className="text-xs font-medium">{formatVnd(entry.costVnd)}</span>
+                {entry.cost != null ? (
+                  <span className="text-xs font-medium">{formatVnd(entry.cost)}</span>
                 ) : null}
               </div>
             );

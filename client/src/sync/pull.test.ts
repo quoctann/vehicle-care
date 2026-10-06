@@ -32,7 +32,7 @@ function vehicleChange(serverSeq: number, entityId: string) {
       archived_at: null,
       deleted_at: null,
     },
-    received_at_server: `2026-09-17T10:00:0${serverSeq}.000Z`,
+    server_synced_at: `2026-09-17T10:00:0${serverSeq}.000Z`,
   };
 }
 
@@ -104,7 +104,7 @@ describe('pullChanges', () => {
       deletedAt: null,
       dueSoonRatio: null,
       createdAtClient: '2026-09-17T09:00:00.000Z',
-      receivedAtServer: null,
+      serverSyncedAt: null,
       serverSeq: null,
     });
     const page: PullResponse = {
