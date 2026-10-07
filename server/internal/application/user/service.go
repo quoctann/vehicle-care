@@ -162,12 +162,12 @@ func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Session store is unavailable."}
 	}
 	if !found {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
 	}
 	account, err := s.ports.AccountByID(ctx, session.AccountID)
 	if err != nil {
 		if !found {
-			return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
+			return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
 		}
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}

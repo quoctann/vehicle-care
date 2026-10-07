@@ -52,9 +52,9 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 
 		changes = append(changes, domain.Change{
 			ServerSeq:      row.ServerSeq,
-			EntityType:     row.EntityType,
+			EntityType:     domain.EntityType(row.EntityType),
 			EntityID:       row.EntityID,
-			Operation:      row.Operation,
+			Operation:      domain.MutationOperation(row.Operation),
 			Payload:        payload,
 			ServerSyncedAt: row.ServerSyncedAt,
 		})

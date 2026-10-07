@@ -14,10 +14,10 @@ func (s *Server) bind(c *gin.Context, destination any) bool {
 	if err := c.ShouldBindJSON(destination); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
-			s.writeAPIError(c, http.StatusRequestEntityTooLarge, "validation_failed", "Request body exceeds limit", false)
+			s.writeAPIError(c, http.StatusRequestEntityTooLarge, app.ECValidationFailed, "Request body exceeds limit", false)
 			return false
 		}
-		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "Request body is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "Request body is invalid.", false)
 		return false
 	}
 
@@ -28,12 +28,13 @@ func (s *Server) writeError(c *gin.Context, err error) {
 	appErr, ok := app.AsError(err)
 	if !ok {
 		s.logger.Error("request failed", zap.Error(err), zap.String("request_id", c.GetString(requestIDKey)))
-		s.writeAPIError(c, http.StatusInternalServerError, "internal_error", "Internal server error.", true)
+		s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
 		return
 	}
 
 	status := http.StatusBadRequest
 	retryable := false
+	code, message := appErr.Code, appErr.Message
 
 	switch appErr.Code {
 
@@ -45,7 +46,7 @@ func (s *Server) writeError(c *gin.Context, err error) {
 
 	case app.ECConflict:
 		status = http.StatusConflict
-		appErr.Code = "validation_failed"
+		code = app.ECValidationFailed
 
 	case app.ECValidationFailed:
 		status = http.StatusBadRequest
@@ -56,11 +57,11 @@ func (s *Server) writeError(c *gin.Context, err error) {
 	default:
 		s.logger.Error("request failed with unknown error code", zap.String("code", appErr.Code), zap.String("request_id", c.GetString(requestIDKey)))
 		status = http.StatusInternalServerError
-		appErr.Code = "internal_error"
-		appErr.Message = "Internal server error."
+		code = app.ECInternalError
+		message = "Internal server error."
 	}
 
-	s.writeAPIError(c, status, appErr.Code, appErr.Message, retryable)
+	s.writeAPIError(c, status, code, message, retryable)
 }
 
 func (s *Server) writeAPIError(c *gin.Context, status int, code, message string, retryable bool) {

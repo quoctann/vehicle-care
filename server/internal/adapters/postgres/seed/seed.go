@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
+	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
 func SeedAccountPartTypes(ctx context.Context, q *sqlcgen.Queries, accountID string, now time.Time) error {
@@ -47,8 +48,8 @@ func SeedAccountPartTypes(ctx context.Context, q *sqlcgen.Queries, accountID str
 		}
 
 		if err := q.InsertChange(ctx, sqlcgen.InsertChangeParams{
-			AccountID: accountID, ServerSeq: seq, EntityType: "part_type", EntityID: id,
-			Operation: "create", Payload: payload, ServerSyncedAt: now,
+			AccountID: accountID, ServerSeq: seq, EntityType: string(domain.EntityPartType), EntityID: id,
+			Operation: string(domain.OperationCreate), Payload: payload, ServerSyncedAt: now,
 		}); err != nil {
 			return fmt.Errorf("append seed part_type %s: %w", item.Code, err)
 		}

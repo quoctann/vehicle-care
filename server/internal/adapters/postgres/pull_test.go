@@ -11,7 +11,7 @@ import (
 )
 
 // TestPullKeepsStableUpperBound asserts bounded pagination
-// behavior as the ApplyMutations/Pull contract. odometer_logs must reference
+// behavior as the ApplyMutation/Pull contract. odometer_logs must reference
 // a real vehicle row. Signup seeds the catalog first, then vehicle creation
 // consumes the next sequence; assertions use that account-specific offset.
 func TestPullKeepsStableUpperBound(t *testing.T) {
@@ -23,20 +23,20 @@ func TestPullKeepsStableUpperBound(t *testing.T) {
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
 	for index := 1; index <= 2; index++ {
-		store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+		store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 			MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 			Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(index * 100), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
-		}}, now)
+		}, now)
 	}
 
 	first, err := store.Pull(ctx, accountID, initialAccountSeq+1, 1, nil)
 	if err != nil {
 		t.Fatalf("first pull: %v", err)
 	}
-	store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 		Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(300), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
-	}}, now)
+	}, now)
 	second, err := store.Pull(ctx, accountID, first.NextCursor, 10, &first.UntilSeq)
 	if err != nil {
 		t.Fatalf("second pull: %v", err)

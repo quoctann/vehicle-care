@@ -15,7 +15,7 @@ import (
 // per-row locks also make the current snapshot explicit inside the transaction.
 func lockCurrentSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation) error {
 	var err error
-	switch domain.EntityType(mutation.EntityType) {
+	switch mutation.EntityType {
 	case domain.EntityVehicle:
 		_, err = queries.LockVehicleForUpdate(ctx, sqlcgen.LockVehicleForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
 	case domain.EntityReminderConfig:
@@ -39,7 +39,7 @@ func lockCurrentSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountI
 // change feed and processed-mutation ACK.
 func writeMutableSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) (domain.MutationResult, bool, error) {
 	var err error
-	switch domain.EntityType(mutation.EntityType) {
+	switch mutation.EntityType {
 	case domain.EntityReminderConfig:
 		return domain.MutationResult{}, false, writeReminderSnapshot(ctx, queries, accountID, mutation, seq, receivedAt)
 	case domain.EntityPartType:
@@ -92,7 +92,7 @@ func writePartTypeSnapshot(ctx context.Context, queries *sqlcgen.Queries, accoun
 		return domain.MutationResult{}, false, fmt.Errorf("upsert part_type: %w", err)
 	}
 	if rowsAffected != 1 {
-		return rejectedResult(mutation.MutationID, "ownership_invalid", "Part type does not belong to this account."), true, nil
+		return rejectedResult(mutation.MutationID, domain.MutationErrorOwnership, "Part type does not belong to this account."), true, nil
 	}
 	return domain.MutationResult{}, false, nil
 }

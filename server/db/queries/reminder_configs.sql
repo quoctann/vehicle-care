@@ -27,8 +27,8 @@ SELECT EXISTS (
 -- config. A sql.ErrNoRows result means it has no current snapshot yet.
 SELECT server_seq FROM reminder_configs WHERE account_id = $1 AND id = $2 FOR UPDATE;
 
--- name: FindActiveReminderScopeOwner :one
--- Pre-check for the D7 uniqueness rule: an active (non-deleted) reminder
+-- name: FindActiveReminderConflict :one
+-- Pre-check for the uniqueness rule: an active (non-deleted) reminder
 -- already owns this (vehicle_id, part_type_id) scope, and it is not the
 -- entity currently being mutated.
 SELECT id FROM reminder_configs

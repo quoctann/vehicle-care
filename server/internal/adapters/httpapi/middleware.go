@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 	"go.uber.org/zap"
 )
@@ -14,7 +15,7 @@ func (s *Server) requireSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionID, err := c.Cookie("sid")
 		if err != nil {
-			s.writeAPIError(c, http.StatusUnauthorized, "session_expired", "Session expired or missing.", false)
+			s.writeAPIError(c, http.StatusUnauthorized, app.ECSessionExpired, "Session expired or missing.", false)
 			c.Abort()
 			return
 		}
@@ -42,7 +43,7 @@ func (s *Server) requireCSRF() gin.HandlerFunc {
 		headerToken := c.GetHeader("X-CSRF-Token")
 
 		if err != nil || cookieToken == "" || headerToken == "" || cookieToken != session.CSRFToken || headerToken != session.CSRFToken {
-			s.writeAPIError(c, http.StatusForbidden, "validation_failed", "Invalid CSRF token.", false)
+			s.writeAPIError(c, http.StatusForbidden, app.ECValidationFailed, "Invalid CSRF token.", false)
 			c.Abort()
 			return
 		}
@@ -96,7 +97,7 @@ func (s *Server) recovery() gin.HandlerFunc {
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				s.logger.Error("request panic", zap.Any("panic", recovered), zap.String("request_id", c.GetString(requestIDKey)))
-				s.writeAPIError(c, http.StatusInternalServerError, "internal_error", "Internal server error.", true)
+				s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
 				c.Abort()
 			}
 		}()

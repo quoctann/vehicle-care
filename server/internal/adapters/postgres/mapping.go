@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
+	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
 // marshalPayload encodes a mutation payload for storage in a jsonb column.
@@ -310,29 +311,38 @@ func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]
 	}, nil
 }
 
-func canonicalPayload(ctx context.Context, queries *sqlcgen.Queries, accountID, entityType, entityID string) (map[string]any, error) {
+func canonicalPayload(ctx context.Context, queries *sqlcgen.Queries, accountID string, entityType domain.EntityType, entityID string) (map[string]any, error) {
 	var (
 		data []byte
 		err  error
 	)
+
 	switch entityType {
-	case "vehicle":
+	case domain.EntityVehicle:
 		data, err = queries.CanonicalVehiclePayload(ctx, sqlcgen.CanonicalVehiclePayloadParams{AccountID: accountID, ID: entityID})
-	case "reminder_config":
+
+	case domain.EntityReminderConfig:
 		data, err = queries.CanonicalReminderConfigPayload(ctx, sqlcgen.CanonicalReminderConfigPayloadParams{AccountID: accountID, ID: entityID})
-	case "odometer_log":
+
+	case domain.EntityOdometerLog:
 		data, err = queries.CanonicalOdometerLogPayload(ctx, sqlcgen.CanonicalOdometerLogPayloadParams{AccountID: accountID, ID: entityID})
-	case "fuel_log":
+
+	case domain.EntityFuelLog:
 		data, err = queries.CanonicalFuelLogPayload(ctx, sqlcgen.CanonicalFuelLogPayloadParams{AccountID: accountID, ID: entityID})
-	case "service_log":
+
+	case domain.EntityServiceLog:
 		data, err = queries.CanonicalServiceLogPayload(ctx, sqlcgen.CanonicalServiceLogPayloadParams{AccountID: accountID, ID: entityID})
-	case "part_type":
+
+	case domain.EntityPartType:
 		data, err = queries.CanonicalPartTypePayload(ctx, sqlcgen.CanonicalPartTypePayloadParams{AccountID: accountID, ID: entityID})
+
 	default:
 		return nil, fmt.Errorf("postgres: canonical payload for unsupported entity type %q", entityType)
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("postgres: read canonical %s payload: %w", entityType, err)
 	}
+
 	return unmarshalPayload(data)
 }

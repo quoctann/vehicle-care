@@ -127,19 +127,19 @@ func (q *Queries) PartTypeActiveForAccount(ctx context.Context, arg PartTypeActi
 	return exists, err
 }
 
-const partTypeOwnedByAccount = `-- name: PartTypeOwnedByAccount :one
+const partTypeExists = `-- name: PartTypeExists :one
 SELECT EXISTS (
     SELECT 1 FROM part_types WHERE id = $1 AND account_id = $2
 )
 `
 
-type PartTypeOwnedByAccountParams struct {
+type PartTypeExistsParams struct {
 	ID        string `json:"id"`
 	AccountID string `json:"account_id"`
 }
 
-func (q *Queries) PartTypeOwnedByAccount(ctx context.Context, arg PartTypeOwnedByAccountParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, partTypeOwnedByAccount, arg.ID, arg.AccountID)
+func (q *Queries) PartTypeExists(ctx context.Context, arg PartTypeExistsParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, partTypeExists, arg.ID, arg.AccountID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err

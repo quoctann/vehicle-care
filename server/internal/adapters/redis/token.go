@@ -35,7 +35,7 @@ func (s *Store) CreateToken(ctx context.Context, kind user.TokenKind, token, acc
 	}
 
 	indexKey := tokenIndexKey(string(kind), accountID)
-	if err := createTokenScript.Run(ctx, s.client, []string{indexKey}, kind, accountID, tokenHash(token), ttlSeconds).Err(); err != nil {
+	if err := createTokenScript.Run(ctx, s.client, []string{indexKey}, string(kind), accountID, tokenHash(token), ttlSeconds).Err(); err != nil {
 		return wrapErr("create token", err)
 	}
 	return nil

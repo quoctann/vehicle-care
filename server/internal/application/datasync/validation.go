@@ -8,27 +8,27 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
-func validateMutation(mutation domain.Mutation) (string, string) {
+func validateMutation(mutation domain.Mutation) (domain.MutationErrorCode, string) {
 	if !isUUID(mutation.MutationID) || !isUUID(mutation.EntityID) || mutation.Payload == nil {
-		return "validation_failed", "Mutation identifiers must be UUIDs and payload is required."
+		return domain.MutationErrorValidation, "Mutation identifiers must be UUIDs and payload is required."
 	}
-	entityType := domain.EntityType(mutation.EntityType)
-	if !entityType.IsSupported() || (mutation.Operation != "create" && mutation.Operation != "update") {
-		return "validation_failed", "Mutation entity_type or operation is invalid."
+	entityType := mutation.EntityType
+	if !entityType.IsSupported() || (mutation.Operation != domain.OperationCreate && mutation.Operation != domain.OperationUpdate) {
+		return domain.MutationErrorValidation, "Mutation entity_type or operation is invalid."
 	}
-	if !entityType.IsMutable() && mutation.Operation != "create" {
-		return "validation_failed", "Append-only entities only support create."
+	if !entityType.IsMutable() && mutation.Operation != domain.OperationCreate {
+		return domain.MutationErrorValidation, "Append-only entities only support create."
 	}
 	if message := validatePayload(mutation.EntityType, mutation.Payload); message != "" {
-		return "validation_failed", message
+		return domain.MutationErrorValidation, message
 	}
 	// part_type has no vehicle_id (it isn't vehicle-scoped) and part_types.id
 	// is a single-column PK (unlike every other mutable entity's composite
 	// (account_id, id) PK), so ownership can't be inferred structurally —
 	// check it explicitly instead of falling into the generic vehicle_id
 	// check below.
-	if mutation.EntityType == "part_type" {
-		if mutation.Operation == "create" {
+	if mutation.EntityType == domain.EntityPartType {
+		if mutation.Operation == domain.OperationCreate {
 			// "code" doubling as the row's own id (enforced here, create only)
 			// is a cheap way to keep the UNIQUE(account_id, code) constraint
 			// collision-free for custom rows without an extra existence/
@@ -40,7 +40,7 @@ func validateMutation(mutation domain.Mutation) (string, string) {
 			// fail validation.
 			code, _ := mutation.Payload["code"].(string)
 			if code != mutation.EntityID {
-				return "validation_failed", "part_type code must equal its id for custom entries."
+				return domain.MutationErrorValidation, "part_type code must equal its id for custom entries."
 			}
 		}
 		return "", ""
@@ -48,32 +48,32 @@ func validateMutation(mutation domain.Mutation) (string, string) {
 	return "", ""
 }
 
-func validatePayload(entityType string, payload map[string]any) string {
+func validatePayload(entityType domain.EntityType, payload map[string]any) string {
 	switch entityType {
-	case "vehicle":
+	case domain.EntityVehicle:
 		if !requiredString(payload, "name") || !nullableString(payload, "plate_number") || !nullableTime(payload, "archived_at") || !nullableTime(payload, "deleted_at") || !nullableRatio(payload, "due_soon_ratio") {
 			return "Vehicle payload is invalid."
 		}
-	case "reminder_config":
+	case domain.EntityReminderConfig:
 		intervalKM, validKM := nullablePositiveNumber(payload, "interval_km")
 		intervalDays, validDays := nullablePositiveInteger(payload, "interval_days", math.MaxInt32)
 		if !requiredUUID(payload, "vehicle_id") || !requiredUUID(payload, "part_type_id") || !validKM || !validDays || (intervalKM == nil && intervalDays == nil) || !nullableNumber(payload, "baseline_odometer_km", false, 99999999.99) || !nullableDate(payload, "baseline_date") || !requiredBool(payload, "enabled") || !nullableTime(payload, "deleted_at") {
 			return "Reminder config payload is invalid."
 		}
-	case "odometer_log":
+	case domain.EntityOdometerLog:
 		source, _ := payload["source"].(string)
 		if !requiredUUID(payload, "vehicle_id") || !requiredNumber(payload, "odometer_km", false, 99999999.99) || !requiredTime(payload, "recorded_at") || !nullableString(payload, "note") || (source != "manual" && source != "fuel") {
 			return "Odometer log payload is invalid."
 		}
-	case "fuel_log":
+	case domain.EntityFuelLog:
 		if hasAnyKey(payload, "cost_vnd", "shop") || !requiredUUID(payload, "vehicle_id") || !requiredTime(payload, "recorded_at") || !nullableNumber(payload, "liters", true, 9999.99) || !nullableMoney(payload, "cost") || !nullableString(payload, "note") || !nullableUUID(payload, "odometer_log_id") || !requiredBool(payload, "is_full_tank") || !nullableTime(payload, "deleted_at") {
 			return "Fuel log payload is invalid."
 		}
-	case "service_log":
+	case domain.EntityServiceLog:
 		if hasAnyKey(payload, "cost_vnd") || !requiredUUID(payload, "vehicle_id") || !requiredUUID(payload, "part_type_id") || !requiredTime(payload, "serviced_at") || !nullableNumber(payload, "odometer_km_snapshot", false, 99999999.99) || !nullableMoney(payload, "cost") || !nullableString(payload, "note") || !nullableTime(payload, "deleted_at") {
 			return "Service log payload is invalid."
 		}
-	case "part_type":
+	case domain.EntityPartType:
 		if hasAnyKey(payload, "name_vi", "seed_version") || !requiredString(payload, "code") || !requiredString(payload, "name") || !requiredInteger(payload, "display_order", 0, math.MaxInt32) || !requiredBool(payload, "active") {
 			return "Part type payload is invalid."
 		}

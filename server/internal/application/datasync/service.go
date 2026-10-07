@@ -35,7 +35,7 @@ func (s *Service) Push(ctx context.Context, accountID string, deviceID string, m
 		return nil, err
 	}
 	if !registered {
-		return nil, &app.Error{Code: "ownership_invalid", Message: "Device is not registered to this account."}
+		return nil, &app.Error{Code: app.ECOwnershipInvalid, Message: "Device is not registered to this account."}
 	}
 
 	results := make([]domain.MutationResult, 0, len(mutations))
@@ -47,7 +47,7 @@ func (s *Service) Push(ctx context.Context, accountID string, deviceID string, m
 
 		result := s.ports.ApplyMutation(ctx, accountID, deviceID, mutation, s.now())
 		results = append(results, result)
-		if result.Status == "rejected" || result.Status == "retryable_error" {
+		if result.Status == domain.StatusRejected || result.Status == domain.StatusRetryableError {
 			break
 		}
 	}
@@ -79,11 +79,11 @@ func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain
 	return s.ports.ListPartTypes(ctx, accountID)
 }
 
-func rejected(mutationID, code, message string) domain.MutationResult {
+func rejected(mutationID string, code domain.MutationErrorCode, message string) domain.MutationResult {
 	retryable := false
-	return domain.MutationResult{MutationID: mutationID, Status: "rejected", ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
+	return domain.MutationResult{MutationID: mutationID, Status: domain.StatusRejected, ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
 }
 
 func validation(message string) error {
-	return &app.Error{Code: "validation_failed", Message: message}
+	return &app.Error{Code: app.ECValidationFailed, Message: message}
 }

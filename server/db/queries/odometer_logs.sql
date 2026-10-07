@@ -23,7 +23,7 @@ SELECT server_seq, server_synced_at FROM odometer_logs WHERE account_id = $1 AND
 INSERT INTO odometer_logs (account_id, id, vehicle_id, odometer_km, recorded_at, source, note, server_seq, server_synced_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 
--- name: OdometerLogBelongsToVehicle :one
+-- name: OdometerLogByVehicleID :one
 SELECT EXISTS (
     SELECT 1 FROM odometer_logs
     WHERE account_id = $1 AND id = $2 AND vehicle_id = $3

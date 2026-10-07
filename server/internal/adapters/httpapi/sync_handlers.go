@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
@@ -37,7 +38,7 @@ func (s *Server) push(c *gin.Context) {
 		return
 	}
 	if len(request.Mutations) == 0 {
-		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "mutations must not be empty.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "mutations must not be empty.", false)
 		return
 	}
 
@@ -67,13 +68,13 @@ func (s *Server) listPartTypes(c *gin.Context) {
 func (s *Server) pull(c *gin.Context) {
 	afterSeq, err := strconv.ParseInt(c.DefaultQuery("after_seq", "0"), 10, 64)
 	if err != nil {
-		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "after_seq is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "after_seq is invalid.", false)
 		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	if err != nil {
-		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "limit is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "limit is invalid.", false)
 		return
 	}
 
@@ -81,7 +82,7 @@ func (s *Server) pull(c *gin.Context) {
 	if rawUntilSeq, ok := c.GetQuery("until_seq"); ok {
 		parsedUntilSeq, parseErr := strconv.ParseInt(rawUntilSeq, 10, 64)
 		if parseErr != nil {
-			s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "until_seq is invalid.", false)
+			s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "until_seq is invalid.", false)
 			return
 		}
 		untilSeq = &parsedUntilSeq

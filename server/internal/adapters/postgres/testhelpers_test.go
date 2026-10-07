@@ -67,12 +67,12 @@ func registerTestDevice(t *testing.T, store *postgres.Store, accountID, deviceID
 func createVehicle(t *testing.T, store *postgres.Store, accountID, deviceID string) string {
 	t.Helper()
 	vehicleID := uuid.NewString()
-	results := store.ApplyMutations(context.Background(), accountID, deviceID, []domain.Mutation{{
+	result := store.ApplyMutation(context.Background(), accountID, deviceID, domain.Mutation{
 		MutationID: uuid.NewString(), EntityType: "vehicle", Operation: "create", EntityID: vehicleID,
 		Payload: map[string]any{"name": "Test Vehicle"},
-	}}, time.Now().UTC())
-	if len(results) != 1 || results[0].Status != "applied" {
-		t.Fatalf("create vehicle: unexpected result: %#v", results)
+	}, time.Now().UTC())
+	if result.Status != "applied" {
+		t.Fatalf("create vehicle: unexpected result: %#v", result)
 	}
 	return vehicleID
 }

@@ -35,7 +35,7 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 	}
 	ready.Wait()
 	close(start)
-	counts := map[string]int{}
+	counts := map[domain.MutationStatus]int{}
 	var receivedAt *time.Time
 	for range workers {
 		result := <-results
@@ -57,10 +57,10 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 	}
 }
 
-// TestApplyMutationsDeduplicatesAndAppliesLatestSnapshot asserts dedupe-by-mutation
+// TestApplyMutationDeduplicatesAndAppliesLatestSnapshot asserts dedupe-by-mutation
 // and server-order LWW. It uses a real vehicle-typed uuid entity id
 // since the vehicles table enforces a uuid primary key.
-func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
+func TestApplyMutationDeduplicatesAndDetectsConflict(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
 	ctx := context.Background()
@@ -70,12 +70,12 @@ func TestApplyMutationsDeduplicatesAndDetectsConflict(t *testing.T) {
 
 	first := domain.Mutation{MutationID: "mutation-1", EntityType: "vehicle", Operation: "create", EntityID: vehicleID, Payload: map[string]any{"name": "First"}}
 
-	firstResult := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{first}, baseTime)[0]
-	duplicate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{first}, baseTime.Add(time.Minute))[0]
-	conflict := store.ApplyMutations(ctx, accountID, deviceTwo, []domain.Mutation{{
+	firstResult := store.ApplyMutation(ctx, accountID, deviceOne, first, baseTime)
+	duplicate := store.ApplyMutation(ctx, accountID, deviceOne, first, baseTime.Add(time.Minute))
+	conflict := store.ApplyMutation(ctx, accountID, deviceTwo, domain.Mutation{
 		MutationID: "mutation-2", EntityType: "vehicle", Operation: "update", EntityID: vehicleID,
 		Payload: map[string]any{"name": "Second"},
-	}}, baseTime.Add(2*time.Minute))[0]
+	}, baseTime.Add(2*time.Minute))
 
 	if firstResult.Status != "applied" || firstResult.ServerSeq == nil || *firstResult.ServerSeq != initialAccountSeq+1 {
 		t.Fatalf("unexpected first result: %#v", firstResult)
@@ -104,12 +104,12 @@ func TestAppendOnlyDuplicateReturnsOriginalAcknowledgment(t *testing.T) {
 	logID := uuid.NewString()
 	payload := map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(100), "recorded_at": now.Format(time.RFC3339), "source": "manual"}
 
-	first := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	first := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "mutation-1", EntityType: "odometer_log", Operation: "create", EntityID: logID, Payload: payload,
-	}}, now)[0]
-	second := store.ApplyMutations(ctx, accountID, deviceTwo, []domain.Mutation{{
+	}, now)
+	second := store.ApplyMutation(ctx, accountID, deviceTwo, domain.Mutation{
 		MutationID: "mutation-2", EntityType: "odometer_log", Operation: "create", EntityID: logID, Payload: payload,
-	}}, now.Add(time.Minute))[0]
+	}, now.Add(time.Minute))
 
 	if first.Status != "applied" || first.ServerSeq == nil {
 		t.Fatalf("unexpected first result: %#v", first)
@@ -127,7 +127,7 @@ func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
 	vehicleID := createVehicle(t, store, accountID, deviceOne)
 	now := time.Date(2026, 9, 17, 10, 0, 0, 123000000, time.UTC)
 
-	result := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	result := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "canonical-fuel",
 		EntityType: "fuel_log",
 		Operation:  "create",
@@ -136,7 +136,7 @@ func TestChangeFeedUsesCanonicalPersistedPayload(t *testing.T) {
 			"vehicle_id": vehicleID, "recorded_at": now.Format(time.RFC3339Nano),
 			"liters": 1.239, "cost": float64(123.45), "is_full_tank": true,
 		},
-	}}, now)[0]
+	}, now)
 	if result.Status != "applied" {
 		t.Fatalf("unexpected fuel result: %#v", result)
 	}
@@ -168,20 +168,20 @@ func TestDuplicateIsReturnedBeforeStatefulValidation(t *testing.T) {
 		"serviced_at": now.Format(time.RFC3339),
 	}
 	mutation := domain.Mutation{MutationID: "service-retry", EntityType: "service_log", Operation: "create", EntityID: uuid.NewString(), Payload: payload}
-	first := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{mutation}, now)[0]
+	first := store.ApplyMutation(ctx, accountID, deviceOne, mutation, now)
 	if first.Status != "applied" {
 		t.Fatalf("unexpected first service result: %#v", first)
 	}
 
-	deactivate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	deactivate := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "part-type-deactivate", EntityType: "part_type", Operation: "update", EntityID: partTypeID,
 		Payload: map[string]any{"code": "engine_oil", "name": "Dau may", "display_order": float64(1), "active": false},
-	}}, now.Add(time.Minute))[0]
+	}, now.Add(time.Minute))
 	if deactivate.Status != "applied" {
 		t.Fatalf("unexpected deactivation result: %#v", deactivate)
 	}
 
-	duplicate := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{mutation}, now.Add(2*time.Minute))[0]
+	duplicate := store.ApplyMutation(ctx, accountID, deviceOne, mutation, now.Add(2*time.Minute))
 	if duplicate.Status != "duplicate" || duplicate.ServerSeq == nil || first.ServerSeq == nil || *duplicate.ServerSeq != *first.ServerSeq {
 		t.Fatalf("retry was statefully revalidated instead of deduplicated: %#v", duplicate)
 	}
@@ -207,17 +207,17 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 		deviceID := uuid.NewString()
 		registerTestDevice(t, store, accountID, deviceID)
 		go func() {
-			result := store.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{{
+			result := store.ApplyMutation(ctx, accountID, deviceID, domain.Mutation{
 				MutationID: "mutation-" + uuid.NewString(), EntityType: "reminder_config", Operation: "create",
 				EntityID: uuid.NewString(), Payload: map[string]any{
 					"vehicle_id": vehicleID, "part_type_id": partTypeID, "interval_km": float64(3000 * index), "enabled": true,
 				},
-			}}, now)[0]
+			}, now)
 			results <- result
 		}()
 	}
 
-	statusCount := map[string]int{}
+	statusCount := map[domain.MutationStatus]int{}
 	for range 2 {
 		statusCount[(<-results).Status]++
 	}
@@ -226,10 +226,10 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	}
 }
 
-// TestApplyMutationsCrossAccountIsolation asserts that identical entity ids
+// TestApplyMutationCrossAccountIsolation asserts that identical entity ids
 // in two different accounts never collide: neither EntityExists nor
-// ApplyMutations should see or be blocked by the other account's row.
-func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
+// ApplyMutation should see or be blocked by the other account's row.
+func TestApplyMutationCrossAccountIsolation(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
 	ctx := context.Background()
@@ -238,12 +238,12 @@ func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
 	sharedVehicleID := uuid.NewString()
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
-	resultA := store.ApplyMutations(ctx, accountA, deviceOne, []domain.Mutation{{
+	resultA := store.ApplyMutation(ctx, accountA, deviceOne, domain.Mutation{
 		MutationID: "mutation-a", EntityType: "vehicle", Operation: "create", EntityID: sharedVehicleID, Payload: map[string]any{"name": "Account A vehicle"},
-	}}, now)[0]
-	resultB := store.ApplyMutations(ctx, accountB, deviceOne, []domain.Mutation{{
+	}, now)
+	resultB := store.ApplyMutation(ctx, accountB, deviceOne, domain.Mutation{
 		MutationID: "mutation-b", EntityType: "vehicle", Operation: "create", EntityID: sharedVehicleID, Payload: map[string]any{"name": "Account B vehicle"},
-	}}, now)[0]
+	}, now)
 
 	if resultA.Status != "applied" || resultB.Status != "applied" {
 		t.Fatalf("same entity id in two accounts should both apply independently: a=%#v b=%#v", resultA, resultB)
@@ -276,11 +276,11 @@ func TestApplyMutationsCrossAccountIsolation(t *testing.T) {
 	}
 }
 
-// TestApplyMutationsStressSequenceIsGaplessAndUnique hammers ApplyMutations
+// TestApplyMutationStressSequenceIsGaplessAndUnique hammers ApplyMutation
 // from many goroutines on one account and asserts server_seq allocation
 // never gaps or duplicates: every mutation here uses a fresh entity id, so
 // all of them are genuinely new writes (never a dedupe/duplicate path).
-func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
+func TestApplyMutationStressSequenceIsGaplessAndUnique(t *testing.T) {
 	t.Parallel()
 	store, _ := newTestStore(t)
 	ctx := context.Background()
@@ -300,11 +300,10 @@ func TestApplyMutationsStressSequenceIsGaplessAndUnique(t *testing.T) {
 	for g := 0; g < goroutines; g++ {
 		go func(g int) {
 			for m := 0; m < perGoroutine; m++ {
-				results := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+				result := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 					MutationID: uuid.NewString(), EntityType: "odometer_log", Operation: "create", EntityID: uuid.NewString(),
 					Payload: map[string]any{"vehicle_id": vehicleID, "odometer_km": float64(m), "recorded_at": now.Format(time.RFC3339), "source": "manual"},
-				}}, now)
-				result := results[0]
+				}, now)
 				if result.Status != "applied" || result.ServerSeq == nil {
 					outcomes <- outcome{err: fmt.Errorf("goroutine %d mutation %d: unexpected result %#v", g, m, result)}
 					continue
@@ -347,7 +346,7 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 	partTypeID := partTypes["engine_oil"]
 	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
 
-	result := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	result := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "part-type-update",
 		EntityType: "part_type",
 		Operation:  "update",
@@ -358,7 +357,7 @@ func TestPartTypeMutationIsWrittenToChangeFeed(t *testing.T) {
 			"display_order": float64(1),
 			"active":        false,
 		},
-	}}, now)[0]
+	}, now)
 	if result.Status != "applied" || result.ServerSeq == nil {
 		t.Fatalf("unexpected part type result: %#v", result)
 	}
@@ -387,16 +386,16 @@ func TestPartTypeUpsertCannotCrossAccountBoundary(t *testing.T) {
 		"active":        true,
 	}
 
-	first := store.ApplyMutations(ctx, accountA, deviceA, []domain.Mutation{{
+	first := store.ApplyMutation(ctx, accountA, deviceA, domain.Mutation{
 		MutationID: "part-type-a", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
-	}}, now)[0]
+	}, now)
 	before, err := store.Pull(ctx, accountB, 0, 1, nil)
 	if err != nil {
 		t.Fatalf("pull account b before rejection: %v", err)
 	}
-	second := store.ApplyMutations(ctx, accountB, deviceB, []domain.Mutation{{
+	second := store.ApplyMutation(ctx, accountB, deviceB, domain.Mutation{
 		MutationID: "part-type-b", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
-	}}, now)[0]
+	}, now)
 
 	if first.Status != "applied" || second.Status != "rejected" || second.ErrorCode != "ownership_invalid" {
 		t.Fatalf("unexpected cross-account results: first=%#v second=%#v", first, second)
@@ -434,18 +433,18 @@ func TestServiceLogUpdateChangesPartType(t *testing.T) {
 		"serviced_at": now.Format(time.RFC3339), "odometer_km_snapshot": float64(1000),
 	}
 
-	created := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	created := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "service-create", EntityType: "service_log", Operation: "create", EntityID: serviceID, Payload: payload,
-	}}, now)[0]
+	}, now)
 	if created.Status != "applied" || created.ServerSeq == nil {
 		t.Fatalf("unexpected create result: %#v", created)
 	}
 
 	payload["part_type_id"] = secondPartTypeID
-	updated := store.ApplyMutations(ctx, accountID, deviceOne, []domain.Mutation{{
+	updated := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
 		MutationID: "service-update", EntityType: "service_log", Operation: "update", EntityID: serviceID,
 		Payload: payload,
-	}}, now.Add(time.Minute))[0]
+	}, now.Add(time.Minute))
 	if updated.Status != "applied" {
 		t.Fatalf("unexpected update result: %#v", updated)
 	}

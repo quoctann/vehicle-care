@@ -23,7 +23,7 @@ func Unmarshal(data []byte) (map[string]any, error) {
 	return out, nil
 }
 
-func MapValue[V any](m map[string]any, key string) (V, error) {
+func ValueS[V any](m map[string]any, key string) (V, error) {
 	var zero V
 	value, ok := m[key]
 	if !ok {
@@ -36,6 +36,21 @@ func MapValue[V any](m map[string]any, key string) (V, error) {
 	}
 
 	return typedValue, nil
+}
+
+func Value[V any](m map[string]any, key string) V {
+	var zero V
+	value, ok := m[key]
+	if !ok {
+		return zero
+	}
+
+	typedValue, ok := value.(V)
+	if !ok {
+		return zero
+	}
+
+	return typedValue
 }
 
 func ToPointer[T any](value T) *T {

@@ -37,7 +37,7 @@ ON CONFLICT (id) DO UPDATE
        server_synced_at = EXCLUDED.server_synced_at
   WHERE part_types.account_id = EXCLUDED.account_id;
 
--- name: PartTypeOwnedByAccount :one
+-- name: PartTypeExists :one
 SELECT EXISTS (
     SELECT 1 FROM part_types WHERE id = $1 AND account_id = $2
 );

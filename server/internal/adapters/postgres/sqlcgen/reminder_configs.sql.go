@@ -38,24 +38,24 @@ func (q *Queries) CanonicalReminderConfigPayload(ctx context.Context, arg Canoni
 	return jsonb_build_object, err
 }
 
-const findActiveReminderScopeOwner = `-- name: FindActiveReminderScopeOwner :one
+const findActiveReminderConflict = `-- name: FindActiveReminderConflict :one
 SELECT id FROM reminder_configs
 WHERE account_id = $1 AND vehicle_id = $2 AND part_type_id = $3 AND deleted_at IS NULL AND id <> $4
 LIMIT 1
 `
 
-type FindActiveReminderScopeOwnerParams struct {
+type FindActiveReminderConflictParams struct {
 	AccountID  string `json:"account_id"`
 	VehicleID  string `json:"vehicle_id"`
 	PartTypeID string `json:"part_type_id"`
 	ID         string `json:"id"`
 }
 
-// Pre-check for the D7 uniqueness rule: an active (non-deleted) reminder
+// Pre-check for the uniqueness rule: an active (non-deleted) reminder
 // already owns this (vehicle_id, part_type_id) scope, and it is not the
 // entity currently being mutated.
-func (q *Queries) FindActiveReminderScopeOwner(ctx context.Context, arg FindActiveReminderScopeOwnerParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, findActiveReminderScopeOwner,
+func (q *Queries) FindActiveReminderConflict(ctx context.Context, arg FindActiveReminderConflictParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, findActiveReminderConflict,
 		arg.AccountID,
 		arg.VehicleID,
 		arg.PartTypeID,
