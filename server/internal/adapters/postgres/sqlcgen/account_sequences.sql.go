@@ -13,6 +13,7 @@ const createAccountSequence = `-- name: CreateAccountSequence :exec
 INSERT INTO account_sequences (account_id, current_seq) VALUES ($1, 0)
 `
 
+// Create new sequence with initial value 0 for new account
 func (q *Queries) CreateAccountSequence(ctx context.Context, accountID string) error {
 	_, err := q.db.ExecContext(ctx, createAccountSequence, accountID)
 	return err
@@ -24,6 +25,18 @@ SELECT current_seq FROM account_sequences WHERE account_id = $1
 
 func (q *Queries) CurrentAccountSequence(ctx context.Context, accountID string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, currentAccountSequence, accountID)
+	var current_seq int64
+	err := row.Scan(&current_seq)
+	return current_seq, err
+}
+
+const lockAccountSequenceForUpdate = `-- name: LockAccountSequenceForUpdate :one
+SELECT current_seq FROM account_sequences WHERE account_id = $1 FOR UPDATE
+`
+
+// Serialize writes before checking a mutation id whose row may not yet exist.
+func (q *Queries) LockAccountSequenceForUpdate(ctx context.Context, accountID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, lockAccountSequenceForUpdate, accountID)
 	var current_seq int64
 	err := row.Scan(&current_seq)
 	return current_seq, err

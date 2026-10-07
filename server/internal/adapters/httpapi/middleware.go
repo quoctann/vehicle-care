@@ -18,16 +18,19 @@ func (s *Server) requireSession() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+
 		session, account, err := s.userService.ResolveSession(c.Request.Context(), sessionID)
 		if err != nil {
 			s.writeError(c, err)
 			c.Abort()
 			return
 		}
+
 		c.Set(sessionIDKey, sessionID)
 		c.Set(sessionKey, session)
 		c.Set(accountKey, account)
 		s.setAuthCookies(c, sessionID, session.CSRFToken)
+
 		c.Next()
 	}
 }
@@ -37,11 +40,13 @@ func (s *Server) requireCSRF() gin.HandlerFunc {
 		session := c.MustGet(sessionKey).(domain.Session)
 		cookieToken, err := c.Cookie("csrf_token")
 		headerToken := c.GetHeader("X-CSRF-Token")
+
 		if err != nil || cookieToken == "" || headerToken == "" || cookieToken != session.CSRFToken || headerToken != session.CSRFToken {
 			s.writeAPIError(c, http.StatusForbidden, "validation_failed", "Invalid CSRF token.", false)
 			c.Abort()
 			return
 		}
+
 		c.Next()
 	}
 }
@@ -49,6 +54,7 @@ func (s *Server) requireCSRF() gin.HandlerFunc {
 func (s *Server) requestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := c.GetHeader("X-Request-ID")
+
 		if !validRequestID(requestID) {
 			requestID = "req_" + uuid.NewString()
 		}
@@ -74,11 +80,13 @@ func (s *Server) cors() gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			c.Header("Vary", "Origin")
 		}
+
 		if c.Request.Method == http.MethodOptions {
 			c.Status(http.StatusNoContent)
 			c.Abort()
 			return
 		}
+
 		c.Next()
 	}
 }
@@ -100,7 +108,12 @@ func (s *Server) accessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		started := time.Now()
 		c.Next()
-		s.logger.Info("http request", zap.String("request_id", c.GetString(requestIDKey)), zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path), zap.Int("status", c.Writer.Status()), zap.Duration("latency", time.Since(started)))
+		s.logger.Info("http request",
+			zap.String("request_id", c.GetString(requestIDKey)),
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.Request.URL.Path),
+			zap.Int("status", c.Writer.Status()),
+			zap.Duration("latency", time.Since(started)),
+		)
 	}
 }

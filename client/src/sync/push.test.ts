@@ -61,6 +61,37 @@ function outboxItem(overrides: Partial<OutboxItem>): OutboxItem {
 }
 
 describe('pushOutbox', () => {
+  it('sends the unversioned push request expected by the server', async () => {
+    const deviceId = 'b3c2ecf4-52d0-47f3-80f2-5a1955a75fd1';
+    await db.vehicles.put(vehicle('vehicle-1', 'Local'));
+    await db.outbox.add(outboxItem({}));
+    vi.mocked(api.pushMutations).mockResolvedValue({
+      results: [
+        {
+          mutation_id: 'mutation-1',
+          status: 'applied',
+          server_seq: 7,
+          server_synced_at: '2026-09-17T10:01:00.000Z',
+        },
+      ],
+    });
+
+    await pushOutbox(deviceId, accountId);
+
+    expect(api.pushMutations).toHaveBeenCalledWith({
+      device_id: deviceId,
+      mutations: [
+        {
+          mutation_id: 'mutation-1',
+          entity_type: 'vehicle',
+          operation: 'update',
+          entity_id: 'vehicle-1',
+          payload: { name: 'Local' },
+        },
+      ],
+    });
+  });
+
   it('sends every mutation in local FIFO order without coalescing', async () => {
     await db.vehicles.put(vehicle('vehicle-1', 'Latest'));
     await db.outbox.bulkAdd([

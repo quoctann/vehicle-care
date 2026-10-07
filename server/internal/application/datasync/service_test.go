@@ -33,6 +33,10 @@ func (d *testDependencies) ListPartTypes(context.Context, string) ([]domain.Part
 	return nil, nil
 }
 
+func (d *testDependencies) Push(context.Context, string, string, []domain.Mutation) ([]domain.MutationResult, error) {
+	return nil, nil
+}
+
 func validMutation(id string) domain.Mutation {
 	mutationID := map[string]string{"first": "00000000-0000-4000-8000-000000000001", "second": "00000000-0000-4000-8000-000000000002", "third": "00000000-0000-4000-8000-000000000003", "retry": "00000000-0000-4000-8000-000000000004"}[id]
 	return domain.Mutation{
@@ -53,7 +57,7 @@ func TestPushStopsAtFirstTerminalResult(t *testing.T) {
 		return domain.MutationResult{MutationID: mutation.MutationID, Status: "applied"}
 	}}
 
-	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", "1", []domain.Mutation{
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", []domain.Mutation{
 		validMutation("first"), validMutation("second"), validMutation("third"),
 	})
 	if err != nil {
@@ -71,9 +75,21 @@ func TestPushLeavesStatefulDedupeToStorage(t *testing.T) {
 	deps := &testDependencies{result: func(mutation domain.Mutation) domain.MutationResult {
 		return domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate"}
 	}}
-	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", "1", []domain.Mutation{validMutation("retry")})
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", []domain.Mutation{validMutation("retry")})
 	if err != nil || len(results) != 1 || results[0].Status != "duplicate" {
 		t.Fatalf("expected duplicate result without stateful validation, results=%#v err=%v", results, err)
+	}
+}
+
+func TestPushRejectsUnsupportedEntityBeforeStorage(t *testing.T) {
+	deps := &testDependencies{result: func(mutation domain.Mutation) domain.MutationResult {
+		return domain.MutationResult{MutationID: mutation.MutationID, Status: "applied"}
+	}}
+	mutation := validMutation("first")
+	mutation.EntityType = "unknown"
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", []domain.Mutation{mutation})
+	if err != nil || len(results) != 1 || results[0].Status != "rejected" || len(deps.applied) != 0 {
+		t.Fatalf("unsupported type reached storage: results=%#v applied=%#v err=%v", results, deps.applied, err)
 	}
 }
 

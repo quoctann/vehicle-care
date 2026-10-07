@@ -12,11 +12,11 @@ func validateMutation(mutation domain.Mutation) (string, string) {
 	if !isUUID(mutation.MutationID) || !isUUID(mutation.EntityID) || mutation.Payload == nil {
 		return "validation_failed", "Mutation identifiers must be UUIDs and payload is required."
 	}
-	validTypes := map[string]bool{"vehicle": true, "reminder_config": true, "odometer_log": true, "fuel_log": true, "service_log": true, "part_type": true}
-	if !validTypes[mutation.EntityType] || (mutation.Operation != "create" && mutation.Operation != "update") {
+	entityType := domain.EntityType(mutation.EntityType)
+	if !entityType.IsSupported() || (mutation.Operation != "create" && mutation.Operation != "update") {
 		return "validation_failed", "Mutation entity_type or operation is invalid."
 	}
-	if !isMutable(mutation.EntityType) && mutation.Operation != "create" {
+	if !entityType.IsMutable() && mutation.Operation != "create" {
 		return "validation_failed", "Append-only entities only support create."
 	}
 	if message := validatePayload(mutation.EntityType, mutation.Payload); message != "" {
@@ -46,15 +46,6 @@ func validateMutation(mutation domain.Mutation) (string, string) {
 		return "", ""
 	}
 	return "", ""
-}
-
-func isMutable(entityType string) bool {
-	switch entityType {
-	case "vehicle", "reminder_config", "fuel_log", "service_log", "part_type":
-		return true
-	default:
-		return false
-	}
 }
 
 func validatePayload(entityType string, payload map[string]any) string {

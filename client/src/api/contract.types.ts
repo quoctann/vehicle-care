@@ -58,7 +58,6 @@ export type PushMutation = {
 
 export type PushRequest = {
   device_id: string;
-  api_version: '1';
   mutations: PushMutation[];
 };
 
@@ -120,7 +119,6 @@ export type ApiErrorCode =
   | 'session_expired'
   | 'validation_failed'
   | 'ownership_invalid'
-  | 'unsupported_version'
   | 'rate_limited'
   | 'internal_error';
 

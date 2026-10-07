@@ -20,17 +20,17 @@ const (
 )
 
 type Service struct {
-	deps       IDependencies
+	ports      IPorts
 	sessionTTL time.Duration
 	now        func() time.Time
 }
 
-func NewService(deps IDependencies, sessionTTL time.Duration) *Service {
-	return &Service{deps: deps, sessionTTL: sessionTTL, now: time.Now}
+func NewService(ports IPorts, sessionTTL time.Duration) *Service {
+	return &Service{ports: ports, sessionTTL: sessionTTL, now: time.Now}
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (domain.Account, string, string, error) {
-	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
@@ -48,14 +48,14 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Acc
 }
 
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
-	accountID, ok, err := s.deps.ConsumeToken(ctx, "verification", token, s.now())
+	accountID, ok, err := s.ports.ConsumeToken(ctx, "verification", token, s.now())
 	if err != nil {
 		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
 		return validation("Verification token is invalid or expired.")
 	}
-	return s.deps.SetEmailVerified(ctx, accountID)
+	return s.ports.SetEmailVerified(ctx, accountID)
 }
 
 // Signup creates an account, verification token, and immediate login session.
@@ -65,7 +65,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 		return domain.Account{}, "", "", "", validation("Invalid email or password")
 	}
 
-	existing, err := s.deps.AccountByEmail(ctx, email)
+	existing, err := s.ports.AccountByEmail(ctx, email)
 	if err == nil && existing != nil {
 		return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
 	}
@@ -85,7 +85,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 		Timezone:     "Asia/Ho_Chi_Minh",
 		PasswordHash: passwordHash,
 	}
-	if err := s.deps.CreateAccount(ctx, account); err != nil {
+	if err := s.ports.CreateAccount(ctx, account); err != nil {
 		if errors.Is(err, ErrAccountExists) {
 			return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
 		}
@@ -93,7 +93,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 	}
 
 	verificationToken := uuid.NewString()
-	if err := s.deps.CreateToken(ctx, "verification", verificationToken, account.ID, s.now().Add(verificationTokenTTL)); err != nil {
+	if err := s.ports.CreateToken(ctx, "verification", verificationToken, account.ID, s.now().Add(verificationTokenTTL)); err != nil {
 		return domain.Account{}, "", "", "", err
 	}
 	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
@@ -103,7 +103,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 
 // CreateVerificationToken creates a token when an account exists.
 func (s *Service) CreateVerificationToken(ctx context.Context, email string) (string, bool, error) {
-	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
@@ -112,12 +112,12 @@ func (s *Service) CreateVerificationToken(ctx context.Context, email string) (st
 	}
 
 	token := uuid.NewString()
-	return token, true, s.deps.CreateToken(ctx, TokenKindVerification, token, account.ID, s.now().Add(verificationTokenTTL))
+	return token, true, s.ports.CreateToken(ctx, TokenKindVerification, token, account.ID, s.now().Add(verificationTokenTTL))
 }
 
 // CreateResetToken creates a password reset token when an account exists.
 func (s *Service) CreateResetToken(ctx context.Context, email string) (string, bool, error) {
-	account, err := s.deps.AccountByEmail(ctx, strings.TrimSpace(email))
+	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
@@ -126,7 +126,7 @@ func (s *Service) CreateResetToken(ctx context.Context, email string) (string, b
 	}
 
 	token := uuid.NewString()
-	return token, true, s.deps.CreateToken(ctx, TokenKindReset, token, account.ID, s.now().Add(resetTokenTTL))
+	return token, true, s.ports.CreateToken(ctx, TokenKindReset, token, account.ID, s.now().Add(resetTokenTTL))
 }
 
 // ResetPassword consumes a token, changes the password, and revokes all sessions.
@@ -140,7 +140,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return err
 	}
 
-	accountID, ok, err := s.deps.ConsumeToken(ctx, TokenKindReset, token, s.now())
+	accountID, ok, err := s.ports.ConsumeToken(ctx, TokenKindReset, token, s.now())
 	if err != nil {
 		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
@@ -148,23 +148,23 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return validation("Password reset token is invalid or expired.")
 	}
 
-	if err := s.deps.SetPassword(ctx, accountID, passwordHash); err != nil {
+	if err := s.ports.SetPassword(ctx, accountID, passwordHash); err != nil {
 		return err
 	}
 
-	return s.deps.DeleteAccountSessions(ctx, accountID)
+	return s.ports.DeleteAccountSessions(ctx, accountID)
 }
 
 // ResolveSession returns the session and account represented by an opaque ID.
 func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.Session, domain.Account, error) {
-	session, found, err := s.deps.GetAndRefreshSession(ctx, sessionID, s.now(), s.now().Add(s.sessionTTL))
+	session, found, err := s.ports.GetAndRefreshSession(ctx, sessionID, s.now(), s.now().Add(s.sessionTTL))
 	if err != nil {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Session store is unavailable."}
 	}
 	if !found {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
 	}
-	account, err := s.deps.AccountByID(ctx, session.AccountID)
+	account, err := s.ports.AccountByID(ctx, session.AccountID)
 	if err != nil {
 		if !found {
 			return domain.Session{}, domain.Account{}, &app.Error{Code: "session_expired", Message: "Session expired or missing."}
@@ -177,7 +177,7 @@ func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.
 
 // Logout deletes the current session.
 func (s *Service) Logout(ctx context.Context, sessionID string) error {
-	return s.deps.DeleteSession(ctx, sessionID)
+	return s.ports.DeleteSession(ctx, sessionID)
 }
 
 // RegisterDevice associates a validated device with the current account.
@@ -185,13 +185,13 @@ func (s *Service) RegisterDevice(ctx context.Context, accountID, deviceID string
 	if _, err := uuid.Parse(deviceID); err != nil {
 		return time.Time{}, validation("device_id must be a UUID.")
 	}
-	return s.deps.RegisterDevice(ctx, accountID, deviceID)
+	return s.ports.RegisterDevice(ctx, accountID, deviceID)
 }
 
 func (s *Service) createSession(ctx context.Context, accountID string) (string, string, error) {
 	sessionID := uuid.NewString()
 	csrfToken := uuid.NewString()
-	err := s.deps.CreateSession(ctx, sessionID, domain.Session{
+	err := s.ports.CreateSession(ctx, sessionID, domain.Session{
 		AccountID: accountID, CSRFToken: csrfToken, ExpiresAt: s.now().Add(s.sessionTTL),
 	})
 	return sessionID, csrfToken, err

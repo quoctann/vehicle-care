@@ -45,11 +45,13 @@ func (s *Store) EntityReferencesPartType(ctx context.Context, accountID, entityT
 			AccountID: accountID, ID: entityID, PartTypeID: partTypeID,
 		})
 		return references, err
+
 	case "service_log":
 		references, err := s.queries.ServiceLogUsesPartType(ctx, sqlcgen.ServiceLogUsesPartTypeParams{
 			AccountID: accountID, ID: entityID, PartTypeID: partTypeID,
 		})
 		return references, err
+
 	default:
 		return false, fmt.Errorf("postgres: unsupported entity type %q", entityType)
 	}

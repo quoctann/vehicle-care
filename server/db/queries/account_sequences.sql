@@ -8,3 +8,7 @@ UPDATE account_sequences SET current_seq = current_seq + 1 WHERE account_id = $1
 
 -- name: CurrentAccountSequence :one
 SELECT current_seq FROM account_sequences WHERE account_id = $1;
+
+-- name: LockAccountSequenceForUpdate :one
+-- Serialize writes before checking a mutation id whose row may not yet exist.
+SELECT current_seq FROM account_sequences WHERE account_id = $1 FOR UPDATE;

@@ -90,6 +90,26 @@ func (q *Queries) InsertOdometerLog(ctx context.Context, arg InsertOdometerLogPa
 	return err
 }
 
+const odometerLogBelongsToVehicle = `-- name: OdometerLogBelongsToVehicle :one
+SELECT EXISTS (
+    SELECT 1 FROM odometer_logs
+    WHERE account_id = $1 AND id = $2 AND vehicle_id = $3
+)
+`
+
+type OdometerLogBelongsToVehicleParams struct {
+	AccountID string `json:"account_id"`
+	ID        string `json:"id"`
+	VehicleID string `json:"vehicle_id"`
+}
+
+func (q *Queries) OdometerLogBelongsToVehicle(ctx context.Context, arg OdometerLogBelongsToVehicleParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, odometerLogBelongsToVehicle, arg.AccountID, arg.ID, arg.VehicleID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const odometerLogExists = `-- name: OdometerLogExists :one
 SELECT EXISTS (
     SELECT 1 FROM odometer_logs WHERE account_id = $1 AND id = $2

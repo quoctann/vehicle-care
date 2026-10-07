@@ -35,8 +35,8 @@ type Datasource struct {
 	*sessionStore
 }
 
-var _ user.IDependencies = (*Datasource)(nil)
-var _ datasync.IDependencies = (*Datasource)(nil)
+var _ user.IPorts = (*Datasource)(nil)
+var _ datasync.IPorts = (*Datasource)(nil)
 var _ httpapi.IOAuthStateStore = (*redisadapter.Store)(nil)
 
 func main() {

@@ -15,11 +15,13 @@ func (s *Server) signup(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	account, sessionID, csrfToken, _, err := s.userService.Signup(c.Request.Context(), request.Email, request.Password, request.Name)
 	if err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	s.setAuthCookies(c, sessionID, csrfToken)
 	c.JSON(http.StatusCreated, gin.H{"status": "verification_required", "email": account.Email})
 }
@@ -32,11 +34,13 @@ func (s *Server) login(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	account, sessionID, csrfToken, err := s.userService.Login(c.Request.Context(), request.Email, request.Password)
 	if err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	s.setAuthCookies(c, sessionID, csrfToken)
 	c.JSON(http.StatusOK, gin.H{"account": account})
 }
@@ -48,10 +52,12 @@ func (s *Server) verifyEmail(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	if err := s.userService.VerifyEmail(c.Request.Context(), request.Token); err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"status": "verified"})
 }
 
@@ -62,11 +68,13 @@ func (s *Server) resendVerification(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	_, _, err := s.userService.CreateVerificationToken(c.Request.Context(), request.Email)
 	if err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{})
 }
 
@@ -77,11 +85,13 @@ func (s *Server) forgotPassword(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	_, _, err := s.userService.CreateResetToken(c.Request.Context(), request.Email)
 	if err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{})
 }
 
@@ -93,10 +103,12 @@ func (s *Server) resetPassword(c *gin.Context) {
 	if !s.bind(c, &request) {
 		return
 	}
+
 	if err := s.userService.ResetPassword(c.Request.Context(), request.Token, request.NewPassword); err != nil {
 		s.writeError(c, err)
 		return
 	}
+
 	s.clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"status": "reset"})
 }
@@ -114,6 +126,7 @@ func (s *Server) logout(c *gin.Context) {
 		s.writeError(c, err)
 		return
 	}
+
 	s.clearAuthCookies(c)
 	c.Status(http.StatusNoContent)
 }

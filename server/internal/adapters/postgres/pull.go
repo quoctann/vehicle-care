@@ -17,12 +17,14 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 		return domain.PullPage{}, fmt.Errorf("postgres: begin pull: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
 	queries := sqlcgen.New(tx)
 
 	currentSeq, err := queries.CurrentAccountSequence(ctx, accountID)
 	if err != nil {
 		return domain.PullPage{}, fmt.Errorf("postgres: read current seq: %w", err)
 	}
+
 	upperBound := currentSeq
 	if untilSeq != nil && *untilSeq < upperBound {
 		upperBound = *untilSeq
@@ -47,6 +49,7 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 		if err != nil {
 			return domain.PullPage{}, err
 		}
+
 		changes = append(changes, domain.Change{
 			ServerSeq:      row.ServerSeq,
 			EntityType:     row.EntityType,

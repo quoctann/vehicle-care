@@ -37,8 +37,8 @@ type Store struct {
 }
 
 var (
-	_ user.IAccountStore     = (*Store)(nil)
-	_ datasync.IDependencies = (*Store)(nil)
+	_ user.IAccountStore = (*Store)(nil)
+	_ datasync.IPorts    = (*Store)(nil)
 )
 
 // New opens a PostgreSQL connection pool for dsn and verifies connectivity
@@ -48,6 +48,7 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)
 	}
+
 	sqlDB.SetMaxOpenConns(defaultMaxOpenConns)
 	sqlDB.SetMaxIdleConns(defaultMaxIdleConns)
 	sqlDB.SetConnMaxLifetime(defaultConnMaxLifetime)

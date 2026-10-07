@@ -4,7 +4,7 @@ SELECT EXISTS (
 );
 
 -- name: CanonicalFuelLogPayload :one
-SELECT jsonb_build_object(
+SELECT jsonb_build_object (
     'vehicle_id', vehicle_id,
     'recorded_at', recorded_at,
     'liters', liters,
@@ -23,16 +23,20 @@ WHERE account_id = $1 AND id = $2;
 SELECT server_seq FROM fuel_logs WHERE account_id = $1 AND id = $2 FOR UPDATE;
 
 -- name: UpsertFuelLog :exec
-INSERT INTO fuel_logs (account_id, id, vehicle_id, recorded_at, liters, cost, note, odometer_log_id, is_full_tank, deleted_at, server_seq, server_synced_at)
+INSERT INTO fuel_logs (
+    account_id, id, vehicle_id, recorded_at, liters, cost, note, 
+    odometer_log_id, is_full_tank, deleted_at, server_seq, server_synced_at
+)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT (account_id, id) DO UPDATE
-  SET vehicle_id = EXCLUDED.vehicle_id,
-      recorded_at = EXCLUDED.recorded_at,
-      liters = EXCLUDED.liters,
-       cost = EXCLUDED.cost,
-      note = EXCLUDED.note,
-      odometer_log_id = EXCLUDED.odometer_log_id,
-      is_full_tank = EXCLUDED.is_full_tank,
-      deleted_at = EXCLUDED.deleted_at,
-      server_seq = EXCLUDED.server_seq,
-       server_synced_at = EXCLUDED.server_synced_at;
+    SET 
+        vehicle_id = EXCLUDED.vehicle_id,
+        recorded_at = EXCLUDED.recorded_at,
+        liters = EXCLUDED.liters,
+        cost = EXCLUDED.cost,
+        note = EXCLUDED.note,
+        odometer_log_id = EXCLUDED.odometer_log_id,
+        is_full_tank = EXCLUDED.is_full_tank,
+        deleted_at = EXCLUDED.deleted_at,
+        server_seq = EXCLUDED.server_seq,
+        server_synced_at = EXCLUDED.server_synced_at;

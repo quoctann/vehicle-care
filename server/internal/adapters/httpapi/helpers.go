@@ -14,12 +14,13 @@ func (s *Server) bind(c *gin.Context, destination any) bool {
 	if err := c.ShouldBindJSON(destination); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
-			s.writeAPIError(c, http.StatusRequestEntityTooLarge, "validation_failed", "Request body exceeds 1 MiB.", false)
+			s.writeAPIError(c, http.StatusRequestEntityTooLarge, "validation_failed", "Request body exceeds limit", false)
 			return false
 		}
 		s.writeAPIError(c, http.StatusBadRequest, "validation_failed", "Request body is invalid.", false)
 		return false
 	}
+
 	return true
 }
 
@@ -30,9 +31,12 @@ func (s *Server) writeError(c *gin.Context, err error) {
 		s.writeAPIError(c, http.StatusInternalServerError, "internal_error", "Internal server error.", true)
 		return
 	}
+
 	status := http.StatusBadRequest
 	retryable := false
+
 	switch appErr.Code {
+
 	case app.ECAuthInvalid, app.ECSessionExpired:
 		status = http.StatusUnauthorized
 
@@ -76,10 +80,13 @@ func validRequestID(value string) bool {
 	if value == "" || len(value) > 64 {
 		return false
 	}
+
 	for _, character := range value {
-		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') && (character < '0' || character > '9') && character != '-' && character != '_' {
+		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') && character != '-' && character != '_' {
 			return false
 		}
 	}
+
 	return true
 }

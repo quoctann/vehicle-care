@@ -25,6 +25,7 @@ func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) 
 	if !errors.Is(err, sql.ErrNoRows) {
 		return time.Time{}, fmt.Errorf("postgres: register device: %w", err)
 	}
+
 	registeredAt, err = s.queries.FindDeviceRegisteredAt(ctx, sqlcgen.FindDeviceRegisteredAtParams{
 		AccountID: accountID,
 		ID:        deviceID,
@@ -32,6 +33,7 @@ func (s *Store) RegisterDevice(ctx context.Context, accountID, deviceID string) 
 	if err != nil {
 		return time.Time{}, fmt.Errorf("postgres: find registered device: %w", err)
 	}
+
 	return registeredAt, nil
 }
 
@@ -44,5 +46,6 @@ func (s *Store) DeviceRegistered(ctx context.Context, accountID, deviceID string
 	if err != nil {
 		return false, fmt.Errorf("postgres: check registered device: %w", err)
 	}
+
 	return registered, nil
 }

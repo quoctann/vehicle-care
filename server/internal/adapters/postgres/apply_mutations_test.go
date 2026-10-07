@@ -390,12 +390,20 @@ func TestPartTypeUpsertCannotCrossAccountBoundary(t *testing.T) {
 	first := store.ApplyMutations(ctx, accountA, deviceA, []domain.Mutation{{
 		MutationID: "part-type-a", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
 	}}, now)[0]
+	before, err := store.Pull(ctx, accountB, 0, 1, nil)
+	if err != nil {
+		t.Fatalf("pull account b before rejection: %v", err)
+	}
 	second := store.ApplyMutations(ctx, accountB, deviceB, []domain.Mutation{{
 		MutationID: "part-type-b", EntityType: "part_type", Operation: "create", EntityID: entityID, Payload: payload,
 	}}, now)[0]
 
 	if first.Status != "applied" || second.Status != "rejected" || second.ErrorCode != "ownership_invalid" {
 		t.Fatalf("unexpected cross-account results: first=%#v second=%#v", first, second)
+	}
+	after, err := store.Pull(ctx, accountB, before.UntilSeq, 10, nil)
+	if err != nil || after.UntilSeq != before.UntilSeq || len(after.Changes) != 0 {
+		t.Fatalf("rejected write consumed a sequence: before=%#v after=%#v err=%v", before, after, err)
 	}
 	existsA, err := store.EntityExists(ctx, accountA, "part_type", entityID)
 	if err != nil {

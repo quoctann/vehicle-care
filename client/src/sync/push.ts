@@ -120,7 +120,6 @@ export async function pushOutbox(deviceId: string, accountId: string): Promise<v
     };
     const response = await api.pushMutations({
       device_id: deviceId,
-      api_version: '1',
       mutations: [mutation],
     });
     assertActiveSyncAccount(accountId);

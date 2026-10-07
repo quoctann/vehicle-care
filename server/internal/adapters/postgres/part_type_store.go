@@ -14,6 +14,7 @@ func (s *Store) ListPartTypes(ctx context.Context, accountID string) ([]domain.P
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list part types: %w", err)
 	}
+
 	partTypes := make([]domain.PartType, 0, len(rows))
 	for _, row := range rows {
 		partTypes = append(partTypes, domain.PartType{
@@ -27,5 +28,6 @@ func (s *Store) ListPartTypes(ctx context.Context, accountID string) ([]domain.P
 			ServerSyncedAt: row.ServerSyncedAt,
 		})
 	}
+
 	return partTypes, nil
 }
