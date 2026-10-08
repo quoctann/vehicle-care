@@ -7,4 +7,4 @@
  * URL mà trình duyệt hiểu thành `https://auth/signup` (host "auth", path
  * "/signup") thay vì một đường dẫn same-origin, gây ERR_NAME_NOT_RESOLVED.
  */
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? ''
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';

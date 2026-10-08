@@ -1,0 +1,229 @@
+CREATE EXTENSION IF NOT EXISTS citext;
+
+CREATE TABLE
+    accounts (
+        id uuid PRIMARY KEY,
+        email citext NOT NULL,
+        name text NULL,
+        timezone text NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+        email_verified boolean NOT NULL DEFAULT false,
+        password_hash bytea NULL,
+        created_at timestamptz NOT NULL DEFAULT now (),
+        updated_at timestamptz NOT NULL DEFAULT now (),
+        CONSTRAINT accounts_email_unique UNIQUE (email)
+    );
+
+CREATE TABLE
+    devices (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        metadata jsonb NULL,
+        app_version text NULL,
+        registered_at timestamptz NOT NULL,
+        last_seen_at timestamptz NULL,
+        PRIMARY KEY (account_id, id)
+    );
+
+CREATE TABLE
+    account_sequences (
+        account_id uuid PRIMARY KEY REFERENCES accounts (id) ON DELETE CASCADE,
+        current_seq bigint NOT NULL DEFAULT 0 CHECK (current_seq >= 0)
+    );
+
+CREATE TABLE
+    part_types (
+        id uuid PRIMARY KEY,
+        account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        code text NOT NULL CHECK (char_length(code) BETWEEN 1 AND 500),
+        name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 500),
+        display_order integer NOT NULL CHECK (display_order >= 0),
+        active boolean NOT NULL DEFAULT true,
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now (),
+        updated_at timestamptz NOT NULL DEFAULT now (),
+        UNIQUE (account_id, code),
+        UNIQUE (account_id, id)
+    );
+
+CREATE INDEX part_types_account_idx ON part_types (account_id);
+
+CREATE TABLE
+    vehicles (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 500),
+        plate_number text NULL CHECK (plate_number IS NULL OR char_length(plate_number) <= 2000),
+        archived_at timestamptz NULL,
+        deleted_at timestamptz NULL,
+        due_soon_ratio numeric(4, 3) NULL CHECK (
+            due_soon_ratio IS NULL
+            OR (
+                due_soon_ratio > 0
+                AND due_soon_ratio <= 1
+            )
+        ),
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        PRIMARY KEY (account_id, id)
+    );
+
+CREATE INDEX vehicles_account_active_idx ON vehicles (account_id)
+WHERE
+    deleted_at IS NULL;
+
+CREATE TABLE
+    reminder_configs (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL,
+        vehicle_id uuid NOT NULL,
+        part_type_id uuid NOT NULL,
+        interval_km numeric(10, 2) NULL CHECK (
+            interval_km IS NULL
+            OR interval_km > 0
+        ),
+        interval_days integer NULL CHECK (
+            interval_days IS NULL
+            OR interval_days > 0
+        ),
+        baseline_odometer_km numeric(10, 2) NULL CHECK (
+            baseline_odometer_km IS NULL
+            OR baseline_odometer_km >= 0
+        ),
+        baseline_date date NULL,
+        enabled boolean NOT NULL,
+        deleted_at timestamptz NULL,
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        PRIMARY KEY (account_id, id),
+        FOREIGN KEY (account_id, vehicle_id) REFERENCES vehicles (account_id, id),
+        FOREIGN KEY (account_id, part_type_id) REFERENCES part_types (account_id, id),
+        CONSTRAINT reminder_configs_interval_required CHECK (
+            interval_km IS NOT NULL
+            OR interval_days IS NOT NULL
+        )
+    );
+
+CREATE UNIQUE INDEX reminder_configs_active_scope_uidx ON reminder_configs (account_id, vehicle_id, part_type_id)
+WHERE
+    deleted_at IS NULL;
+
+CREATE INDEX reminder_configs_lookup_idx ON reminder_configs (account_id, vehicle_id, part_type_id);
+
+CREATE TABLE
+    odometer_logs (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL,
+        vehicle_id uuid NOT NULL,
+        odometer_km numeric(10, 2) NOT NULL CHECK (odometer_km >= 0),
+        recorded_at timestamptz NOT NULL,
+        source text NOT NULL CHECK (source IN ('manual', 'fuel')),
+        note text NULL CHECK (note IS NULL OR char_length(note) <= 2000),
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        PRIMARY KEY (account_id, id),
+        FOREIGN KEY (account_id, vehicle_id) REFERENCES vehicles (account_id, id)
+    );
+
+CREATE INDEX odometer_logs_vehicle_time_idx ON odometer_logs (account_id, vehicle_id, recorded_at);
+
+CREATE TABLE
+    fuel_logs (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL,
+        vehicle_id uuid NOT NULL,
+        odometer_log_id uuid NULL,
+        recorded_at timestamptz NOT NULL,
+        liters numeric(6, 2) NULL CHECK (
+            liters IS NULL
+            OR liters > 0
+        ),
+        cost numeric(10, 2) NULL CHECK (
+            cost IS NULL
+            OR cost >= 0
+        ),
+        note text NULL CHECK (note IS NULL OR char_length(note) <= 2000),
+        is_full_tank boolean NOT NULL,
+        deleted_at timestamptz NULL,
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        PRIMARY KEY (account_id, id),
+        FOREIGN KEY (account_id, vehicle_id) REFERENCES vehicles (account_id, id),
+        FOREIGN KEY (account_id, odometer_log_id) REFERENCES odometer_logs (account_id, id)
+    );
+
+CREATE INDEX fuel_logs_vehicle_time_idx ON fuel_logs (account_id, vehicle_id, recorded_at);
+
+CREATE TABLE
+    service_logs (
+        id uuid NOT NULL,
+        account_id uuid NOT NULL,
+        vehicle_id uuid NOT NULL,
+        part_type_id uuid NOT NULL,
+        serviced_at timestamptz NOT NULL,
+        odometer_km_snapshot numeric(10, 2) NULL CHECK (
+            odometer_km_snapshot IS NULL
+            OR odometer_km_snapshot >= 0
+        ),
+        cost numeric(10, 2) NULL CHECK (
+            cost IS NULL
+            OR cost >= 0
+        ),
+        note text NULL CHECK (note IS NULL OR char_length(note) <= 2000),
+        deleted_at timestamptz NULL,
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        server_synced_at timestamptz NOT NULL,
+        PRIMARY KEY (account_id, id),
+        FOREIGN KEY (account_id, vehicle_id) REFERENCES vehicles (account_id, id),
+        FOREIGN KEY (account_id, part_type_id) REFERENCES part_types (account_id, id)
+    );
+
+CREATE INDEX service_logs_vehicle_part_time_idx ON service_logs (account_id, vehicle_id, part_type_id, serviced_at);
+
+CREATE TABLE
+    change_feed (
+        id bigserial PRIMARY KEY,
+        account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        entity_id uuid NOT NULL,
+        entity_type text NOT NULL,
+        server_seq bigint NOT NULL CHECK (server_seq > 0),
+        operation text NOT NULL,
+        payload jsonb NOT NULL,
+        server_synced_at timestamptz NOT NULL,
+        UNIQUE (account_id, server_seq)
+    );
+
+CREATE TABLE
+    processed_mutations (
+        account_id uuid NOT NULL,
+        device_id uuid NOT NULL,
+        mutation_id text NOT NULL,
+        entity_type text NOT NULL,
+        entity_id uuid NOT NULL,
+        status text NOT NULL,
+        server_seq bigint NULL,
+        server_synced_at timestamptz NULL,
+        error_code text NULL,
+        error_message text NULL,
+        retryable boolean NULL,
+        server_snapshot jsonb NULL,
+        created_at timestamptz NOT NULL DEFAULT now (),
+        PRIMARY KEY (account_id, device_id, mutation_id),
+        FOREIGN KEY (account_id, device_id) REFERENCES devices (account_id, id) ON DELETE CASCADE
+    );
+
+CREATE TABLE
+    reminder_notification (
+        id bigserial PRIMARY KEY,
+        account_id uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        vehicle_id uuid NOT NULL,
+        reminder_config_id uuid NOT NULL,
+        idempotency_key text NOT NULL,
+        status text NOT NULL,
+        attempted_at timestamptz NOT NULL DEFAULT now (),
+        sent_at timestamptz NULL,
+        error_message text NULL,
+        FOREIGN KEY (account_id, vehicle_id) REFERENCES vehicles (account_id, id),
+        FOREIGN KEY (account_id, reminder_config_id) REFERENCES reminder_configs (account_id, id),
+        UNIQUE (account_id, idempotency_key)
+    );

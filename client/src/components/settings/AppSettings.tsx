@@ -1,17 +1,17 @@
-import { ChevronRight, Gauge, Moon, Ruler, ShieldCheck, SunMoon, Wrench } from "lucide-react";
-import { useTheme } from "next-themes";
-import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { ChevronRight, Gauge, Moon, Ruler, ShieldCheck, SunMoon, Wrench } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { PREFERENCE_KEYS, useLocalStoragePreference } from "./preferences";
-import { SyncStatusBadge } from "./SyncStatusBadge";
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { PREFERENCE_KEYS, useLocalStoragePreference } from './preferences';
+import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 
 function SettingsRow({
   icon: Icon,
@@ -31,9 +31,7 @@ function SettingsRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
-        {description && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-        )}
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
       {children}
     </div>
@@ -47,14 +45,8 @@ export function AppSettings() {
     PREFERENCE_KEYS.askForOdometer,
     true,
   );
-  const [quietHours, setQuietHours] = useLocalStoragePreference(
-    PREFERENCE_KEYS.quietHours,
-    true,
-  );
-  const [units, setUnits] = useLocalStoragePreference<"km" | "mi">(
-    PREFERENCE_KEYS.units,
-    "km",
-  );
+  const [quietHours, setQuietHours] = useLocalStoragePreference(PREFERENCE_KEYS.quietHours, true);
+  const [units, setUnits] = useLocalStoragePreference<'km' | 'mi'>(PREFERENCE_KEYS.units, 'km');
   return (
     <div className="space-y-5">
       <section>
@@ -63,7 +55,11 @@ export function AppSettings() {
         </h2>
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
           <Link to="/settings/part-types" className="block transition hover:bg-muted/50">
-            <SettingsRow icon={Wrench} title={t('partType.title')} description={t('partType.settingsRowDescription')}>
+            <SettingsRow
+              icon={Wrench}
+              title={t('partType.title')}
+              description={t('partType.settingsRowDescription')}
+            >
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </SettingsRow>
           </Link>
@@ -98,10 +94,7 @@ export function AppSettings() {
         </h2>
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
           <SettingsRow icon={Ruler} title={t('settings.units')}>
-            <Select
-              value={units}
-              onValueChange={(value) => setUnits(value as "km" | "mi")}
-            >
+            <Select value={units} onValueChange={(value) => setUnits(value as 'km' | 'mi')}>
               <SelectTrigger size="sm" aria-label={t('settings.units')}>
                 <SelectValue />
               </SelectTrigger>

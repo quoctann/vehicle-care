@@ -1,21 +1,21 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
-import { AppShell } from '@/components/layout/AppShell'
-import { CheckEmailPage } from '@/pages/auth/CheckEmailPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
-import { ForgotPasswordSentPage } from '@/pages/auth/ForgotPasswordSentPage'
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
-import { SignInPage } from '@/pages/auth/SignInPage'
-import { SignUpPage } from '@/pages/auth/SignUpPage'
-import { CostsPage } from '@/pages/CostsPage'
-import { HistoryPage } from '@/pages/HistoryPage'
-import { HomePage } from '@/pages/HomePage'
-import { LogEntryPage } from '@/pages/LogEntryPage'
-import { AddVehiclePage } from '@/pages/onboarding/AddVehiclePage'
-import { PartTypesPage } from '@/pages/PartTypesPage'
-import { RemindersPage } from '@/pages/RemindersPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { RequireAuth } from './RequireAuth'
-import { RootRedirect } from './RootRedirect'
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { AppShell } from '@/components/layout/AppShell';
+import { CheckEmailPage } from '@/pages/auth/CheckEmailPage';
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ForgotPasswordSentPage } from '@/pages/auth/ForgotPasswordSentPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { SignInPage } from '@/pages/auth/SignInPage';
+import { SignUpPage } from '@/pages/auth/SignUpPage';
+import { CostsPage } from '@/pages/CostsPage';
+import { HistoryPage } from '@/pages/HistoryPage';
+import { HomePage } from '@/pages/HomePage';
+import { LogEntryPage } from '@/pages/LogEntryPage';
+import { AddVehiclePage } from '@/pages/onboarding/AddVehiclePage';
+import { PartTypesPage } from '@/pages/PartTypesPage';
+import { RemindersPage } from '@/pages/RemindersPage';
+import { SettingsPage } from '@/pages/SettingsPage';
+import { RequireAuth } from './RequireAuth';
+import { RootRedirect } from './RootRedirect';
 
 export function AppRouter() {
   return (
@@ -44,5 +44,5 @@ export function AppRouter() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  )
+  );
 }

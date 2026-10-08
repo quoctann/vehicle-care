@@ -1,25 +1,33 @@
-import { Gauge } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { formatNumber } from '@/lib/formatters'
+import { Gauge } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { formatNumber } from '@/lib/formatters';
 
 type OdometerInputCardProps = {
-  value: string
-  currentOdometerKm: number | null
-  error?: string | null
-  onChange: (value: string) => void
-}
+  value: string;
+  currentOdometerKm: number | null;
+  error?: string | null;
+  onChange: (value: string) => void;
+};
 
-export function OdometerInputCard({ value, currentOdometerKm, error, onChange }: OdometerInputCardProps) {
-  const { t } = useTranslation()
+export function OdometerInputCard({
+  value,
+  currentOdometerKm,
+  error,
+  onChange,
+}: OdometerInputCardProps) {
+  const { t } = useTranslation();
   return (
     <section className="rounded-2xl border border-border-subtle bg-card p-4 shadow-[0_1px_1px_rgba(44,54,53,0.025)]">
       <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Gauge className="size-4 text-muted-foreground" aria-hidden="true" />
-            <Label htmlFor="log-odometer" className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            <Label
+              htmlFor="log-odometer"
+              className="text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase"
+            >
               {t('logEntry.odometer')}
             </Label>
           </div>
@@ -47,5 +55,5 @@ export function OdometerInputCard({ value, currentOdometerKm, error, onChange }:
       </div>
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
     </section>
-  )
+  );
 }

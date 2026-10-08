@@ -1,22 +1,21 @@
-import { useParams } from "react-router-dom";
-import { CostOverview } from "@/components/costs/CostOverview";
-import { readUnitsPreference } from "@/components/settings/preferences";
-import { useCostPerKm, useMonthlyCosts } from "@/hooks/useCosts";
-import { useSessionStore } from "@/stores/useSessionStore";
-import { useTranslation } from "react-i18next";
+import { useParams } from 'react-router-dom';
+import { CostOverview } from '@/components/costs/CostOverview';
+import { readUnitsPreference } from '@/components/settings/preferences';
+import { useCostPerKm, useMonthlyCosts } from '@/hooks/useCosts';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { useTranslation } from 'react-i18next';
 
 function currentMonthInTimezone(timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
     timeZone: timezone,
   }).formatToParts(new Date());
   const year =
-    parts.find((part) => part.type === "year")?.value ??
-    new Date().getUTCFullYear().toString();
+    parts.find((part) => part.type === 'year')?.value ?? new Date().getUTCFullYear().toString();
   const month =
-    parts.find((part) => part.type === "month")?.value ??
-    String(new Date().getUTCMonth() + 1).padStart(2, "0");
+    parts.find((part) => part.type === 'month')?.value ??
+    String(new Date().getUTCMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
 }
 
@@ -24,7 +23,7 @@ export function CostsPage() {
   const { t } = useTranslation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const account = useSessionStore((state) => state.account);
-  const timezone = account?.timezone ?? "UTC";
+  const timezone = account?.timezone ?? 'UTC';
   const monthlyCosts = useMonthlyCosts(account?.id, vehicleId, timezone);
   const costPerKm = useCostPerKm(account?.id, vehicleId);
   const units = readUnitsPreference();

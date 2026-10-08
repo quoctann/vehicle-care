@@ -4,69 +4,105 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
 type Service struct {
-	deps       IDependencies
+	ports      IPorts
 	batchLimit int
 	pageLimit  int
 	now        func() time.Time
 }
 
-func NewService(deps IDependencies, batchLimit, pageLimit int) *Service {
-	return &Service{deps: deps, batchLimit: batchLimit, pageLimit: pageLimit, now: time.Now}
+func NewService(ports IPorts, batchLimit, pageLimit int) *Service {
+	return &Service{ports: ports, batchLimit: batchLimit, pageLimit: pageLimit, now: time.Now}
 }
 
-// Push validates and applies a mutation batch in request order.
-func (s *Service) Push(ctx context.Context, accountID, deviceID, apiVersion string, mutations []domain.Mutation) ([]domain.MutationResult, error) {
-	if apiVersion != "1" {
-		return nil, &app.Error{Code: "unsupported_version", Message: "Unsupported API version."}
-	}
-	if !s.deps.DeviceRegistered(ctx, accountID, deviceID) {
-		return nil, &app.Error{Code: "ownership_invalid", Message: "Device is not registered to this account."}
-	}
+// Push applies one mutation at a time in request order. A terminal or
+// retryable result stops the batch so later mutations retain FIFO order.
+func (s *Service) Push(ctx context.Context, accountID string, deviceID string, mutations []domain.Mutation) ([]domain.MutationResult, error) {
 	if len(mutations) > s.batchLimit {
-		return nil, validation("Mutation batch exceeds the configured limit.")
+		return nil, validation("Mutation batch exceeds the limit.")
 	}
+	if _, err := uuid.Parse(deviceID); err != nil {
+		return nil, validation("device_id must be a UUID.")
+	}
+
+	registered, err := s.ports.DeviceRegistered(ctx, accountID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if !registered {
+		return nil, &app.Error{Code: app.ECOwnershipInvalid, Message: "Device is not registered to this account."}
+	}
+
 	results := make([]domain.MutationResult, 0, len(mutations))
 	for _, mutation := range mutations {
-		if code, message := s.validateMutation(ctx, accountID, mutation); message != "" {
+		if code, message := validateMutation(mutation); message != "" {
 			results = append(results, rejected(mutation.MutationID, code, message))
-			continue
+			break
 		}
-		results = append(results, s.deps.ApplyMutations(ctx, accountID, deviceID, []domain.Mutation{mutation}, s.now())...)
+
+		result := s.ports.ApplyMutation(ctx, accountID, deviceID, mutation, s.now())
+		if result == nil {
+			retryable := true
+			results = append(results, domain.MutationResult{MutationID: mutation.MutationID, Status: domain.StatusRetryableError, ErrorCode: domain.MutationErrorInternal, ErrorMessage: "Temporary storage failure. Please retry.", Retryable: &retryable})
+			break
+		}
+		results = append(results, *result)
+		if result.Status == domain.StatusRejected || result.Status == domain.StatusRetryableError {
+			break
+		}
 	}
+
 	return results, nil
 }
 
-// Pull reads one stable-watermark changefeed page.
-func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, limit int, watermark string) (domain.PullPage, error) {
+// Pull reads one page bounded by a stateless upper sequence.
+func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, limit int, untilSeq *int64) (domain.PullPage, error) {
 	if afterSeq < 0 || limit < 1 {
 		return domain.PullPage{}, validation("after_seq and limit are invalid.")
+	}
+	if untilSeq != nil && (*untilSeq < 0 || *untilSeq < afterSeq) {
+		return domain.PullPage{}, validation("until_seq is invalid.")
 	}
 	if limit > s.pageLimit {
 		limit = s.pageLimit
 	}
-	page, err := s.deps.Pull(ctx, accountID, afterSeq, limit, watermark, s.now())
+
+	page, err := s.ports.Pull(ctx, accountID, afterSeq, limit, untilSeq)
 	if err != nil {
-		return domain.PullPage{}, validation("Watermark is invalid or expired.")
+		return domain.PullPage{}, err
 	}
-	return page, nil
+	if page == nil {
+		return domain.PullPage{}, &app.Error{Code: app.ECInternalError, Message: "Pull store returned no page."}
+	}
+
+	return *page, nil
 }
 
-// ListPartTypes returns the global part-type catalog plus accountID's own
-// custom rows.
 func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error) {
-	return s.deps.ListPartTypes(ctx, accountID)
+	partTypes, err := s.ports.ListPartTypes(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	values := make([]domain.PartType, 0, len(partTypes))
+	for _, partType := range partTypes {
+		if partType == nil {
+			return nil, &app.Error{Code: app.ECInternalError, Message: "Part type store returned an invalid entry."}
+		}
+		values = append(values, *partType)
+	}
+	return values, nil
 }
 
-func rejected(mutationID, code, message string) domain.MutationResult {
+func rejected(mutationID string, code domain.MutationErrorCode, message string) domain.MutationResult {
 	retryable := false
-	return domain.MutationResult{MutationID: mutationID, Status: "rejected", ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
+	return domain.MutationResult{MutationID: mutationID, Status: domain.StatusRejected, ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
 }
 
 func validation(message string) error {
-	return &app.Error{Code: "validation_failed", Message: message}
+	return &app.Error{Code: app.ECValidationFailed, Message: message}
 }

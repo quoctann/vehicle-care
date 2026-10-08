@@ -44,6 +44,13 @@ type Config struct {
 	SessionTTL          time.Duration `env:"SESSION_TTL" envDefault:"720h"`
 	SyncMaxBatchSize    int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
 	SyncMaxPageSize     int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+	// AutoMigrate applies pending schema migrations before the API starts
+	// listening. Local dev convenience only — defaults off so production/k8s
+	// keeps migrations as a separate, explicit deploy step (see
+	// .docs/architecture.md). Safe even if left on with multiple replicas:
+	// migrations.Up takes a Postgres advisory lock for the duration of the
+	// run.
+	AutoMigrate bool `env:"AUTO_MIGRATE" envDefault:"false"`
 
 	Database Database
 

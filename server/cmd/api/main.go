@@ -3,13 +3,18 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/quoctann/vehicle-care/server/db/migrations"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/httpapi"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	redisadapter "github.com/quoctann/vehicle-care/server/internal/adapters/redis"
@@ -30,8 +35,8 @@ type Datasource struct {
 	*sessionStore
 }
 
-var _ user.IDependencies = (*Datasource)(nil)
-var _ datasync.IDependencies = (*Datasource)(nil)
+var _ user.IPorts = (*Datasource)(nil)
+var _ datasync.IPorts = (*Datasource)(nil)
 var _ httpapi.IOAuthStateStore = (*redisadapter.Store)(nil)
 
 func main() {
@@ -45,6 +50,13 @@ func main() {
 		panic(err)
 	}
 	defer func() { _ = logger.Sync() }()
+
+	if cfg.AutoMigrate {
+		if err := runAutoMigrate(cfg); err != nil {
+			logger.Fatal("auto migrate", zap.Error(err))
+		}
+		logger.Info("auto migrate: schema up to date")
+	}
 
 	source, pingers, close, err := buildDatasource(context.Background(), cfg)
 	if err != nil {
@@ -82,6 +94,20 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown", zap.Error(err))
 	}
+}
+
+func runAutoMigrate(cfg config.Config) error {
+	db, err := sql.Open("pgx", cfg.Database.DSN())
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("ping database: %w", err)
+	}
+
+	return migrations.Up(db)
 }
 
 func buildDatasource(ctx context.Context, cfg config.Config) (*Datasource, []httpapi.IPinger, func(), error) {

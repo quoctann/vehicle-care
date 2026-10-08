@@ -1,5 +1,5 @@
-import { Navigate, Outlet } from 'react-router-dom'
-import { useSessionStore } from '@/stores/useSessionStore'
+import { Navigate, Outlet } from 'react-router-dom';
+import { useSessionStore } from '@/stores/useSessionStore';
 
 /**
  * Bọc mọi route cần đăng nhập (`/v/:vehicleId/*`, `/settings`, `/onboarding/*`).
@@ -7,17 +7,17 @@ import { useSessionStore } from '@/stores/useSessionStore'
  * — cookie session tự đính kèm, component này KHÔNG tự gọi API.
  */
 export function RequireAuth() {
-  const status = useSessionStore((s) => s.status)
+  const status = useSessionStore((s) => s.status);
 
   if (status === 'loading') {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
         <div className="size-6 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
-    )
+    );
   }
 
-  if (status === 'anonymous') return <Navigate to="/sign-in" replace />
+  if (status === 'anonymous') return <Navigate to="/sign-in" replace />;
 
-  return <Outlet />
+  return <Outlet />;
 }

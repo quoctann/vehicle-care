@@ -1,43 +1,44 @@
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { useTranslation } from 'react-i18next'
-import type { LogEntryType } from './EntryTypeSelector'
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useTranslation } from 'react-i18next';
+import type { LogEntryType } from './EntryTypeSelector';
 
 type LogEntryDetailsCardProps = {
-  entryType: LogEntryType
-  occurredAt: string
-  liters: string
-  costVnd: string
-  shop: string
-  note: string
-  errors: Record<string, string | undefined>
-  onOccurredAtChange: (value: string) => void
-  onLitersChange: (value: string) => void
-  onCostVndChange: (value: string) => void
-  onShopChange: (value: string) => void
-  onNoteChange: (value: string) => void
-}
+  entryType: LogEntryType;
+  occurredAt: string;
+  liters: string;
+  cost: string;
+  note: string;
+  errors: Record<string, string | undefined>;
+  onOccurredAtChange: (value: string) => void;
+  onLitersChange: (value: string) => void;
+  onCostChange: (value: string) => void;
+  onNoteChange: (value: string) => void;
+};
 
 export function LogEntryDetailsCard({
   entryType,
   occurredAt,
   liters,
-  costVnd,
-  shop,
+  cost,
   note,
   errors,
   onOccurredAtChange,
   onLitersChange,
-  onCostVndChange,
-  onShopChange,
+  onCostChange,
   onNoteChange,
 }: LogEntryDetailsCardProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
   return (
     <section className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-[0_1px_1px_rgba(44,54,53,0.025)]">
       <div className="grid gap-4 p-4 sm:grid-cols-2">
-        <Field label={t('logEntry.dateTime')} htmlFor="log-time" error={errors.occurredAt} className="sm:col-span-2">
+        <Field
+          label={t('logEntry.dateTime')}
+          htmlFor="log-time"
+          error={errors.occurredAt}
+          className="sm:col-span-2"
+        >
           <Input
             id="log-time"
             type="datetime-local"
@@ -66,32 +67,26 @@ export function LogEntryDetailsCard({
           </Field>
         ) : null}
 
-        <Field label={t('logEntry.cost')} htmlFor="log-cost" error={errors.costVnd} className={entryType === 'service' ? 'sm:col-span-2' : undefined}>
+        <Field
+          label={t('logEntry.cost')}
+          htmlFor="log-cost"
+          error={errors.cost}
+          className={entryType === 'service' ? 'sm:col-span-2' : undefined}
+        >
           <Input
             id="log-cost"
             type="number"
             min="0"
-            step="1000"
-            inputMode="numeric"
+            max="99999999.99"
+            step="0.01"
+            inputMode="decimal"
             placeholder={t('common.optional')}
-            aria-invalid={Boolean(errors.costVnd)}
-            value={costVnd}
-            onChange={(event) => onCostVndChange(event.target.value)}
+            aria-invalid={Boolean(errors.cost)}
+            value={cost}
+            onChange={(event) => onCostChange(event.target.value)}
             className="h-10"
           />
         </Field>
-
-        {entryType === 'fuel' ? (
-          <Field label={t('logEntry.shop')} htmlFor="log-shop" className="sm:col-span-2">
-            <Input
-              id="log-shop"
-              placeholder={t('common.optional')}
-              value={shop}
-              onChange={(event) => onShopChange(event.target.value)}
-              className="h-10"
-            />
-          </Field>
-        ) : null}
 
         <Field label={t('logEntry.note')} htmlFor="log-note" className="sm:col-span-2">
           <Textarea
@@ -104,7 +99,7 @@ export function LogEntryDetailsCard({
         </Field>
       </div>
     </section>
-  )
+  );
 }
 
 function Field({
@@ -114,11 +109,11 @@ function Field({
   className,
   children,
 }: {
-  label: string
-  htmlFor: string
-  error?: string
-  className?: string
-  children: React.ReactNode
+  label: string;
+  htmlFor: string;
+  error?: string;
+  className?: string;
+  children: React.ReactNode;
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className ?? ''}`}>
@@ -128,5 +123,5 @@ function Field({
       {children}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
-  )
+  );
 }

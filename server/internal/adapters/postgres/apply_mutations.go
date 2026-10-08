@@ -7,214 +7,203 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
+	conv "github.com/quoctann/vehicle-care/server/pkg/conversion"
 )
 
-// ErrUnsupportedBatchSize is a caller-contract violation: this adapter only
-// supports exactly one mutation per ApplyMutations call. The only real
-// caller, application.Service.Push, always calls it that way (see
-// service.go, which loops one mutation at a time). Generalizing to N>1
-// would require per-mutation SAVEPOINTs; nothing in the codebase needs that
-// today (see the architecture plan's "Batch nhiều mutation" decision), so
-// violating this assumption is reported back as a retryable error per
-// mutation instead of applying anything.
-var ErrUnsupportedBatchSize = errors.New("postgres: ApplyMutations only supports exactly one mutation per call")
-
-// ApplyMutations applies exactly one mutation inside a single READ
-// COMMITTED transaction: dedupe check, entity lock/seq allocation, table
-// upsert/insert, change_feed append, and processed_mutations record. It uses
-// real row locks and constraints instead of an in-process mutex.
-func (s *Store) ApplyMutations(ctx context.Context, accountID, deviceID string, mutations []domain.Mutation, now time.Time) []domain.MutationResult {
-	if len(mutations) != 1 {
-		results := make([]domain.MutationResult, len(mutations))
-		for i, mutation := range mutations {
-			results[i] = retryableErrorResult(mutation.MutationID, ErrUnsupportedBatchSize.Error())
-		}
-		return results
-	}
-	mutation := mutations[0]
-
+func (s *Store) ApplyMutation(ctx context.Context, accountID string, deviceID string, mutation domain.Mutation, now time.Time) *domain.MutationResult {
 	result, err := s.applyOneMutation(ctx, accountID, deviceID, mutation, now)
 	if err != nil {
-		return []domain.MutationResult{retryableErrorResult(mutation.MutationID, err.Error())}
+		if isTerminalMutationErr(err) {
+			return &domain.MutationResult{
+				MutationID:   mutation.MutationID,
+				Status:       domain.StatusRejected,
+				ErrorCode:    domain.MutationErrorValidation,
+				ErrorMessage: "Mutation violates a database constraint.",
+				Retryable:    conv.ToPointer(false),
+			}
+		}
+
+		return retryableResult(mutation.MutationID, "Temporary storage failure. Please retry.")
 	}
-	return []domain.MutationResult{result}
+
+	return result
 }
 
-func (s *Store) applyOneMutation(ctx context.Context, accountID, deviceID string, mutation domain.Mutation, now time.Time) (domain.MutationResult, error) {
+func isTerminalMutationErr(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+
+	// An idempotency-key collision is never evidence of an invalid payload.
+	// The account lock prevents this race for normal callers; retry if another
+	// writer bypassed that protocol so the next lookup returns its saved ACK.
+	if pgErr.Code == "23505" && pgErr.ConstraintName == "processed_mutations_pkey" {
+		return false
+	}
+	return len(pgErr.Code) >= 2 && pgErr.Code[:2] == "23"
+}
+
+func (s *Store) applyOneMutation(ctx context.Context, accountID string, deviceID string, mutation domain.Mutation, now time.Time) (*domain.MutationResult, error) {
+	if !mutation.EntityType.IsSupported() {
+		return rejectedResult(mutation.MutationID, domain.MutationErrorValidation, "Unsupported entity type."), nil
+	}
+
 	tx, err := s.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return domain.MutationResult{}, fmt.Errorf("begin: %w", err)
+		return nil, fmt.Errorf("begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
 	queries := sqlcgen.New(tx)
 
-	// Step 1: dedupe by (account_id, device_id, mutation_id). A prior
-	// applied/conflict_resolved write is presented as "duplicate" without
-	// touching the stored row.
-	existingRow, err := queries.FindProcessedMutationForUpdate(ctx, sqlcgen.FindProcessedMutationForUpdateParams{
-		AccountID: accountID, DeviceID: deviceID, MutationID: mutation.MutationID,
-	})
-	switch {
-	case err == nil:
-		result, decodeErr := resultFromProcessedRow(mutation.MutationID, existingRow)
-		if decodeErr != nil {
-			return domain.MutationResult{}, decodeErr
-		}
-		if result.Status == "applied" || result.Status == "conflict_resolved" {
-			result.Status = "duplicate"
-		}
-		if err := tx.Commit(); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("commit dedupe: %w", err)
-		}
-		return result, nil
-	case errors.Is(err, sql.ErrNoRows):
-		// Not seen before; continue.
-	default:
-		return domain.MutationResult{}, fmt.Errorf("find processed mutation: %w", err)
+	// Step 1: lock the sequence for apply mutations between devices
+	if _, err := queries.LockAccountSequenceForUpdate(ctx, accountID); err != nil {
+		return nil, fmt.Errorf("lock account sequence: %w", err)
 	}
 
-	payload := mutation.Payload
-
-	// Step 2: reminder scope pre-check (D7 uniqueness), only relevant when
-	// this write leaves the reminder active (not a tombstone).
-	if mutation.EntityType == "reminder_config" && payload["deleted_at"] == nil {
-		vehicleID := stringValue(payload, "vehicle_id")
-		partTypeID := stringValue(payload, "part_type_id")
-		_, err := queries.FindActiveReminderScopeOwner(ctx, sqlcgen.FindActiveReminderScopeOwnerParams{
-			AccountID: accountID, VehicleID: vehicleID, PartTypeID: partTypeID, ID: mutation.EntityID,
-		})
-		switch {
-		case err == nil:
-			result := rejectedResult(mutation.MutationID, "validation_failed", "An active reminder already exists for this vehicle and part type.")
-			if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
-				return domain.MutationResult{}, fmt.Errorf("record rejected reminder scope: %w", err)
-			}
-			if err := tx.Commit(); err != nil {
-				return domain.MutationResult{}, fmt.Errorf("commit rejected reminder scope: %w", err)
-			}
-			return result, nil
-		case errors.Is(err, sql.ErrNoRows):
-			// No conflicting owner; continue.
-		default:
-			return domain.MutationResult{}, fmt.Errorf("find active reminder scope owner: %w", err)
-		}
+	// Step 2: find ACK processed for this device request, prevent duplicate
+	// writes by returning the prior result
+	processed, err := findProcessedResult(ctx, queries, accountID, deviceID, mutation)
+	if err != nil {
+		return nil, err
+	}
+	if processed != nil {
+		return processed, tx.Commit()
 	}
 
-	if isMutableEntity(mutation.EntityType) {
+	// Step 3: check ownership and current-state rules, reject if violated
+	code, message, err := validateCurrentState(ctx, queries, accountID, mutation)
+	if err != nil {
+		return nil, err
+	}
+	if code != "" {
+		result := rejectedResult(mutation.MutationID, code, message)
+		err = recordRejection(ctx, tx, queries, accountID, deviceID, mutation, result)
+		return result, err
+	}
+
+	// Step 4: apply the mutation, record the ACK, and commit
+	switch mutation.EntityType {
+	case domain.EntityOdometerLog:
+		return s.applyAppendOnlyMutation(ctx, queries, accountID, deviceID, mutation, now, tx)
+
+	case
+		domain.EntityVehicle,
+		domain.EntityReminderConfig,
+		domain.EntityFuelLog,
+		domain.EntityServiceLog,
+		domain.EntityPartType:
 		return s.applyMutableMutation(ctx, tx, queries, accountID, deviceID, mutation, now)
+
+	default:
+		return nil, fmt.Errorf("unsupported entity type %q", mutation.EntityType)
 	}
-	return s.applyAppendOnlyMutation(ctx, queries, accountID, deviceID, mutation, now, tx)
 }
 
-// applyMutableMutation handles "vehicle" and "reminder_config": lock the
-// current row (if any) to serialize concurrent writers on the same entity,
-// allocate a server_seq, decide applied vs conflict_resolved by comparing
-// BaseServerSeq, then upsert.
-func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, now time.Time) (domain.MutationResult, error) {
-	var hasCurrent bool
-	var currentSeq int64
-	var err error
-	switch mutation.EntityType {
-	case "vehicle":
-		currentSeq, err = queries.LockVehicleForUpdate(ctx, sqlcgen.LockVehicleForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
-	case "reminder_config":
-		currentSeq, err = queries.LockReminderConfigForUpdate(ctx, sqlcgen.LockReminderConfigForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
-	case "fuel_log":
-		currentSeq, err = queries.LockFuelLogForUpdate(ctx, sqlcgen.LockFuelLogForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
-	case "service_log":
-		currentSeq, err = queries.LockServiceLogForUpdate(ctx, sqlcgen.LockServiceLogForUpdateParams{AccountID: accountID, ID: mutation.EntityID})
-	case "part_type":
-		currentSeq, err = queries.LockPartTypeForUpdate(ctx, sqlcgen.LockPartTypeForUpdateParams{AccountID: &accountID, ID: mutation.EntityID})
-	}
-	switch {
-	case err == nil:
-		hasCurrent = true
-	case errors.Is(err, sql.ErrNoRows):
-		hasCurrent = false
-	default:
-		return domain.MutationResult{}, fmt.Errorf("lock current %s: %w", mutation.EntityType, err)
-	}
-
-	newSeq, err := queries.NextSeq(ctx, accountID)
+func findProcessedResult(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation) (*domain.MutationResult, error) {
+	processed, err := queries.FindProcessedMutationForUpdate(ctx,
+		sqlcgen.FindProcessedMutationForUpdateParams{
+			AccountID:  accountID,
+			DeviceID:   deviceID,
+			MutationID: mutation.MutationID,
+		},
+	)
 	if err != nil {
-		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
-	}
-	receivedAt := now.UTC()
-
-	status := "applied"
-	if hasCurrent && mutation.BaseServerSeq != nil && currentSeq > *mutation.BaseServerSeq {
-		status = "conflict_resolved"
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find processed mutation: %w", err)
 	}
 
-	if mutation.EntityType == "reminder_config" {
-		params, buildErr := buildUpsertReminderConfigParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
+	result := &domain.MutationResult{MutationID: mutation.MutationID, Status: domain.MutationStatus(processed.Status)}
+	if result.Status == domain.StatusApplied {
+		result.Status = domain.StatusDuplicate
+	}
+	if processed.ServerSeq.Valid {
+		seq := processed.ServerSeq.Int64
+		result.ServerSeq = &seq
+	}
+	if processed.ServerSyncedAt.Valid {
+		receivedAt := processed.ServerSyncedAt.Time
+		result.ServerSyncedAt = &receivedAt
+	}
+	if processed.ErrorCode.Valid {
+		result.ErrorCode = domain.MutationErrorCode(processed.ErrorCode.String)
+	}
+	if processed.ErrorMessage.Valid {
+		result.ErrorMessage = processed.ErrorMessage.String
+	}
+	if processed.Retryable.Valid {
+		retryable := processed.Retryable.Bool
+		result.Retryable = &retryable
+	}
+
+	return result, nil
+}
+
+func recordRejection(ctx context.Context, tx *sqlx.Tx, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, result *domain.MutationResult) error {
+	if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
+		return fmt.Errorf("record rejected mutation: %w", err)
+	}
+	return tx.Commit()
+}
+
+// applyMutableMutation keeps the sequence, row write, feed and ACK in one transaction.
+func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, now time.Time) (*domain.MutationResult, error) {
+	if err := lockCurrentSnapshot(ctx, queries, accountID, mutation); err != nil {
+		return nil, err
+	}
+	// Writes that can reject after allocating a sequence must restore it before
+	// recording the rejection. The entire write is still in one transaction.
+	mayReject := mutation.EntityType == domain.EntityReminderConfig || mutation.EntityType == domain.EntityPartType
+	if mayReject {
+		if _, err := tx.ExecContext(ctx, "SAVEPOINT mutation_write"); err != nil {
+			return nil, fmt.Errorf("savepoint mutable write: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, "SAVEPOINT reminder_upsert"); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("savepoint: %w", err)
-		}
-		if err := queries.UpsertReminderConfig(ctx, params); err != nil {
-			if isUniqueViolation(err, "reminder_configs_active_scope_uidx") {
-				// Lost a race against another device that inserted the
-				// same (vehicle_id, part_type_id) scope after our Step 2
-				// pre-check but before this upsert committed.
-				if _, rbErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT reminder_upsert"); rbErr != nil {
-					return domain.MutationResult{}, fmt.Errorf("rollback to savepoint: %w", rbErr)
-				}
-				result := rejectedResult(mutation.MutationID, "validation_failed", "An active reminder already exists for this vehicle and part type.")
-				if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
-					return domain.MutationResult{}, fmt.Errorf("record rejected reminder scope race: %w", err)
-				}
-				if err := tx.Commit(); err != nil {
-					return domain.MutationResult{}, fmt.Errorf("commit rejected reminder scope race: %w", err)
-				}
-				return result, nil
+	}
+
+	newSeq, err := queries.NextAccountSequence(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("allocate server_seq: %w", err)
+	}
+
+	// PostgreSQL timestamptz stores microseconds. Return that same precision in
+	// the first ACK so a duplicate read from processed_mutations is identical.
+	receivedAt := now.UTC().Truncate(time.Microsecond)
+
+	if rejection, err := writeMutableSnapshot(ctx, queries, accountID, mutation, newSeq, receivedAt); err != nil {
+		if mutation.EntityType == domain.EntityReminderConfig && isUniqueViolation(err, "reminder_configs_active_scope_uidx") {
+			if _, rollbackErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT mutation_write"); rollbackErr != nil {
+				return nil, fmt.Errorf("rollback reminder conflict: %w", rollbackErr)
 			}
-			return domain.MutationResult{}, fmt.Errorf("upsert reminder_config: %w", err)
+			result := rejectedResult(mutation.MutationID, domain.MutationErrorValidation, "An active reminder already exists for this vehicle and part type.")
+			return result, recordRejection(ctx, tx, queries, accountID, deviceID, mutation, result)
 		}
-		if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT reminder_upsert"); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("release savepoint: %w", err)
+		return nil, err
+	} else if rejection != nil {
+		if _, err := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT mutation_write"); err != nil {
+			return nil, fmt.Errorf("rollback rejected write: %w", err)
 		}
-	} else if mutation.EntityType == "vehicle" {
-		params, buildErr := buildUpsertVehicleParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		if err := queries.UpsertVehicle(ctx, params); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("upsert vehicle: %w", err)
-		}
-	} else if mutation.EntityType == "fuel_log" {
-		params, buildErr := buildUpsertFuelLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		if err := queries.UpsertFuelLog(ctx, params); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("upsert fuel_log: %w", err)
-		}
-	} else if mutation.EntityType == "service_log" {
-		params, buildErr := buildUpsertServiceLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		if err := queries.UpsertServiceLog(ctx, params); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("upsert service_log: %w", err)
-		}
-	} else {
-		params, buildErr := buildUpsertPartTypeParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
-		if buildErr != nil {
-			return domain.MutationResult{}, buildErr
-		}
-		if err := queries.UpsertPartType(ctx, params); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("upsert part_type: %w", err)
+		return rejection, recordRejection(ctx, tx, queries, accountID, deviceID, mutation, rejection)
+	}
+	if mayReject {
+		if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT mutation_write"); err != nil {
+			return nil, fmt.Errorf("release mutable write savepoint: %w", err)
 		}
 	}
 
-	return s.finishApplied(ctx, queries, accountID, deviceID, mutation, status, newSeq, receivedAt, tx)
+	canonical, err := canonicalPayload(ctx, queries, accountID, mutation.EntityType, mutation.EntityID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.finishApplied(ctx, queries, accountID, deviceID, mutation, canonical, newSeq, receivedAt, tx)
 }
 
 // applyAppendOnlyMutation handles "odometer_log": it is immutable once
@@ -223,145 +212,125 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 // prior snapshot by the same entity ID is always a duplicate, never a
 // conflict. fuel_log/service_log used to be handled here too but are now
 // mutable (applyMutableMutation) so users can edit/delete them.
-func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, now time.Time, tx *sqlx.Tx) (domain.MutationResult, error) {
+func (s *Store) applyAppendOnlyMutation(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, now time.Time, tx *sqlx.Tx) (*domain.MutationResult, error) {
 	existing, err := queries.FindOdometerLog(ctx, sqlcgen.FindOdometerLogParams{AccountID: accountID, ID: mutation.EntityID})
 	hasCurrent := true
-	switch {
-	case err == nil:
-	case errors.Is(err, sql.ErrNoRows):
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("find current %s: %w", mutation.EntityType, err)
+		}
 		hasCurrent = false
-	default:
-		return domain.MutationResult{}, fmt.Errorf("find current %s: %w", mutation.EntityType, err)
 	}
 
 	if hasCurrent {
-		result := domain.MutationResult{MutationID: mutation.MutationID, Status: "duplicate", ServerSeq: &existing.ServerSeq, ReceivedAtServer: &existing.ReceivedAtServer}
-		if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("record duplicate %s: %w", mutation.EntityType, err)
+		result := domain.MutationResult{
+			MutationID:     mutation.MutationID,
+			Status:         domain.StatusDuplicate,
+			ServerSeq:      &existing.ServerSeq,
+			ServerSyncedAt: &existing.ServerSyncedAt,
 		}
-		if err := tx.Commit(); err != nil {
-			return domain.MutationResult{}, fmt.Errorf("commit duplicate %s: %w", mutation.EntityType, err)
+		if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, &result); err != nil {
+			return nil, fmt.Errorf("record duplicate %s: %w", mutation.EntityType, err)
 		}
-		return result, nil
+		return &result, tx.Commit()
 	}
 
-	newSeq, err := queries.NextSeq(ctx, accountID)
+	newSeq, err := queries.NextAccountSequence(ctx, accountID)
 	if err != nil {
-		return domain.MutationResult{}, fmt.Errorf("allocate server_seq: %w", err)
+		return nil, fmt.Errorf("allocate server_seq: %w", err)
 	}
-	receivedAt := now.UTC()
+	syncedAt := now.UTC().Truncate(time.Microsecond)
 
-	params, buildErr := buildInsertOdometerLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, receivedAt)
+	params, buildErr := buildInsertOdometerLogParams(accountID, mutation.EntityID, mutation.Payload, newSeq, syncedAt)
 	if buildErr != nil {
-		return domain.MutationResult{}, buildErr
+		return nil, buildErr
 	}
 	if err := queries.InsertOdometerLog(ctx, params); err != nil {
-		return domain.MutationResult{}, fmt.Errorf("insert %s: %w", mutation.EntityType, err)
+		return nil, fmt.Errorf("insert %s: %w", mutation.EntityType, err)
 	}
 
-	return s.finishApplied(ctx, queries, accountID, deviceID, mutation, "applied", newSeq, receivedAt, tx)
+	canonical, err := canonicalPayload(ctx, queries, accountID, mutation.EntityType, mutation.EntityID)
+	if err != nil {
+		return nil, err
+	}
+	return s.finishApplied(ctx, queries, accountID, deviceID, mutation, canonical, newSeq, syncedAt, tx)
 }
 
 // finishApplied appends the change_feed row, records the processed_mutation
 // acknowledgment, and commits.
-func (s *Store) finishApplied(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, status string, seq int64, receivedAt time.Time, tx *sqlx.Tx) (domain.MutationResult, error) {
-	changePayload, err := marshalPayload(mutation.Payload)
+func (s *Store) finishApplied(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, canonical map[string]any, seq int64, receivedAt time.Time, tx *sqlx.Tx) (*domain.MutationResult, error) {
+	changePayload, err := conv.Marshal(canonical)
 	if err != nil {
-		return domain.MutationResult{}, err
+		return nil, err
 	}
+
 	if err := queries.InsertChange(ctx, sqlcgen.InsertChangeParams{
-		AccountID: accountID, ServerSeq: seq, EntityType: mutation.EntityType, EntityID: mutation.EntityID,
-		Operation: mutation.Operation, Payload: changePayload, ReceivedAtServer: receivedAt,
+		AccountID:      accountID,
+		ServerSeq:      seq,
+		EntityType:     string(mutation.EntityType),
+		EntityID:       mutation.EntityID,
+		Operation:      string(mutation.Operation),
+		Payload:        changePayload,
+		ServerSyncedAt: receivedAt,
 	}); err != nil {
-		return domain.MutationResult{}, fmt.Errorf("insert change_feed row: %w", err)
+		return nil, fmt.Errorf("insert change_feed row: %w", err)
 	}
 
-	result := domain.MutationResult{MutationID: mutation.MutationID, Status: status, ServerSeq: &seq, ReceivedAtServer: &receivedAt}
-	if status == "conflict_resolved" {
-		result.ServerSnapshot = cloneMap(mutation.Payload)
+	result := domain.MutationResult{
+		MutationID:     mutation.MutationID,
+		Status:         domain.StatusApplied,
+		ServerSeq:      &seq,
+		ServerSyncedAt: &receivedAt,
+	}
+	if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, &result); err != nil {
+		return nil, fmt.Errorf("record processed mutation: %w", err)
 	}
 
-	if err := insertProcessedMutation(ctx, queries, accountID, deviceID, mutation, result); err != nil {
-		return domain.MutationResult{}, fmt.Errorf("record processed mutation: %w", err)
-	}
 	if err := tx.Commit(); err != nil {
-		return domain.MutationResult{}, fmt.Errorf("commit: %w", err)
+		return nil, fmt.Errorf("commit: %w", err)
 	}
-	return result, nil
+
+	return &result, nil
 }
 
-func isMutableEntity(entityType string) bool {
-	switch entityType {
-	case "vehicle", "reminder_config", "fuel_log", "service_log", "part_type":
-		return true
-	default:
-		return false
+func rejectedResult(mutationID string, code domain.MutationErrorCode, message string) *domain.MutationResult {
+	return &domain.MutationResult{
+		MutationID:   mutationID,
+		Status:       domain.StatusRejected,
+		ErrorCode:    code,
+		ErrorMessage: message,
+		Retryable:    conv.ToPointer(false),
 	}
 }
 
-func cloneMap(input map[string]any) map[string]any {
-	output := make(map[string]any, len(input))
-	for key, value := range input {
-		output[key] = value
+func retryableResult(mutationID, message string) *domain.MutationResult {
+	return &domain.MutationResult{
+		MutationID:   mutationID,
+		Status:       domain.StatusRetryableError,
+		ErrorCode:    domain.MutationErrorInternal,
+		ErrorMessage: message,
+		Retryable:    conv.ToPointer(true),
 	}
-	return output
 }
 
-func rejectedResult(mutationID, code, message string) domain.MutationResult {
-	retryable := false
-	return domain.MutationResult{MutationID: mutationID, Status: "rejected", ErrorCode: code, ErrorMessage: message, Retryable: &retryable}
-}
-
-func retryableErrorResult(mutationID, message string) domain.MutationResult {
-	retryable := true
-	return domain.MutationResult{MutationID: mutationID, Status: "retryable_error", ErrorCode: "internal_error", ErrorMessage: message, Retryable: &retryable}
-}
-
-func resultFromProcessedRow(mutationID string, row sqlcgen.FindProcessedMutationForUpdateRow) (domain.MutationResult, error) {
-	result := domain.MutationResult{MutationID: mutationID, Status: row.Status}
-	if row.ServerSeq.Valid {
-		seq := row.ServerSeq.Int64
-		result.ServerSeq = &seq
-	}
-	if row.ReceivedAtServer.Valid {
-		receivedAt := row.ReceivedAtServer.Time
-		result.ReceivedAtServer = &receivedAt
-	}
-	if row.ErrorCode.Valid {
-		result.ErrorCode = row.ErrorCode.String
-	}
-	if row.ErrorMessage.Valid {
-		result.ErrorMessage = row.ErrorMessage.String
-	}
-	if row.Retryable.Valid {
-		retryable := row.Retryable.Bool
-		result.Retryable = &retryable
-	}
-	snapshot, err := unmarshalPayload(row.ServerSnapshot)
-	if err != nil {
-		return domain.MutationResult{}, err
-	}
-	result.ServerSnapshot = snapshot
-	return result, nil
-}
-
-func insertProcessedMutation(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, result domain.MutationResult) error {
+func insertProcessedMutation(ctx context.Context, queries *sqlcgen.Queries, accountID, deviceID string, mutation domain.Mutation, result *domain.MutationResult) error {
 	params := sqlcgen.InsertProcessedMutationParams{
 		AccountID:  accountID,
 		DeviceID:   deviceID,
 		MutationID: mutation.MutationID,
-		EntityType: mutation.EntityType,
+		EntityType: string(mutation.EntityType),
 		EntityID:   mutation.EntityID,
-		Status:     result.Status,
+		Status:     string(result.Status),
 	}
+
 	if result.ServerSeq != nil {
 		params.ServerSeq = sql.NullInt64{Int64: *result.ServerSeq, Valid: true}
 	}
-	if result.ReceivedAtServer != nil {
-		params.ReceivedAtServer = sql.NullTime{Time: *result.ReceivedAtServer, Valid: true}
+	if result.ServerSyncedAt != nil {
+		params.ServerSyncedAt = sql.NullTime{Time: *result.ServerSyncedAt, Valid: true}
 	}
 	if result.ErrorCode != "" {
-		params.ErrorCode = sql.NullString{String: result.ErrorCode, Valid: true}
+		params.ErrorCode = sql.NullString{String: string(result.ErrorCode), Valid: true}
 	}
 	if result.ErrorMessage != "" {
 		params.ErrorMessage = sql.NullString{String: result.ErrorMessage, Valid: true}
@@ -369,12 +338,6 @@ func insertProcessedMutation(ctx context.Context, queries *sqlcgen.Queries, acco
 	if result.Retryable != nil {
 		params.Retryable = sql.NullBool{Bool: *result.Retryable, Valid: true}
 	}
-	if result.ServerSnapshot != nil {
-		snapshot, err := marshalPayload(result.ServerSnapshot)
-		if err != nil {
-			return err
-		}
-		params.ServerSnapshot = snapshot
-	}
+
 	return queries.InsertProcessedMutation(ctx, params)
 }

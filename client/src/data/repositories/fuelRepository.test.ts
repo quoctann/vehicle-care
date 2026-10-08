@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { db } from '@/data/db'
-import { clearAllTables } from '@/data/testUtils'
-import { addFuelLog } from './fuelRepository'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { db } from '@/data/db';
+import { clearAllTables } from '@/data/testUtils';
+import { addFuelLog } from './fuelRepository';
 
-afterEach(clearAllTables)
+afterEach(clearAllTables);
 
-const VEHICLE_ID = 'veh-1'
+const VEHICLE_ID = 'veh-1';
 
 beforeEach(async () => {
   await db.vehicles.put({
@@ -17,10 +17,10 @@ beforeEach(async () => {
     deletedAt: null,
     dueSoonRatio: null,
     createdAtClient: new Date().toISOString(),
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
-  })
-})
+  });
+});
 
 describe('fuelRepository.addFuelLog', () => {
   it('không nhập KM: chỉ tạo FuelLog, không tạo OdometerLog', async () => {
@@ -28,43 +28,43 @@ describe('fuelRepository.addFuelLog', () => {
       accountId: 'acc-1',
       vehicleId: VEHICLE_ID,
       liters: 3.2,
-      costVnd: 85000,
-      shop: null,
+      cost: 85000,
       note: null,
       odometerKm: null,
       isFullTank: false,
-    })
+    });
 
-    expect(odometerLog).toBeNull()
-    expect(fuelLog.odometerLogId).toBeNull()
-    expect(await db.odometerLogs.where('vehicleId').equals(VEHICLE_ID).count()).toBe(0)
-    const outboxRows = await db.outbox.toArray()
-    expect(outboxRows).toHaveLength(1)
-    expect(outboxRows[0].entityType).toBe('fuel_log')
-  })
+    expect(odometerLog).toBeNull();
+    expect(fuelLog.odometerLogId).toBeNull();
+    expect(await db.odometerLogs.where('vehicleId').equals(VEHICLE_ID).count()).toBe(0);
+    const outboxRows = await db.outbox.toArray();
+    expect(outboxRows).toHaveLength(1);
+    expect(outboxRows[0].entityType).toBe('fuel_log');
+    expect(outboxRows[0].payload).toMatchObject({ cost: 85000 });
+    expect(outboxRows[0].payload).not.toHaveProperty('shop');
+  });
 
   it('có nhập KM: tạo FuelLog + OdometerLog ATOMIC, liên kết đúng odometerLogId, 2 outbox mutation', async () => {
     const { fuelLog, odometerLog } = await addFuelLog({
       accountId: 'acc-1',
       vehicleId: VEHICLE_ID,
       liters: 3.2,
-      costVnd: 85000,
-      shop: 'Cây xăng A',
+      cost: 85000,
       note: null,
       odometerKm: 42180,
       isFullTank: true,
-    })
+    });
 
-    expect(odometerLog).not.toBeNull()
-    expect(fuelLog.odometerLogId).toBe(odometerLog!.id)
-    expect(odometerLog!.source).toBe('fuel')
+    expect(odometerLog).not.toBeNull();
+    expect(fuelLog.odometerLogId).toBe(odometerLog!.id);
+    expect(odometerLog!.source).toBe('fuel');
 
-    const storedOdometer = await db.odometerLogs.get(odometerLog!.id)
-    expect(storedOdometer?.odometerKm).toBe(42180)
+    const storedOdometer = await db.odometerLogs.get(odometerLog!.id);
+    expect(storedOdometer?.odometerKm).toBe(42180);
 
-    const outboxRows = await db.outbox.toArray()
-    expect(outboxRows.map((r) => r.entityType).sort()).toEqual(['fuel_log', 'odometer_log'])
-  })
+    const outboxRows = await db.outbox.toArray();
+    expect(outboxRows.map((r) => r.entityType).sort()).toEqual(['fuel_log', 'odometer_log']);
+  });
 
   it('từ chối odometer âm', async () => {
     await expect(
@@ -72,12 +72,11 @@ describe('fuelRepository.addFuelLog', () => {
         accountId: 'acc-1',
         vehicleId: VEHICLE_ID,
         liters: null,
-        costVnd: null,
-        shop: null,
+        cost: null,
         note: null,
         odometerKm: -10,
         isFullTank: false,
       }),
-    ).rejects.toThrow()
-  })
-})
+    ).rejects.toThrow();
+  });
+});

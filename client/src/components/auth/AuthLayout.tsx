@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Layout dùng chung mọi màn auth (không có trong design.html — tự thiết kế theo
- * cùng ngôn ngữ thị giác: card trắng bo góc, border nhẹ, font Archivo).
+ * cùng ngôn ngữ thị giác: card trắng bo góc, border nhẹ).
  */
 export function AuthLayout({
   title,
@@ -11,12 +11,12 @@ export function AuthLayout({
   children,
   footer,
 }: {
-  title: string
-  subtitle?: string
-  children: ReactNode
-  footer?: ReactNode
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  footer?: ReactNode;
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="w-full max-w-[400px]">
@@ -33,8 +33,10 @@ export function AuthLayout({
           <div className="mt-5">{children}</div>
         </div>
 
-        {footer ? <div className="mt-4 text-center text-sm text-muted-foreground">{footer}</div> : null}
+        {footer ? (
+          <div className="mt-4 text-center text-sm text-muted-foreground">{footer}</div>
+        ) : null}
       </div>
     </div>
-  )
+  );
 }

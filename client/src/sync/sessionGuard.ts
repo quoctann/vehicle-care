@@ -1,8 +1,8 @@
-import { useSessionStore } from '@/stores/useSessionStore'
+import { useSessionStore } from '@/stores/useSessionStore';
 
 export function assertActiveSyncAccount(accountId: string): void {
-  const session = useSessionStore.getState()
+  const session = useSessionStore.getState();
   if (session.status !== 'authenticated' || session.account?.id !== accountId) {
-    throw new Error('The active account changed during sync.')
+    throw new Error('The active account changed during sync.');
   }
 }

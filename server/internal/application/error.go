@@ -2,6 +2,16 @@ package application
 
 import "errors"
 
+// Application Error Codes
+const (
+	ECAuthInvalid      = "auth_invalid"
+	ECSessionExpired   = "session_expired"
+	ECOwnershipInvalid = "ownership_invalid"
+	ECConflict         = "conflict"
+	ECInternalError    = "internal_error"
+	ECValidationFailed = "validation_failed"
+)
+
 // Error identifies an application failure that the HTTP adapter can map safely.
 type Error struct {
 	Code    string

@@ -1,32 +1,35 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { db } from '@/data/db'
-import { ApiError } from '@/api/errors'
-import { clearAllTables } from '@/data/testUtils'
-import { useSessionStore } from '@/stores/useSessionStore'
-import { useSyncStore } from '@/stores/useSyncStore'
-import { bootstrapSync } from './bootstrap'
-import { pullChanges } from './pull'
-import { pushOutbox } from './push'
-import { runSync } from './syncOrchestrator'
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/data/db';
+import { ApiError } from '@/api/errors';
+import { clearAllTables } from '@/data/testUtils';
+import { useSessionStore } from '@/stores/useSessionStore';
+import { useSyncStore } from '@/stores/useSyncStore';
+import { bootstrapSync } from './bootstrap';
+import { pullChanges } from './pull';
+import { pushOutbox } from './push';
+import { runSync } from './syncOrchestrator';
 
-vi.mock('./bootstrap', () => ({ bootstrapSync: vi.fn() }))
-vi.mock('./pull', () => ({ pullChanges: vi.fn() }))
-vi.mock('./push', () => ({ pushOutbox: vi.fn() }))
+vi.mock('./bootstrap', () => ({ bootstrapSync: vi.fn() }));
+vi.mock('./pull', () => ({ pullChanges: vi.fn() }));
+vi.mock('./push', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./push')>();
+  return { ...actual, pushOutbox: vi.fn() };
+});
 
 afterEach(async () => {
-  vi.clearAllMocks()
-  useSessionStore.setState({ status: 'anonymous', account: null })
+  vi.clearAllMocks();
+  useSessionStore.setState({ status: 'anonymous', account: null });
   useSyncStore.setState({
     status: 'idle',
     lastSyncedAt: null,
     lastError: null,
-  })
-  await clearAllTables()
-})
+  });
+  await clearAllTables();
+});
 
 describe('runSync', () => {
   it('deduplicates concurrent runs and pushes before pulling', async () => {
-    const calls: string[] = []
+    const calls: string[] = [];
     useSessionStore.setState({
       status: 'authenticated',
       account: {
@@ -36,58 +39,124 @@ describe('runSync', () => {
         timezone: 'UTC',
         emailVerified: true,
       },
-    })
+    });
     await db.syncMeta.put({
       accountId: 'account-1',
       deviceId: 'device-1',
       lastSeenSeq: 0,
+      nextLocalSeq: 1,
+      operation: 'idle',
       lastSyncedAt: null,
       lastSyncError: null,
+      lastSyncFailureKind: null,
       bootstrapState: 'bootstrapping',
-    })
+    });
 
-    let finishBootstrap!: () => void
+    let finishBootstrap!: () => void;
     vi.mocked(bootstrapSync).mockImplementation(
       () =>
         new Promise((resolve) => {
-          finishBootstrap = () => resolve({ accountId: 'account-1', deviceId: 'device-1' })
+          finishBootstrap = () => resolve({ accountId: 'account-1', deviceId: 'device-1' });
         }),
-    )
+    );
     vi.mocked(pushOutbox).mockImplementation(async () => {
-      calls.push('push')
-    })
+      calls.push('push');
+    });
     vi.mocked(pullChanges).mockImplementation(async () => {
-      calls.push('pull')
-    })
+      calls.push('pull');
+      return 'complete';
+    });
 
-    const first = runSync()
-    const second = runSync()
-    expect(second).toBe(first)
-    finishBootstrap()
-    await first
+    const first = runSync();
+    const second = runSync();
+    expect(second).toBe(first);
+    await vi.waitFor(() => expect(finishBootstrap).toBeTypeOf('function'));
+    finishBootstrap();
+    await first;
 
-    expect(calls).toEqual(['push', 'pull'])
-    expect(useSyncStore.getState().status).toBe('synced')
+    expect(calls).toEqual(['push', 'pull']);
+    expect(useSyncStore.getState().status).toBe('synced');
     expect(await db.syncMeta.get('account-1')).toMatchObject({
       bootstrapState: 'ready',
       lastSyncError: null,
-    })
-  })
+    });
+  });
 
   it('clears the local session when sync reports an expired session', async () => {
     useSessionStore.setState({
       status: 'authenticated',
-      account: { id: 'account-1', email: 'rider@example.com', name: null, timezone: 'UTC', emailVerified: true },
-    })
-    vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' })
+      account: {
+        id: 'account-1',
+        email: 'rider@example.com',
+        name: null,
+        timezone: 'UTC',
+        emailVerified: true,
+      },
+    });
+    vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' });
     vi.mocked(pushOutbox).mockRejectedValue(
       new ApiError(
-        { error: { code: 'session_expired', message: 'Expired', retryable: false, request_id: 'request-1' } },
+        {
+          error: {
+            code: 'session_expired',
+            message: 'Expired',
+            retryable: false,
+            request_id: 'request-1',
+          },
+        },
         401,
       ),
-    )
+    );
 
-    await expect(runSync()).rejects.toThrow('Expired')
-    expect(useSessionStore.getState()).toMatchObject({ status: 'anonymous', account: null })
-  })
-})
+    await expect(runSync()).rejects.toThrow('Expired');
+    expect(useSessionStore.getState()).toMatchObject({ status: 'anonymous', account: null });
+  });
+
+  it('does not report synced while an account mutation is unresolved', async () => {
+    useSessionStore.setState({
+      status: 'authenticated',
+      account: {
+        id: 'account-1',
+        email: 'rider@example.com',
+        name: null,
+        timezone: 'UTC',
+        emailVerified: true,
+      },
+    });
+    await db.vehicles.put({
+      id: 'vehicle-1',
+      accountId: 'account-1',
+      name: 'Local vehicle',
+      plateNumber: null,
+      archivedAt: null,
+      deletedAt: null,
+      dueSoonRatio: null,
+      createdAtClient: '2026-09-17T09:00:00.000Z',
+      serverSyncedAt: null,
+      serverSeq: null,
+    });
+    await db.outbox.put({
+      mutationId: 'mutation-rejected',
+      entityType: 'vehicle',
+      operation: 'create',
+      entityId: 'vehicle-1',
+      payload: { name: 'Local vehicle' },
+      accountId: 'account-1',
+      localSeq: 1,
+      baseServerSeq: null,
+      status: 'blocked',
+      retryCount: 0,
+      lastError: 'Rejected by server',
+      failureKind: 'terminal',
+      createdAt: '2026-09-17T10:00:00.000Z',
+    });
+    vi.mocked(bootstrapSync).mockResolvedValue({ accountId: 'account-1', deviceId: 'device-1' });
+    vi.mocked(pushOutbox).mockResolvedValue();
+    vi.mocked(pullChanges).mockResolvedValue('complete');
+
+    await expect(runSync()).rejects.toThrow('Rejected by server');
+
+    expect(useSyncStore.getState()).toMatchObject({ status: 'blocked' });
+    expect((await db.syncMeta.get('account-1'))?.lastSyncedAt ?? null).toBeNull();
+  });
+});

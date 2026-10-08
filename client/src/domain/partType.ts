@@ -1,10 +1,10 @@
-import type { PartType } from './types'
+import type { PartType } from './types';
 
 export type PartTypeDisplay = {
-  displayName: string
-  icon: PartTypeIconKey
-  isKnown: boolean
-}
+  displayName: string;
+  icon: PartTypeIconKey;
+  isKnown: boolean;
+};
 
 /**
  * Icon key UI-only (map sang lucide-react ở `components/`) — KHÔNG phải domain
@@ -21,7 +21,7 @@ export type PartTypeIconKey =
   | 'drive_belt'
   | 'chain_sprocket_set'
   | 'battery'
-  | 'unknown'
+  | 'unknown';
 
 /**
  * C3: client phải xử lý được PartType "lạ" (chưa biết, do server thêm sau) một
@@ -29,12 +29,12 @@ export type PartTypeIconKey =
  * trong enum đóng cứng.
  */
 export function resolvePartTypeDisplay(code: string, knownPartTypes: PartType[]): PartTypeDisplay {
-  const found = knownPartTypes.find((p) => p.code === code)
+  const found = knownPartTypes.find((p) => p.code === code);
   if (!found) {
-    return { displayName: code, icon: 'unknown', isKnown: false }
+    return { displayName: code, icon: 'unknown', isKnown: false };
   }
-  const icon: PartTypeIconKey = isKnownIconKey(found.code) ? found.code : 'unknown'
-  return { displayName: found.displayName, icon, isKnown: true }
+  const icon: PartTypeIconKey = isKnownIconKey(found.code) ? found.code : 'unknown';
+  return { displayName: found.displayName, icon, isKnown: true };
 }
 
 function isKnownIconKey(code: string): code is PartTypeIconKey {
@@ -49,5 +49,5 @@ function isKnownIconKey(code: string): code is PartTypeIconKey {
     code === 'drive_belt' ||
     code === 'chain_sprocket_set' ||
     code === 'battery'
-  )
+  );
 }

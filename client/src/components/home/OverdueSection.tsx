@@ -1,15 +1,15 @@
-import type { ReminderWithStatus } from '@/data/queries/reminderQueries'
-import { useTranslation } from 'react-i18next'
-import { ReminderListItem } from './ReminderListItem'
+import type { ReminderWithStatus } from '@/data/queries/reminderQueries';
+import { useTranslation } from 'react-i18next';
+import { ReminderListItem } from './ReminderListItem';
 
 type OverdueSectionProps = {
-  reminders: ReminderWithStatus[]
-  vehicleId: string
-}
+  reminders: ReminderWithStatus[];
+  vehicleId: string;
+};
 
 export function OverdueSection({ reminders, vehicleId }: OverdueSectionProps) {
-  const { t } = useTranslation()
-  if (reminders.length === 0) return null
+  const { t } = useTranslation();
+  if (reminders.length === 0) return null;
 
   return (
     <section>
@@ -27,5 +27,5 @@ export function OverdueSection({ reminders, vehicleId }: OverdueSectionProps) {
         ))}
       </div>
     </section>
-  )
+  );
 }
