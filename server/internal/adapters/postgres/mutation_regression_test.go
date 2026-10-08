@@ -94,3 +94,42 @@ func TestReminderScopeRejectionPreservesNextSequence(t *testing.T) {
 		t.Fatalf("rejection left a sequence gap: first=%#v next=%#v", first, vehicle)
 	}
 }
+
+func TestReminderCreateConflictAndUpdateAcknowledgments(t *testing.T) {
+	store, _ := newTestStore(t)
+	ctx := context.Background()
+	accountID := newAccount(t, store)
+	vehicleID := createVehicle(t, store, accountID, deviceOne)
+	partTypeID := seedPartTypes(t, store, accountID)["engine_oil"]
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	reminderID := uuid.NewString()
+	payload := map[string]any{"vehicle_id": vehicleID, "part_type_id": partTypeID, "interval_km": float64(1000), "enabled": true}
+	create := domain.Mutation{MutationID: uuid.NewString(), EntityType: "reminder_config", Operation: "create", EntityID: reminderID, Payload: payload}
+	first := store.ApplyMutation(ctx, accountID, deviceOne, create, now)
+	if first.Status != domain.StatusApplied || first.ServerSeq == nil || first.ServerSyncedAt == nil {
+		t.Fatalf("first active reminder must apply: %#v", first)
+	}
+	retry := store.ApplyMutation(ctx, accountID, deviceOne, create, now.Add(time.Minute))
+	if retry.Status != domain.StatusDuplicate || retry.ServerSeq == nil || retry.ServerSyncedAt == nil || *retry.ServerSeq != *first.ServerSeq || !retry.ServerSyncedAt.Equal(*first.ServerSyncedAt) {
+		t.Fatalf("retry must preserve acknowledgment: %#v", retry)
+	}
+	conflict := domain.Mutation{MutationID: uuid.NewString(), EntityType: "reminder_config", Operation: "create", EntityID: uuid.NewString(), Payload: payload}
+	rejected := store.ApplyMutation(ctx, accountID, deviceTwo, conflict, now)
+	if rejected.Status != domain.StatusRejected || rejected.ErrorCode != domain.MutationErrorValidation || rejected.ServerSeq != nil {
+		t.Fatalf("second active reminder must be rejected: %#v", rejected)
+	}
+	if again := store.ApplyMutation(ctx, accountID, deviceTwo, conflict, now); again.Status != domain.StatusRejected || again.ErrorCode != rejected.ErrorCode {
+		t.Fatalf("rejected acknowledgment must be replayed: %#v", again)
+	}
+	updatedPayload := map[string]any{"vehicle_id": vehicleID, "part_type_id": partTypeID, "interval_km": float64(2000), "enabled": true}
+	updated := store.ApplyMutation(ctx, accountID, deviceOne, domain.Mutation{
+		MutationID: uuid.NewString(), EntityType: "reminder_config", Operation: "update", EntityID: reminderID, Payload: updatedPayload,
+	}, now.Add(time.Minute))
+	if updated.Status != domain.StatusApplied || updated.ServerSeq == nil || *updated.ServerSeq != *first.ServerSeq+1 {
+		t.Fatalf("update of same reminder must apply without sequence gap: %#v", updated)
+	}
+	page, err := store.Pull(ctx, accountID, *first.ServerSeq, 10, nil)
+	if err != nil || len(page.Changes) != 1 || page.Changes[0].Payload["interval_km"] != float64(2000) {
+		t.Fatalf("update must appear once in feed: page=%#v err=%v", page, err)
+	}
+}

@@ -161,18 +161,21 @@ func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.
 	if err != nil {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Session store is unavailable."}
 	}
-	if !found {
+	if !found || session == nil {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
 	}
 	account, err := s.ports.AccountByID(ctx, session.AccountID)
 	if err != nil {
-		if !found {
+		if errors.Is(err, ErrAccountNotFound) {
 			return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
 		}
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
+	if account == nil {
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
+	}
 
-	return session, *account, nil
+	return *session, *account, nil
 }
 
 // Logout deletes the current session.

@@ -1,9 +1,6 @@
 package conversion
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "encoding/json"
 
 func Marshal(payload map[string]any) ([]byte, error) {
 	if payload == nil {
@@ -23,21 +20,6 @@ func Unmarshal(data []byte) (map[string]any, error) {
 	return out, nil
 }
 
-func ValueS[V any](m map[string]any, key string) (V, error) {
-	var zero V
-	value, ok := m[key]
-	if !ok {
-		return zero, nil
-	}
-
-	typedValue, ok := value.(V)
-	if !ok {
-		return zero, fmt.Errorf("unable to convert %T to %T", value, zero)
-	}
-
-	return typedValue, nil
-}
-
 func Value[V any](m map[string]any, key string) V {
 	var zero V
 	value, ok := m[key]
@@ -51,6 +33,19 @@ func Value[V any](m map[string]any, key string) V {
 	}
 
 	return typedValue
+}
+
+func ValueOK[V any](m map[string]any, key string) (V, bool) {
+	var zero V
+	value, exists := m[key]
+	if !exists || value == nil {
+		return zero, false
+	}
+	typedValue, ok := value.(V)
+	if !ok {
+		return zero, false
+	}
+	return typedValue, true
 }
 
 func ToPointer[T any](value T) *T {

@@ -23,7 +23,7 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 	}
 	const workers = 12
 	start := make(chan struct{})
-	results := make(chan domain.MutationResult, workers)
+	results := make(chan *domain.MutationResult, workers)
 	var ready sync.WaitGroup
 	ready.Add(workers)
 	for range workers {
@@ -39,6 +39,9 @@ func TestConcurrentRetriesReturnOneOriginalAcknowledgment(t *testing.T) {
 	var receivedAt *time.Time
 	for range workers {
 		result := <-results
+		if result == nil {
+			t.Fatal("nil mutation result")
+		}
 		counts[result.Status]++
 		if result.ServerSeq == nil || *result.ServerSeq != initialAccountSeq+1 || result.ServerSyncedAt == nil {
 			t.Fatalf("retry did not return original ACK: %#v", result)
@@ -201,7 +204,7 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 	partTypeID := partTypes["engine_oil"]
 	now := time.Date(2026, 9, 17, 10, 0, 0, 0, time.UTC)
 
-	results := make(chan domain.MutationResult, 2)
+	results := make(chan *domain.MutationResult, 2)
 	for index := 1; index <= 2; index++ {
 		index := index
 		deviceID := uuid.NewString()
@@ -219,7 +222,11 @@ func TestReminderScopeIsUniqueAcrossConcurrentDevices(t *testing.T) {
 
 	statusCount := map[domain.MutationStatus]int{}
 	for range 2 {
-		statusCount[(<-results).Status]++
+		result := <-results
+		if result == nil {
+			t.Fatal("nil mutation result")
+		}
+		statusCount[result.Status]++
 	}
 	if statusCount["applied"] != 1 || statusCount["rejected"] != 1 {
 		t.Fatalf("expected one applied and one rejected result, got %v", statusCount)

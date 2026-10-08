@@ -26,7 +26,7 @@ func (s *Store) EntityExists(ctx context.Context, accountID, entityType, entityI
 		exists, err := s.queries.ServiceLogExists(ctx, sqlcgen.ServiceLogExistsParams{AccountID: accountID, ID: entityID})
 		return exists, wrapExistsError(entityType, err)
 	case "part_type":
-		exists, err := s.queries.PartTypeOwnedByAccount(ctx, sqlcgen.PartTypeOwnedByAccountParams{ID: entityID, AccountID: accountID})
+		exists, err := s.queries.PartTypeExists(ctx, sqlcgen.PartTypeExistsParams{ID: entityID, AccountID: accountID})
 		return exists, wrapExistsError(entityType, err)
 	default:
 		return false, fmt.Errorf("postgres: unsupported entity type %q", entityType)

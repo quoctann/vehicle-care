@@ -83,10 +83,10 @@ func validateCurrentState(ctx context.Context, queries *sqlcgen.Queries, account
 			PartTypeID: conv.Value[string](mutation.Payload, "part_type_id"),
 			VehicleID:  conv.Value[string](mutation.Payload, "vehicle_id"),
 		})
-		if err == nil || errors.Is(err, sql.ErrNoRows) {
+		if err == nil {
 			return domain.MutationErrorValidation, "An active reminder already exists for this vehicle and part type.", nil
 		}
-		if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return "", "", fmt.Errorf("find active reminder conflict: %w", err)
 		}
 	}

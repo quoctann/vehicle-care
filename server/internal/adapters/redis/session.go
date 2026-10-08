@@ -76,26 +76,26 @@ func (s *Store) CreateSession(ctx context.Context, sessionID string, session dom
 // judged from the expires_at field stored in the JSON value (not solely
 // from the Redis key TTL), since this method makes no attempt to keep the
 // two in sync the way GetAndRefreshSession/RefreshSession do.
-func (s *Store) Session(ctx context.Context, sessionID string, now time.Time) (domain.Session, bool, error) {
+func (s *Store) Session(ctx context.Context, sessionID string, now time.Time) (*domain.Session, bool, error) {
 	raw, err := s.client.Get(ctx, sessionKey(sessionID)).Result()
 	if errors.Is(err, goredis.Nil) {
-		return domain.Session{}, false, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return domain.Session{}, false, wrapErr("get session", err)
+		return nil, false, wrapErr("get session", err)
 	}
 	stored, err := decodeSession(raw)
 	if err != nil {
-		return domain.Session{}, false, wrapErr("decode session", err)
+		return nil, false, wrapErr("decode session", err)
 	}
 	session, err := stored.toDomain()
 	if err != nil {
-		return domain.Session{}, false, wrapErr("decode session", err)
+		return nil, false, wrapErr("decode session", err)
 	}
 	if !now.Before(session.ExpiresAt) {
-		return domain.Session{}, false, nil
+		return nil, false, nil
 	}
-	return session, true, nil
+	return &session, true, nil
 }
 
 // refreshSessionValue is the shared implementation behind
@@ -146,15 +146,15 @@ func (s *Store) refreshSessionValue(ctx context.Context, sessionID string, newEx
 // the user.SessionStore contract but unused here: Redis's own key TTL is
 // the source of truth for expiration, so there is nothing left for a
 // separately-passed "now" to check.
-func (s *Store) GetAndRefreshSession(ctx context.Context, sessionID string, _ time.Time, newExpiresAt time.Time) (domain.Session, bool, error) {
+func (s *Store) GetAndRefreshSession(ctx context.Context, sessionID string, _ time.Time, newExpiresAt time.Time) (*domain.Session, bool, error) {
 	stored, err := s.refreshSessionValue(ctx, sessionID, newExpiresAt)
 	if errors.Is(err, errSessionExpired) {
-		return domain.Session{}, false, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return domain.Session{}, false, err
+		return nil, false, err
 	}
-	return domain.Session{AccountID: stored.AccountID, CSRFToken: stored.CSRFToken, ExpiresAt: newExpiresAt}, true, nil
+	return &domain.Session{AccountID: stored.AccountID, CSRFToken: stored.CSRFToken, ExpiresAt: newExpiresAt}, true, nil
 }
 
 // RefreshSession extends an active session's expiry. It errors if the

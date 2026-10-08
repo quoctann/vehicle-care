@@ -37,38 +37,45 @@ func lockCurrentSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountI
 
 // writeMutableSnapshot only writes the entity; its caller owns the transaction,
 // change feed and processed-mutation ACK.
-func writeMutableSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) (domain.MutationResult, bool, error) {
+func writeMutableSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) (*domain.MutationResult, error) {
 	var err error
 	switch mutation.EntityType {
 	case domain.EntityReminderConfig:
-		return domain.MutationResult{}, false, writeReminderSnapshot(ctx, queries, accountID, mutation, seq, receivedAt)
+		return nil, writeReminderSnapshot(ctx, queries, accountID, mutation, seq, receivedAt)
+
 	case domain.EntityPartType:
 		return writePartTypeSnapshot(ctx, queries, accountID, mutation, seq, receivedAt)
+
 	case domain.EntityVehicle:
 		params, buildErr := buildUpsertVehicleParams(accountID, mutation.EntityID, mutation.Payload, seq, receivedAt)
 		if buildErr != nil {
-			return domain.MutationResult{}, false, buildErr
+			return nil, buildErr
 		}
 		err = queries.UpsertVehicle(ctx, params)
+
 	case domain.EntityFuelLog:
 		params, buildErr := buildUpsertFuelLogParams(accountID, mutation.EntityID, mutation.Payload, seq, receivedAt)
 		if buildErr != nil {
-			return domain.MutationResult{}, false, buildErr
+			return nil, buildErr
 		}
 		err = queries.UpsertFuelLog(ctx, params)
+
 	case domain.EntityServiceLog:
 		params, buildErr := buildUpsertServiceLogParams(accountID, mutation.EntityID, mutation.Payload, seq, receivedAt)
 		if buildErr != nil {
-			return domain.MutationResult{}, false, buildErr
+			return nil, buildErr
 		}
 		err = queries.UpsertServiceLog(ctx, params)
+
 	default:
-		return domain.MutationResult{}, false, fmt.Errorf("unsupported mutable entity type %q", mutation.EntityType)
+		return nil, fmt.Errorf("unsupported mutable entity type %q", mutation.EntityType)
 	}
+
 	if err != nil {
-		return domain.MutationResult{}, false, fmt.Errorf("upsert %s: %w", mutation.EntityType, err)
+		return nil, fmt.Errorf("upsert %s: %w", mutation.EntityType, err)
 	}
-	return domain.MutationResult{}, false, nil
+
+	return nil, nil
 }
 
 func writeReminderSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) error {
@@ -82,17 +89,17 @@ func writeReminderSnapshot(ctx context.Context, queries *sqlcgen.Queries, accoun
 	return nil
 }
 
-func writePartTypeSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) (domain.MutationResult, bool, error) {
+func writePartTypeSnapshot(ctx context.Context, queries *sqlcgen.Queries, accountID string, mutation domain.Mutation, seq int64, receivedAt time.Time) (*domain.MutationResult, error) {
 	params, err := buildUpsertPartTypeParams(accountID, mutation.EntityID, mutation.Payload, seq, receivedAt)
 	if err != nil {
-		return domain.MutationResult{}, false, err
+		return nil, err
 	}
 	rowsAffected, err := queries.UpsertPartType(ctx, params)
 	if err != nil {
-		return domain.MutationResult{}, false, fmt.Errorf("upsert part_type: %w", err)
+		return nil, fmt.Errorf("upsert part_type: %w", err)
 	}
 	if rowsAffected != 1 {
-		return rejectedResult(mutation.MutationID, domain.MutationErrorOwnership, "Part type does not belong to this account."), true, nil
+		return rejectedResult(mutation.MutationID, domain.MutationErrorOwnership, "Part type does not belong to this account."), nil
 	}
-	return domain.MutationResult{}, false, nil
+	return nil, nil
 }

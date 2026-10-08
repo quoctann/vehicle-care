@@ -3,120 +3,54 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
+	conv "github.com/quoctann/vehicle-care/server/pkg/conversion"
 )
 
-// marshalPayload encodes a mutation payload for storage in a jsonb column.
-// A nil payload is stored as an empty JSON object rather than SQL NULL,
-// matching the NOT NULL change_feed.payload column.
-func marshalPayload(payload map[string]any) ([]byte, error) {
-	if payload == nil {
-		payload = map[string]any{}
-	}
-	return json.Marshal(payload)
-}
-
-// unmarshalPayload decodes a jsonb column back into a payload map. It
-// returns nil for an empty/NULL column.
-func unmarshalPayload(data []byte) (map[string]any, error) {
-	if len(data) == 0 {
-		return nil, nil
-	}
-	var out map[string]any
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("postgres: decode payload: %w", err)
-	}
-	return out, nil
-}
-
-func stringValue(payload map[string]any, key string) string {
-	value, _ := payload[key].(string)
-	return value
-}
-
-func boolValue(payload map[string]any, key string) bool {
-	value, _ := payload[key].(bool)
-	return value
-}
-
-func numberValue(payload map[string]any, key string) float64 {
-	value, _ := payload[key].(float64)
-	return value
-}
-
 func nullString(payload map[string]any, key string) sql.NullString {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return sql.NullString{}
-	}
-	text, ok := value.(string)
+	text, ok := conv.ValueOK[string](payload, key)
 	if !ok {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: text, Valid: true}
 }
 
-// nullStringPtr renders a nullable string field as *string, matching the
-// generated Go type for nullable uuid columns (see sqlc.yaml overrides).
+// Nullable string field as *string, matching the generated Go type for nullable
+// uuid columns (see sqlc.yaml overrides).
 func nullStringPtr(payload map[string]any, key string) *string {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return nil
-	}
-	text, ok := value.(string)
+	text, ok := conv.ValueOK[string](payload, key)
 	if !ok {
 		return nil
 	}
 	return &text
 }
 
-// numericString formats a float64 the way a numeric(p,s) column parameter
-// must be sent as text over the wire; PostgreSQL applies the column's own
-// scale when storing it.
+// Formats a float64 the way a numeric(p,s) column parameter must be sent as
+// text over the wire; PostgreSQL applies the column's own scale when storing
+// it.
 func numericString(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
 func requiredNumericString(payload map[string]any, key string) string {
-	return numericString(numberValue(payload, key))
+	return numericString(conv.Value[float64](payload, key))
 }
 
 func nullNumericString(payload map[string]any, key string) sql.NullString {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return sql.NullString{}
-	}
-	number, ok := value.(float64)
+	number, ok := conv.ValueOK[float64](payload, key)
 	if !ok {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: numericString(number), Valid: true}
 }
 
-func nullInt64FromNumber(payload map[string]any, key string) sql.NullInt64 {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return sql.NullInt64{}
-	}
-	number, ok := value.(float64)
-	if !ok {
-		return sql.NullInt64{}
-	}
-	return sql.NullInt64{Int64: int64(number), Valid: true}
-}
-
 func nullInt32FromNumber(payload map[string]any, key string) sql.NullInt32 {
-	value, exists := payload[key]
-	if !exists || value == nil {
-		return sql.NullInt32{}
-	}
-	number, ok := value.(float64)
+	number, ok := conv.ValueOK[float64](payload, key)
 	if !ok {
 		return sql.NullInt32{}
 	}
@@ -179,10 +113,11 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 	if err != nil {
 		return sqlcgen.UpsertVehicleParams{}, err
 	}
+
 	return sqlcgen.UpsertVehicleParams{
 		AccountID:      accountID,
 		ID:             entityID,
-		Name:           stringValue(payload, "name"),
+		Name:           conv.Value[string](payload, "name"),
 		PlateNumber:    nullString(payload, "plate_number"),
 		ArchivedAt:     archivedAt,
 		DeletedAt:      deletedAt,
@@ -202,64 +137,61 @@ func buildUpsertPartTypeParams(accountID, entityID string, payload map[string]an
 	return sqlcgen.UpsertPartTypeParams{
 		ID:             entityID,
 		AccountID:      accountID,
-		Code:           stringValue(payload, "code"),
-		Name:           stringValue(payload, "name"),
-		DisplayOrder:   int32(numberValue(payload, "display_order")),
-		Active:         boolValue(payload, "active"),
+		Code:           conv.Value[string](payload, "code"),
+		Name:           conv.Value[string](payload, "name"),
+		DisplayOrder:   int32(conv.Value[float64](payload, "display_order")),
+		Active:         conv.Value[bool](payload, "active"),
 		ServerSeq:      seq,
 		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
-// buildUpsertReminderConfigParams decodes a validated reminder_config
-// payload into UPSERT parameters.
 func buildUpsertReminderConfigParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertReminderConfigParams, error) {
 	baselineDate, err := nullDate(payload, "baseline_date")
 	if err != nil {
 		return sqlcgen.UpsertReminderConfigParams{}, err
 	}
+
 	deletedAt, err := nullTime(payload, "deleted_at")
 	if err != nil {
 		return sqlcgen.UpsertReminderConfigParams{}, err
 	}
+
 	return sqlcgen.UpsertReminderConfigParams{
 		AccountID:          accountID,
 		ID:                 entityID,
-		VehicleID:          stringValue(payload, "vehicle_id"),
-		PartTypeID:         stringValue(payload, "part_type_id"),
+		VehicleID:          conv.Value[string](payload, "vehicle_id"),
+		PartTypeID:         conv.Value[string](payload, "part_type_id"),
 		IntervalKm:         nullNumericString(payload, "interval_km"),
 		IntervalDays:       nullInt32FromNumber(payload, "interval_days"),
 		BaselineOdometerKm: nullNumericString(payload, "baseline_odometer_km"),
 		BaselineDate:       baselineDate,
-		Enabled:            boolValue(payload, "enabled"),
+		Enabled:            conv.Value[bool](payload, "enabled"),
 		DeletedAt:          deletedAt,
 		ServerSeq:          seq,
 		ServerSyncedAt:     receivedAt,
 	}, nil
 }
 
-// buildInsertOdometerLogParams decodes a validated odometer_log payload
-// into INSERT parameters.
 func buildInsertOdometerLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.InsertOdometerLogParams, error) {
 	recordedAt, err := requiredTime(payload, "recorded_at")
 	if err != nil {
 		return sqlcgen.InsertOdometerLogParams{}, err
 	}
+
 	return sqlcgen.InsertOdometerLogParams{
 		AccountID:      accountID,
 		ID:             entityID,
-		VehicleID:      stringValue(payload, "vehicle_id"),
+		VehicleID:      conv.Value[string](payload, "vehicle_id"),
 		OdometerKm:     requiredNumericString(payload, "odometer_km"),
 		RecordedAt:     recordedAt,
-		Source:         stringValue(payload, "source"),
+		Source:         conv.Value[string](payload, "source"),
 		Note:           nullString(payload, "note"),
 		ServerSeq:      seq,
 		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
-// buildUpsertFuelLogParams decodes a validated fuel_log payload into UPSERT
-// parameters.
 func buildUpsertFuelLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertFuelLogParams, error) {
 	recordedAt, err := requiredTime(payload, "recorded_at")
 	if err != nil {
@@ -269,24 +201,23 @@ func buildUpsertFuelLogParams(accountID, entityID string, payload map[string]any
 	if err != nil {
 		return sqlcgen.UpsertFuelLogParams{}, err
 	}
+
 	return sqlcgen.UpsertFuelLogParams{
 		AccountID:      accountID,
 		ID:             entityID,
-		VehicleID:      stringValue(payload, "vehicle_id"),
+		VehicleID:      conv.Value[string](payload, "vehicle_id"),
 		RecordedAt:     recordedAt,
 		Liters:         nullNumericString(payload, "liters"),
 		Cost:           nullNumericString(payload, "cost"),
 		Note:           nullString(payload, "note"),
 		OdometerLogID:  nullStringPtr(payload, "odometer_log_id"),
-		IsFullTank:     boolValue(payload, "is_full_tank"),
+		IsFullTank:     conv.Value[bool](payload, "is_full_tank"),
 		DeletedAt:      deletedAt,
 		ServerSeq:      seq,
 		ServerSyncedAt: receivedAt,
 	}, nil
 }
 
-// buildUpsertServiceLogParams decodes a validated service_log payload into
-// UPSERT parameters.
 func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertServiceLogParams, error) {
 	servicedAt, err := requiredTime(payload, "serviced_at")
 	if err != nil {
@@ -296,11 +227,12 @@ func buildUpsertServiceLogParams(accountID, entityID string, payload map[string]
 	if err != nil {
 		return sqlcgen.UpsertServiceLogParams{}, err
 	}
+
 	return sqlcgen.UpsertServiceLogParams{
 		AccountID:          accountID,
 		ID:                 entityID,
-		VehicleID:          stringValue(payload, "vehicle_id"),
-		PartTypeID:         stringValue(payload, "part_type_id"),
+		VehicleID:          conv.Value[string](payload, "vehicle_id"),
+		PartTypeID:         conv.Value[string](payload, "part_type_id"),
 		ServicedAt:         servicedAt,
 		OdometerKmSnapshot: nullNumericString(payload, "odometer_km_snapshot"),
 		Cost:               nullNumericString(payload, "cost"),
@@ -344,5 +276,9 @@ func canonicalPayload(ctx context.Context, queries *sqlcgen.Queries, accountID s
 		return nil, fmt.Errorf("postgres: read canonical %s payload: %w", entityType, err)
 	}
 
-	return unmarshalPayload(data)
+	payload, err := conv.Unmarshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: decode payload: %w", err)
+	}
+	return payload, nil
 }

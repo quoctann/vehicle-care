@@ -30,8 +30,8 @@ const (
 
 type ISessionStore interface {
 	CreateSession(ctx context.Context, sessionID string, session domain.Session) error
-	GetAndRefreshSession(ctx context.Context, sessionID string, now, newExpiresAt time.Time) (domain.Session, bool, error)
-	Session(ctx context.Context, sessionID string, now time.Time) (domain.Session, bool, error)
+	GetAndRefreshSession(ctx context.Context, sessionID string, now, newExpiresAt time.Time) (*domain.Session, bool, error)
+	Session(ctx context.Context, sessionID string, now time.Time) (*domain.Session, bool, error)
 	RefreshSession(ctx context.Context, sessionID string, expiresAt time.Time) error
 	DeleteSession(ctx context.Context, sessionID string) error
 	DeleteAccountSessions(ctx context.Context, accountID string) error

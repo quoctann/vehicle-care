@@ -46,7 +46,12 @@ func (s *Service) Push(ctx context.Context, accountID string, deviceID string, m
 		}
 
 		result := s.ports.ApplyMutation(ctx, accountID, deviceID, mutation, s.now())
-		results = append(results, result)
+		if result == nil {
+			retryable := true
+			results = append(results, domain.MutationResult{MutationID: mutation.MutationID, Status: domain.StatusRetryableError, ErrorCode: domain.MutationErrorInternal, ErrorMessage: "Temporary storage failure. Please retry.", Retryable: &retryable})
+			break
+		}
+		results = append(results, *result)
 		if result.Status == domain.StatusRejected || result.Status == domain.StatusRetryableError {
 			break
 		}
@@ -71,12 +76,26 @@ func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, li
 	if err != nil {
 		return domain.PullPage{}, err
 	}
+	if page == nil {
+		return domain.PullPage{}, &app.Error{Code: app.ECInternalError, Message: "Pull store returned no page."}
+	}
 
-	return page, nil
+	return *page, nil
 }
 
 func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain.PartType, error) {
-	return s.ports.ListPartTypes(ctx, accountID)
+	partTypes, err := s.ports.ListPartTypes(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	values := make([]domain.PartType, 0, len(partTypes))
+	for _, partType := range partTypes {
+		if partType == nil {
+			return nil, &app.Error{Code: app.ECInternalError, Message: "Part type store returned an invalid entry."}
+		}
+		values = append(values, *partType)
+	}
+	return values, nil
 }
 
 func rejected(mutationID string, code domain.MutationErrorCode, message string) domain.MutationResult {

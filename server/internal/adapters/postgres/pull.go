@@ -7,14 +7,15 @@ import (
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
+	conv "github.com/quoctann/vehicle-care/server/pkg/conversion"
 )
 
 // Pull returns one page bounded by untilSeq. When untilSeq is nil, the current
 // account sequence is captured as the bound for the caller's first page.
-func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limit int, untilSeq *int64) (domain.PullPage, error) {
+func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limit int, untilSeq *int64) (*domain.PullPage, error) {
 	tx, err := s.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return domain.PullPage{}, fmt.Errorf("postgres: begin pull: %w", err)
+		return nil, fmt.Errorf("postgres: begin pull: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -22,7 +23,7 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 
 	currentSeq, err := queries.CurrentAccountSequence(ctx, accountID)
 	if err != nil {
-		return domain.PullPage{}, fmt.Errorf("postgres: read current seq: %w", err)
+		return nil, fmt.Errorf("postgres: read current seq: %w", err)
 	}
 
 	upperBound := currentSeq
@@ -35,7 +36,7 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 		AccountID: accountID, ServerSeq: afterSeq, ServerSeq_2: upperBound, Limit: int32(limit + 1),
 	})
 	if err != nil {
-		return domain.PullPage{}, fmt.Errorf("postgres: list changes: %w", err)
+		return nil, fmt.Errorf("postgres: list changes: %w", err)
 	}
 
 	hasMore := len(rows) > limit
@@ -45,9 +46,9 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 
 	changes := make([]domain.Change, 0, len(rows))
 	for _, row := range rows {
-		payload, err := unmarshalPayload(row.Payload)
+		payload, err := conv.Unmarshal(row.Payload)
 		if err != nil {
-			return domain.PullPage{}, err
+			return nil, err
 		}
 
 		changes = append(changes, domain.Change{
@@ -66,8 +67,8 @@ func (s *Store) Pull(ctx context.Context, accountID string, afterSeq int64, limi
 	}
 
 	if err := tx.Commit(); err != nil {
-		return domain.PullPage{}, fmt.Errorf("postgres: commit pull: %w", err)
+		return nil, fmt.Errorf("postgres: commit pull: %w", err)
 	}
 
-	return domain.PullPage{Changes: changes, NextCursor: nextCursor, UntilSeq: upperBound, HasMore: hasMore}, nil
+	return &domain.PullPage{Changes: changes, NextCursor: nextCursor, UntilSeq: upperBound, HasMore: hasMore}, nil
 }

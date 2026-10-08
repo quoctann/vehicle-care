@@ -11,26 +11,36 @@ import (
 )
 
 type testDependencies struct {
-	applied []string
-	result  func(domain.Mutation) domain.MutationResult
-	pullErr error
+	applied   []string
+	result    func(domain.Mutation) domain.MutationResult
+	pullErr   error
+	nilResult bool
+	nilPage   bool
+	partTypes []*domain.PartType
 }
 
 func (d *testDependencies) DeviceRegistered(context.Context, string, string) (bool, error) {
 	return true, nil
 }
 
-func (d *testDependencies) ApplyMutation(_ context.Context, _ string, _ string, mutation domain.Mutation, _ time.Time) domain.MutationResult {
+func (d *testDependencies) ApplyMutation(_ context.Context, _ string, _ string, mutation domain.Mutation, _ time.Time) *domain.MutationResult {
 	d.applied = append(d.applied, mutation.MutationID)
-	return d.result(mutation)
+	if d.nilResult {
+		return nil
+	}
+	result := d.result(mutation)
+	return &result
 }
 
-func (d *testDependencies) Pull(context.Context, string, int64, int, *int64) (domain.PullPage, error) {
-	return domain.PullPage{}, d.pullErr
+func (d *testDependencies) Pull(context.Context, string, int64, int, *int64) (*domain.PullPage, error) {
+	if d.nilPage {
+		return nil, nil
+	}
+	return &domain.PullPage{}, d.pullErr
 }
 
-func (d *testDependencies) ListPartTypes(context.Context, string) ([]domain.PartType, error) {
-	return nil, nil
+func (d *testDependencies) ListPartTypes(context.Context, string) ([]*domain.PartType, error) {
+	return d.partTypes, nil
 }
 
 func (d *testDependencies) Push(context.Context, string, string, []domain.Mutation) ([]domain.MutationResult, error) {
@@ -99,5 +109,32 @@ func TestPullPropagatesDependencyErrors(t *testing.T) {
 	_, err := NewService(deps, 10, 10).Pull(context.Background(), "account-1", 0, 10, nil)
 	if !errors.Is(err, want) {
 		t.Fatalf("expected pull error to propagate, got %v", err)
+	}
+}
+
+func TestPushStopsSafelyWhenStorageReturnsNil(t *testing.T) {
+	deps := &testDependencies{nilResult: true}
+	results, err := NewService(deps, 10, 10).Push(context.Background(), "account-1", "00000000-0000-4000-8000-000000000010", []domain.Mutation{validMutation("first"), validMutation("second")})
+	if err != nil || len(results) != 1 || results[0].Status != domain.StatusRetryableError || len(deps.applied) != 1 {
+		t.Fatalf("expected one retryable result and stopped batch, results=%#v err=%v", results, err)
+	}
+}
+
+func TestPullRejectsNilPage(t *testing.T) {
+	_, err := NewService(&testDependencies{nilPage: true}, 10, 10).Pull(context.Background(), "account-1", 0, 10, nil)
+	if err == nil {
+		t.Fatal("expected an error for nil page")
+	}
+}
+
+func TestListPartTypesPreservesValuesAndRejectsNilEntries(t *testing.T) {
+	service := NewService(&testDependencies{partTypes: []*domain.PartType{{Name: "Oil"}}}, 10, 10)
+	got, err := service.ListPartTypes(context.Background(), "account-1")
+	if err != nil || len(got) != 1 || got[0].Name != "Oil" {
+		t.Fatalf("unexpected part types: %#v, %v", got, err)
+	}
+	_, err = NewService(&testDependencies{partTypes: []*domain.PartType{nil}}, 10, 10).ListPartTypes(context.Background(), "account-1")
+	if err == nil {
+		t.Fatal("expected error for nil part type")
 	}
 }
