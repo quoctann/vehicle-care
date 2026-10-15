@@ -110,6 +110,30 @@ func (s *Store) SetEmailVerified(ctx context.Context, accountID string) error {
 	return nil
 }
 
+func (s *Store) UpdateAccountTimezone(ctx context.Context, accountID, timezone string) (*domain.Account, error) {
+	row, err := s.queries.UpdateAccountTimezone(ctx, sqlcgen.UpdateAccountTimezoneParams{ID: accountID, Timezone: timezone})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, app_user.ErrAccountNotFound
+		}
+		return nil, fmt.Errorf("postgres: update account timezone: %w", err)
+	}
+
+	account := domain.Account{
+		ID:            row.ID,
+		Email:         row.Email,
+		Timezone:      row.Timezone,
+		EmailVerified: row.EmailVerified,
+		PasswordHash:  row.PasswordHash,
+	}
+	if row.Name.Valid {
+		value := row.Name.String
+		account.Name = &value
+	}
+
+	return &account, nil
+}
+
 func (s *Store) SetPassword(ctx context.Context, accountID string, passwordHash []byte) error {
 	if err := s.queries.SetPassword(ctx, sqlcgen.SetPasswordParams{ID: accountID, PasswordHash: passwordHash}); err != nil {
 		return fmt.Errorf("postgres: set password: %w", err)

@@ -76,7 +76,7 @@ Luôn trả 200 kể cả email không tồn tại (không lộ thông tin tài 
 // Request
 { "email": "minh@gmail.com", "password": "matkhau123" }
 // Response 200
-{ "account": { "id": "acc_1", "email": "minh@gmail.com", "name": "Minh Trần", "timezone": "Asia/Ho_Chi_Minh", "email_verified": true } }
+{ "account": { "id": "acc_1", "email": "minh@gmail.com", "name": "Minh Trần", "timezone": "UTC+07:00", "email_verified": true } }
 ```
 Set-Cookie: `sid`, `csrf_token`. Sai email/password → 401 `auth_invalid` (KHÔNG phân biệt "email không tồn tại" vs "sai mật khẩu" trong message, tránh lộ thông tin).
 
@@ -112,11 +112,43 @@ Revoke toàn bộ session Redis của account sau khi reset thành công.
 ### 2.9. `GET /auth/session`
 ```json
 // 200 — còn phiên hợp lệ
-{ "account": { "id": "acc_1", "email": "minh@gmail.com", "name": "Minh Trần", "timezone": "Asia/Ho_Chi_Minh", "email_verified": true } }
+{ "account": { "id": "acc_1", "email": "minh@gmail.com", "name": "Minh Trần", "timezone": "UTC+07:00", "email_verified": true } }
 // 401 — chưa đăng nhập/hết hạn
 { "error": { "code": "session_expired", "message": "Session expired or missing.", "retryable": false, "request_id": "req_abc" } }
 ```
 Gọi 1 lần lúc app khởi động để hydrate `useSessionStore`.
+
+#### `POST /account/timezone`
+
+Authenticated, CSRF-protected account preference update. The account
+ID is derived exclusively from the session, never from the request body.
+
+```json
+// Request
+{ "timezone": "UTC+07:00", "expected_account_id": "acc_1" }
+// Response 200 (same account shape as GET /auth/session)
+{ "account": { "id": "acc_1", "email": "minh@gmail.com", "name": "Minh Trần", "timezone": "UTC+07:00", "email_verified": true } }
+```
+
+Only the hardcoded supported fixed-offset values are accepted. Zero is `UTC+00:00`;
+unsupported offsets, geography-based IANA values, `UTC`, `Etc/GMT`, whitespace and
+malformed input return 400 `validation_failed`. City and IANA names in the picker
+are explanatory labels only. No compatibility migration or data backfill is applied.
+Missing session returns 401 and invalid CSRF returns 403.
+Optional `expected_account_id` is a stale-tab precondition, never an authorization
+source. If supplied, it must match the session account ID; otherwise return 409
+`validation_failed` before any database write, without exposing the active account.
+Clients should send their captured account ID to prevent shared-cookie account
+switches from applying an old tab's preference to a different account.
+Saving requires connectivity; the saved preference is cached for offline use.
+One account timezone controls reminder calendar days, history, monthly costs, and
+log-entry wall-clock inputs. UTC timestamps and date-only reminder baselines are
+never rewritten. Other devices see changes on their next session refresh.
+The picker offers a hardcoded list of fixed offsets, including
+`UTC+07:00 — Bangkok, Hanoi, Jakarta`, without search, timezone datasets or DST-based
+new choices. “Use device timezone” snapshots the current offset only on click,
+including listed fractional offsets; unsupported values show an explanation.
+Device selection also requires explicit Save; it does not enable automatic travel tracking.
 
 ### 2.10. `POST /auth/logout`
 Header bắt buộc: `X-CSRF-Token`. 204 No Content, clear cả 2 cookie, xoá session khỏi Redis.
@@ -409,3 +441,16 @@ transaction signup. Thiết bị mới pull từ `after_seq=0` sẽ nhận cả 
 PartType inactive không xuất hiện trong picker tạo mới, nhưng server vẫn chấp nhận reference
 từ record offline nếu PartType đó thuộc đúng account. ReminderConfig ID được sinh xác định
 từ account + vehicle + PartType để concurrent offline create cùng scope hội tụ về một ID.
+
+### 6.5. Wire contract sau khi thay baseline DB
+
+Các ví dụ ở mục 2.11–2.14 và 4 dùng tên trường cũ và chỉ còn là tư liệu lịch sử.
+Contract hiện hành (cùng với `client/src/api/contract.types.ts`):
+
+- `POST /sync/push` nhận `device_id` và `mutations`, không còn yêu cầu `api_version`; mục 2.11 và mã lỗi `unsupported_version` ở mục 4 là thông tin lịch sử.
+- `device_id` trên HTTP vẫn là tên trường cũ nhưng **giá trị phải là UUID**; bảng `devices` lưu `id uuid`, `processed_mutations.device_id` cũng là UUID.
+- PartType trả `name` thay `name_vi`; payload create/update dùng `name`, `code`, `display_order`, `active`. Không còn `seed_version` trên DB/API/client.
+- FuelLog/ServiceLog dùng `cost` (số trong `[0, 99999999.99]`, tối đa hai chữ số thập phân); tiền hiện được diễn giải và hiển thị là **VND**, chưa có field currency trong phase này. FuelLog không còn `shop` trên DB/API/UI. Không gửi `cost_vnd` hoặc `shop`: payload cũ sẽ bị từ chối thay vì âm thầm mất tiền/cửa hàng.
+- ACK push, thay đổi pull và `GET /part-types` trả `server_synced_at` thay `received_at_server`; các entity local lưu `serverSyncedAt`. Nó vẫn là thời điểm server ghi nhận, không phải đồng hồ client.
+- Bảng `notification_deliveries` được đổi tên thành `reminder_notification` (mới có schema, chưa có worker gửi email).
+- Đây là **baseline cho database sạch**, không phải migration nâng cấp phiên bản đã áp dụng baseline cũ. Khi reset dev phải chủ động reset cả server DB và IndexedDB/PWA của các browser test; không tự động xóa dữ liệu khi deploy.

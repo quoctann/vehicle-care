@@ -1,5 +1,6 @@
 import { daysBetweenCalendarDates, toCalendarDateInTimezone } from '@/domain/datetime';
 import type { IanaTimezone, IsoDateTime } from '@/domain/types';
+import { toRuntimeTimezone } from '@/domain/timezone';
 
 /**
  * Formatting cho UI (locale/copy) — khác `domain/datetime.ts` (tính toán thuần
@@ -29,6 +30,6 @@ export function formatShortDate(instant: IsoDateTime, timezone: IanaTimezone): s
   return new Intl.DateTimeFormat('vi-VN', {
     day: '2-digit',
     month: 'short',
-    timeZone: timezone,
+    timeZone: toRuntimeTimezone(timezone),
   }).format(new Date(instant));
 }

@@ -1,6 +1,3 @@
-import { type FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import * as api from '@/api/client';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { GoogleButton } from '@/components/auth/GoogleButton';
@@ -8,8 +5,11 @@ import { PasswordInput } from '@/components/auth/PasswordInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore';
 import { getUserError } from '@/lib/userError';
+import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore';
+import { type FormEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 
 export function SignInPage() {
   const { t } = useTranslation();
@@ -62,6 +62,7 @@ export function SignInPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            tabIndex={1}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -80,10 +81,11 @@ export function SignInPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            tabIndex={2}
           />
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={submitting} className="mt-1">
+        <Button type="submit" disabled={submitting} className="mt-1" tabIndex={3}>
           {submitting ? t('auth.signingIn') : t('auth.signIn')}
         </Button>
       </form>

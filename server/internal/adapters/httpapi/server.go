@@ -94,6 +94,7 @@ func (s *Server) routes() {
 	protected := authenticated.Group("")
 	protected.Use(s.requireCSRF())
 	protected.POST("/auth/logout", s.logout)
+	protected.POST("/account/timezone", s.updateTimezone)
 	protected.POST("/devices/register", s.registerDevice)
 	protected.POST("/sync/push", s.push)
 }

@@ -32,6 +32,8 @@ export function LogEntryPage() {
   }, [accountId, vehicleId, kind, entryId]);
 
   if (!vehicleId || !accountId) return <Navigate to="/" replace />;
+  // Wait for the existing record before mounting the form's initial state.
+  if (kind && entryId && editingEntry === undefined) return null;
   if (kind && entryId && editingEntry === null)
     return <Navigate to={`/v/${vehicleId}/history`} replace />;
 
@@ -45,6 +47,7 @@ export function LogEntryPage() {
 
   return (
     <LogEntryForm
+      key={editingEntry ? `${editingEntry.kind}:${editingEntry.log.id}` : vehicleId}
       accountId={accountId}
       vehicleId={vehicleId}
       currentOdometerKm={currentOdometerKm}

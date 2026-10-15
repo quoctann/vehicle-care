@@ -19,6 +19,8 @@ import { validateOdometerReading } from '@/domain/validation';
 import { isValidCost } from '@/domain/cost';
 import type { FuelLog, PartType, ServiceLog } from '@/domain/types';
 import { formatNumber } from '@/lib/formatters';
+import { resolveLogEntryTimestamp, toLocalDateTimeInput } from '@/lib/logEntryDate';
+import { useSessionStore } from '@/stores/useSessionStore';
 import { EntryTypeSelector, type LogEntryType } from './EntryTypeSelector';
 import { LogEntryDetailsCard } from './LogEntryDetailsCard';
 import { OdometerInputCard } from './OdometerInputCard';
@@ -49,21 +51,23 @@ export function LogEntryForm({
   onSaved,
 }: LogEntryFormProps) {
   const { t } = useTranslation();
+  const accountTimezone = useSessionStore((state) => state.account?.timezone ?? 'UTC');
   const isEditing = editingEntry != null;
   const [entryType, setEntryType] = useState<LogEntryType>(editingEntry?.kind ?? 'fuel');
   const [partTypeId, setPartTypeId] = useState<string | null>(
     editingEntry?.kind === 'service' ? editingEntry.log.partTypeId : null,
   );
-  const [occurredAt, setOccurredAt] = useState(
-    toLocalDateTimeInput(
-      editingEntry
-        ? new Date(
-            editingEntry.kind === 'fuel'
-              ? editingEntry.log.recordedAt
-              : editingEntry.log.servicedAt,
-          )
-        : new Date(),
-    ),
+  // A session timezone change must not reinterpret this form's existing wallclock or discard edits.
+  const [{ originalTimestamp, timezone }] = useState(() => ({
+    originalTimestamp: editingEntry
+      ? editingEntry.kind === 'fuel'
+        ? editingEntry.log.recordedAt
+        : editingEntry.log.servicedAt
+      : new Date().toISOString(),
+    timezone: accountTimezone,
+  }));
+  const [occurredAt, setOccurredAt] = useState(() =>
+    toLocalDateTimeInput(new Date(originalTimestamp), timezone),
   );
   const [liters, setLiters] = useState(
     editingEntry?.kind === 'fuel' && editingEntry.log.liters != null
@@ -134,8 +138,11 @@ export function LogEntryForm({
 
   function validateForm(): FormErrors {
     const nextErrors: FormErrors = {};
-    if (!occurredAt || Number.isNaN(new Date(occurredAt).getTime()))
+    try {
+      resolveLogEntryTimestamp(occurredAt, originalTimestamp, timezone);
+    } catch {
       nextErrors.occurredAt = t('logEntry.invalidDate');
+    }
 
     if (!isEditing) {
       const parsedOdometer = optionalNumber(displayedOdometerKm);
@@ -178,7 +185,7 @@ export function LogEntryForm({
 
     setSubmitting(true);
     try {
-      const timestamp = new Date(occurredAt).toISOString();
+      const timestamp = resolveLogEntryTimestamp(occurredAt, originalTimestamp, timezone);
       if (entryType === 'fuel') {
         if (isEditing && editingEntry?.kind === 'fuel') {
           await updateFuelLog(accountId, editingEntry.log.id, {
@@ -286,6 +293,7 @@ export function LogEntryForm({
           )}
 
           <LogEntryDetailsCard
+            timezone={timezone}
             entryType={entryType}
             occurredAt={occurredAt}
             liters={liters}
@@ -383,9 +391,4 @@ function optionalNumber(value: string): number | null {
 function optionalText(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-function toLocalDateTimeInput(date: Date): string {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
 }

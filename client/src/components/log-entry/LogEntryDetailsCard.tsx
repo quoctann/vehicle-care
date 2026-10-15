@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { LogEntryType } from './EntryTypeSelector';
 
 type LogEntryDetailsCardProps = {
+  timezone: string;
   entryType: LogEntryType;
   occurredAt: string;
   liters: string;
@@ -18,6 +19,7 @@ type LogEntryDetailsCardProps = {
 };
 
 export function LogEntryDetailsCard({
+  timezone,
   entryType,
   occurredAt,
   liters,
@@ -34,7 +36,7 @@ export function LogEntryDetailsCard({
     <section className="overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-[0_1px_1px_rgba(44,54,53,0.025)]">
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         <Field
-          label={t('logEntry.dateTime')}
+          label={`${t('logEntry.dateTime')} (${timezone})`}
           htmlFor="log-time"
           error={errors.occurredAt}
           className="sm:col-span-2"

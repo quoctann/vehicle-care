@@ -1,6 +1,6 @@
 import { DUE_SOON_REMAINING_RATIO } from '@/domain/constants';
+import { deriveCurrentOdometer, type OdometerReading } from '@/domain/odometer';
 import { calculateReminderStatus } from '@/domain/reminder';
-import { deriveCurrentOdometer } from '@/domain/odometer';
 import type {
   IanaTimezone,
   IsoDateTime,
@@ -23,10 +23,26 @@ export async function getCurrentOdometer(
 ): Promise<number | null> {
   const vehicle = await db.vehicles.get(vehicleId);
   if (!vehicle || vehicle.accountId !== accountId || vehicle.deletedAt != null) return null;
-  const logs = (await db.odometerLogs.where('vehicleId').equals(vehicleId).toArray()).filter(
-    (log) => log.accountId === accountId,
+  const [logs, services] = await Promise.all([
+    db.odometerLogs.where('vehicleId').equals(vehicleId).toArray(),
+    db.serviceLogs.where('vehicleId').equals(vehicleId).toArray(),
+  ]);
+  const serviceReadings: OdometerReading[] = services.flatMap((log) =>
+    log.accountId === accountId && log.deletedAt == null && log.odometerKmSnapshot != null
+      ? [
+          {
+            odometerKm: log.odometerKmSnapshot,
+            recordedAt: log.servicedAt,
+            createdAtClient: log.createdAtClient,
+            serverSyncedAt: log.serverSyncedAt,
+          },
+        ]
+      : [],
   );
-  return deriveCurrentOdometer(logs);
+  return deriveCurrentOdometer([
+    ...logs.filter((log) => log.accountId === accountId),
+    ...serviceReadings,
+  ]);
 }
 
 /**

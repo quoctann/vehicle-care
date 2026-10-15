@@ -24,6 +24,30 @@
 
 ## 2. Mô hình dữ liệu — nguyên tắc nền tảng
 
+### Account timezone preference
+
+- One manually selected timezone preference controls calendar-day reminders, history
+  dates, monthly cost grouping, and log-entry date/time inputs across the account.
+- Settings uses a static dropdown of supported fixed UTC offsets, grouped
+  like `UTC+07:00 — Bangkok, Hanoi, Jakarta`. No search, timezone datasets, enumeration
+  or dynamic seasonal-offset labels are needed. New saves store canonical readable
+  `UTC±HH:MM` values; zero is `UTC+00:00`. Intl/Temporal receive the corresponding
+  runtime `±HH:MM` identifier through a shared conversion helper.
+- New and updated accounts store only listed canonical fixed offsets such as
+  `UTC+07:00`. City/IANA names in the picker are explanatory labels only; they
+  never drive timezone calculations. No legacy-data migration or backfill is used.
+- New accounts and fresh databases default to `UTC+07:00`; event timestamps stay
+  unchanged.
+- “Use device timezone” snapshots the current device offset on click and selects
+  its matching supported option, including fractional offsets where listed. It
+  does not use the device's geographical timezone or enable DST.
+- Changes require an authenticated online save; the saved preference is cached
+  for offline reading. Other devices pick it up on session refresh, not live sync.
+- Stored UTC instants and date-only reminder baselines (`YYYY-MM-DD`) are never
+  rewritten when the preference changes. Display dates/cost months may change.
+- Fixed-offset presets do not observe daylight saving. Unchanged date/time edits
+  preserve the exact original instant.
+
 Nguyên tắc quan trọng nhất: **tách rõ dữ liệu dạng log (append-only, bất biến) và dữ liệu dạng cấu hình (mutable state)**. Đây là quyết định nền tảng giúp toàn bộ bài toán sync trở nên đơn giản hơn nhiều.
 
 | Entity | Loại | Ghi chú |

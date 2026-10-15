@@ -21,9 +21,6 @@ export function AuthLayout({
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="w-full max-w-[400px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-[13px] font-bold tracking-tight text-primary-foreground">
-            VC
-          </div>
           <span className="text-[15px] font-semibold tracking-tight">{t('auth.appName')}</span>
         </div>
 

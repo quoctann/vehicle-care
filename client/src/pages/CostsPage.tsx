@@ -4,12 +4,13 @@ import { readUnitsPreference } from '@/components/settings/preferences';
 import { useCostPerKm, useMonthlyCosts } from '@/hooks/useCosts';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useTranslation } from 'react-i18next';
+import { toRuntimeTimezone } from '@/domain/timezone';
 
 function currentMonthInTimezone(timezone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
     month: '2-digit',
-    timeZone: timezone,
+    timeZone: toRuntimeTimezone(timezone),
   }).formatToParts(new Date());
   const year =
     parts.find((part) => part.type === 'year')?.value ?? new Date().getUTCFullYear().toString();

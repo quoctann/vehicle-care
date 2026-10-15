@@ -1,18 +1,32 @@
-import { describe, expect, it } from 'vitest';
-import { formatDate, formatMonth, formatNumber, formatTime } from './formatters';
+import { afterEach, expect, it, vi } from 'vitest';
+import { formatDate, formatTime, formatMonth, formatNumber } from './formatters';
+import { formatShortDate, daysAgo, formatUpdatedLabel } from './datetime';
+import { toCalendarDateInTimezone } from '@/domain/datetime';
 
-describe('Vietnamese UI formatters', () => {
-  it('formats numbers with Vietnamese separators', () => {
-    expect(formatNumber(1234567)).toBe('1.234.567');
-  });
+afterEach(() => vi.useRealTimers());
 
-  it('formats dates and months in Vietnamese', () => {
-    expect(formatDate('2026-09-18T12:30:00Z', 'UTC')).toContain('18');
-    expect(formatMonth('2026-09')).toMatch(/tháng 9.*2026/i);
-    expect(formatMonth('2026-09', 'long', 'America/Los_Angeles')).toMatch(/tháng 9.*2026/i);
-  });
+it('formats canonical offsets using the account calendar, including fractional offsets', () => {
+  const instant = '2026-03-01T00:30:00Z';
+  expect(toCalendarDateInTimezone(instant, 'UTC-03:30')).toBe('2026-02-28');
+  expect(formatDate(instant, 'UTC+05:45')).toBe(formatDate(instant, '+05:45'));
+  expect(formatTime(instant, 'UTC-03:30')).toBe(formatTime(instant, '-03:30'));
+  expect(formatMonth(instant, 'long', 'UTC-03:30')).toBe(formatMonth(instant, 'long', '-03:30'));
+  expect(formatMonth('2026-03', 'long', 'UTC-03:30')).toBe(formatMonth('2026-03', 'long', 'UTC'));
+  expect(formatShortDate(instant, 'UTC-03:30')).toBe(formatShortDate(instant, '-03:30'));
+  expect(daysAgo(instant, 'UTC+07:00', '2026-03-01T18:00:00Z')).toBe(1);
+});
 
-  it('formats time with a stable Vietnamese locale', () => {
-    expect(formatTime('2026-09-18T12:30:00Z', 'UTC')).toBe('12:30');
-  });
+it('supports default display zones and canonical relative-date labels', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-03-03T12:00:00Z'));
+  const instant = '2026-03-03T00:30:00Z';
+  expect(formatTime(instant)).toBeTruthy();
+  expect(formatDate(instant)).toBeTruthy();
+  expect(formatMonth(instant, 'short')).toBeTruthy();
+  expect(formatNumber(1000)).toBe('1.000');
+  expect(daysAgo(instant, 'UTC+07:00')).toBe(0);
+  expect(formatUpdatedLabel(null, 'UTC+07:00')).toBe('Chưa có dữ liệu');
+  expect(formatUpdatedLabel(instant, 'UTC+07:00')).toBe('Cập nhật vừa xong');
+  expect(formatUpdatedLabel('2026-03-02T00:00:00Z', 'UTC+07:00')).toBe('Cập nhật hôm qua');
+  expect(formatUpdatedLabel('2026-03-01T00:00:00Z', 'UTC+07:00')).toBe('Cập nhật 2 ngày trước');
 });

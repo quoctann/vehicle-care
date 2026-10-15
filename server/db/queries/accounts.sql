@@ -17,3 +17,7 @@ UPDATE accounts SET email_verified = true, updated_at = now() WHERE id = $1;
 
 -- name: SetPassword :exec
 UPDATE accounts SET password_hash = $2, updated_at = now() WHERE id = $1;
+
+-- name: UpdateAccountTimezone :one
+UPDATE accounts SET timezone = $2, updated_at = now() WHERE id = $1
+RETURNING id, email, name, timezone, email_verified, password_hash;

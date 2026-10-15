@@ -20,7 +20,7 @@ export const vi = {
       update: 'Cập nhật',
     },
     auth: {
-      appName: 'Nhắc bảo dưỡng xe',
+      appName: 'XẾ IU',
       signIn: 'Đăng nhập',
       signingIn: 'Đang đăng nhập...',
       signUp: 'Đăng ký',
@@ -268,15 +268,33 @@ export const vi = {
       quietHoursDescription: 'Không nhắc từ 22:00 đến 07:00',
       quietHoursAria: 'Sử dụng giờ yên tĩnh',
       app: 'Ứng dụng',
+      timezone: 'Múi giờ',
+      timezoneDescription:
+        'Dùng cho ngày nhắc bảo dưỡng, lịch sử, chi phí theo tháng và nhập ngày giờ. Đổi múi giờ không thay đổi thời điểm đã lưu.',
+      timezoneCurrent: 'Đang dùng: {{timezone}}',
+      timezoneOffsetHelp:
+        'Các lựa chọn UTC có độ lệch cố định, không đổi theo mùa. Tên thành phố chỉ giúp nhận biết, không tự điều chỉnh theo giờ mùa hè.',
+      timezoneChoose: 'Chọn múi giờ',
+      timezoneDeviceUnsupported:
+        'Không tìm thấy độ lệch thiết bị trong danh sách. Vui lòng chọn múi giờ UTC thủ công.',
+      useDeviceTimezone: 'Dùng múi giờ thiết bị',
+      timezoneSave: 'Lưu múi giờ',
+      timezoneSaving: 'Đang lưu...',
+      timezoneSaved: 'Đã cập nhật múi giờ.',
+      timezoneSaveFailed: 'Không thể lưu múi giờ. Kiểm tra kết nối và thử lại.',
+      timezoneCacheFailed:
+        'Đã lưu trên máy chủ nhưng chưa lưu được ngoại tuyến. Vui lòng tải lại khi có kết nối.',
+      timezoneOnlineHelp:
+        'Cần kết nối để lưu. Múi giờ đã lưu dùng được ngoại tuyến. Nút thiết bị lấy độ lệch UTC hiện tại khi bấm; độ lệch không tự đổi theo mùa hoặc khi di chuyển.',
       units: 'Đơn vị',
       kilometres: 'Ki-lô-mét',
       miles: 'Dặm',
       appearance: 'Giao diện',
-      appearanceDescription: 'Chọn giao diện sáng hoặc tối',
+      appearanceDescription: 'Sáng hoặc tối',
       light: 'Sáng',
       dark: 'Tối',
       sync: 'Đồng bộ',
-      syncDescription: 'Thay đổi được lưu cục bộ trước khi đồng bộ',
+      syncDescription: 'Nhiều thiết bị',
     },
     reminder: {
       eyebrow: 'Bảo dưỡng xe',
@@ -331,7 +349,7 @@ export const vi = {
       retry: 'Thử lại đồng bộ',
       blocked: 'Đang chờ xử lý ({{count}})',
       needsAttention: 'Cần kiểm tra đồng bộ',
-      syncedAt: 'Đã đồng bộ lúc {{time}}',
+      syncedAt: 'Đã đồng bộ {{time}}',
       pending: '{{count}} thay đổi đang chờ',
       queued: '{{count}} thay đổi trong hàng đợi',
       never: 'Chưa từng đồng bộ',

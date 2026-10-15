@@ -15,6 +15,6 @@ var Manifest = []PartTypeSeed{
 	{Code: "spark_plug", Name: "Bugi", DisplayOrder: 6},
 	{Code: "air_filter", Name: "Lọc gió", DisplayOrder: 7},
 	{Code: "drive_belt", Name: "Dây curoa", DisplayOrder: 8},
-	{Code: "chain_sprocket_set", Name: "Nhông, sên, đĩa", DisplayOrder: 9},
+	{Code: "chain_sprocket_set", Name: "Nhông, sên, dĩa", DisplayOrder: 9},
 	{Code: "battery", Name: "Ắc quy", DisplayOrder: 10},
 }

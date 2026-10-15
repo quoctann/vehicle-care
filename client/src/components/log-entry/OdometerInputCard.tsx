@@ -48,7 +48,7 @@ export function OdometerInputCard({
             aria-invalid={Boolean(error)}
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="h-11 w-32 text-right text-lg font-bold tabular-nums"
+            className="h-11 w-45 text-right text-lg font-bold tabular-nums"
           />
           <span className="text-sm text-muted-foreground">km</span>
         </div>

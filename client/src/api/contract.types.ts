@@ -38,6 +38,9 @@ export type ResetPasswordResponse = { status: 'reset' };
 /** 200 = còn phiên hợp lệ; 401 (ApiErrorBody) = chưa đăng nhập/hết hạn. */
 export type SessionResponse = { account: AccountDto };
 
+export type UpdateAccountTimezoneRequest = { timezone: string; expected_account_id?: string };
+export type UpdateAccountTimezoneResponse = { account: AccountDto };
+
 export type RegisterDeviceRequest = { device_id: string; platform: string; app_version: string };
 export type RegisterDeviceResponse = { device_id: string; registered_at: string };
 

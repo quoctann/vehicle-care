@@ -1,3 +1,5 @@
+import { toRuntimeTimezone } from '@/domain/timezone';
+
 export const UI_LOCALE = 'vi-VN';
 
 const numberFormatter = new Intl.NumberFormat(UI_LOCALE);
@@ -10,7 +12,7 @@ export function formatTime(value: string | Date, timezone?: string): string {
   return new Intl.DateTimeFormat(UI_LOCALE, {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: timezone,
+    timeZone: timezone === undefined ? undefined : toRuntimeTimezone(timezone),
   }).format(new Date(value));
 }
 
@@ -19,7 +21,7 @@ export function formatDate(value: string | Date, timezone?: string): string {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: timezone,
+    timeZone: timezone === undefined ? undefined : toRuntimeTimezone(timezone),
   }).format(new Date(value));
 }
 
@@ -33,6 +35,6 @@ export function formatMonth(
   return new Intl.DateTimeFormat(UI_LOCALE, {
     month: style,
     year: style === 'long' ? 'numeric' : undefined,
-    timeZone: isMonthKey ? 'UTC' : timezone,
+    timeZone: isMonthKey ? 'UTC' : timezone === undefined ? undefined : toRuntimeTimezone(timezone),
   }).format(date);
 }

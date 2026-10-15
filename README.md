@@ -90,7 +90,7 @@ Biến môi trường liên quan xem `.env.example` (`DB_HOST`/`DB_PORT`/`DB_USE
 - Email verification, password reset và Google OAuth chưa gửi email hoặc gọi provider thật.
 - Chưa có rate limiting.
 - `ApplyMutations` ở adapter Postgres chỉ hỗ trợ đúng 1 mutation/lần gọi (khớp caller thực tế hiện tại là `application.Service.Push`); xem plan tại `.claude/plans` để biết trade-off nếu cần batch thật sau này.
-- `notification_deliveries` đã có migration nhưng chưa có code nào dùng (schema chuẩn bị cho tính năng nhắc lịch/notification, chưa implement).
+- `reminder_notification` đã có migration nhưng chưa có code nào dùng (schema chuẩn bị cho tính năng nhắc lịch/notification, chưa implement).
 
 Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http://localhost:5173`, `FRONTEND_ORIGIN` khớp chính xác và `COOKIE_SECURE=false` khi chạy HTTP local. Nếu port frontend thay đổi, cập nhật cả `FRONTEND_ORIGIN` và URL frontend.
 
@@ -116,3 +116,5 @@ Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng a
 - [Plan incremental sync A](.docs/incremental-sync-plan.md): invariants, checklist nghiệm thu và runbook reset dev thủ công.
 
 > Schema PostgreSQL hiện được consolidate thành baseline `1790121600_baseline` dùng Unix timestamp, cùng convention với `migrate create`. Nếu database dev đã chạy bộ migration cũ (kể cả baseline thử nghiệm `20260923000000`), hãy dùng database mới hoặc chủ động reset database, Redis session và IndexedDB/PWA storage theo [runbook](.docs/incremental-sync-plan.md#manual-dev-reset-runbook) trước khi chạy `make migrate-up`. Project không tự drop schema hoặc xóa dữ liệu.
+
+**Lưu ý khi đổi baseline DB/contract:** kể cả khi DB đã chạy cùng version `1790121600` trước khi schema được sửa (cột `cost_vnd`/`name_vi`/`received_at_server`), `make migrate-up` sẽ không chạy lại version này. Chỉ dùng DB dev mới hoặc tự sao lưu/reset **cả** PostgreSQL và browser IndexedDB/PWA theo runbook; outbox cũ có payload bất biến không tương thích, không được giữ lại. API hiện dùng `cost` (VND trong phase này), `name` và `server_synced_at`; device ID phải là UUID.

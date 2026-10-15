@@ -19,6 +19,40 @@ function log(overrides: Partial<OdometerLog>): OdometerLog {
 }
 
 describe('deriveCurrentOdometer', () => {
+  it('preserves sub-millisecond precision in server receipt ordering', () => {
+    expect(
+      deriveCurrentOdometer([
+        log({ odometerKm: 100, serverSyncedAt: '2026-03-01T08:00:00.123100Z' }),
+        log({ odometerKm: 200, serverSyncedAt: '2026-03-01T08:00:00.123900Z' }),
+      ]),
+    ).toBe(200);
+  });
+
+  it('uses stable array order when event and server receipt times are identical', () => {
+    expect(
+      deriveCurrentOdometer([
+        log({ odometerKm: 100, serverSyncedAt: '2026-03-01T08:00:00.123Z' }),
+        log({ odometerKm: 200, serverSyncedAt: '2026-03-01T08:00:00.123000Z' }),
+      ]),
+    ).toBe(200);
+  });
+  it('compares event times as instants, including different timezone offsets', () => {
+    expect(
+      deriveCurrentOdometer([
+        log({ recordedAt: '2026-03-01T14:30:00+07:00', odometerKm: 100 }),
+        log({ recordedAt: '2026-03-01T08:00:00.000Z', odometerKm: 200 }),
+      ]),
+    ).toBe(200);
+  });
+
+  it('breaks offline equal-time ties by local creation time across sources', () => {
+    expect(
+      deriveCurrentOdometer([
+        log({ odometerKm: 200, createdAtClient: '2026-03-01T08:01:00.000Z' }),
+        log({ odometerKm: 100, createdAtClient: '2026-03-01T08:00:00.000Z' }),
+      ]),
+    ).toBe(200);
+  });
   it('trả về null khi không có log nào', () => {
     expect(deriveCurrentOdometer([])).toBeNull();
   });

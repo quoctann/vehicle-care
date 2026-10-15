@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { HistoryEntry } from '@/data/queries/historyQueries';
 import { formatVnd } from '@/lib/currency';
 import { formatNumber, UI_LOCALE } from '@/lib/formatters';
+import { toRuntimeTimezone } from '@/domain/timezone';
 
 type RecentlyLoggedSectionProps = {
   entries: HistoryEntry[];
@@ -21,7 +22,7 @@ export function RecentlyLoggedSection({
   const dateFormatter = new Intl.DateTimeFormat(UI_LOCALE, {
     day: 'numeric',
     month: 'short',
-    timeZone: timezone,
+    timeZone: toRuntimeTimezone(timezone),
   });
 
   return (

@@ -1,4 +1,5 @@
 import type { IanaTimezone, IsoDate, IsoDateTime } from './types';
+import { toRuntimeTimezone } from './timezone';
 
 /**
  * D-07: reminder theo ngày phải tính theo timezone của Account, không phải UTC
@@ -8,7 +9,7 @@ import type { IanaTimezone, IsoDate, IsoDateTime } from './types';
  */
 export function toCalendarDateInTimezone(instant: IsoDateTime, timezone: IanaTimezone): IsoDate {
   const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
+    timeZone: toRuntimeTimezone(timezone),
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

@@ -22,6 +22,54 @@ afterEach(async () => {
   await clearAllTables();
 });
 
+it('caches the latest session profile rather than the captured bootstrap account', async () => {
+  useSessionStore.getState().setAuthenticated(account);
+  vi.stubGlobal('localStorage', { getItem: () => 'device-1', setItem: vi.fn() });
+  vi.mocked(api.registerDevice).mockImplementation(async () => {
+    // Profile updates do not represent a new login/session generation.
+    useSessionStore.setState({ account: { ...account, timezone: 'Asia/Tokyo' } });
+    return { device_id: 'device-1', registered_at: new Date().toISOString() };
+  });
+  await bootstrapSync(account);
+  expect(await db.accountCache.get('current')).toMatchObject({ timezone: 'Asia/Tokyo' });
+});
+
+it.each(['switch', 'relogin'])('does not cache a bootstrap result after %s', async (change) => {
+  useSessionStore.getState().setAuthenticated(account);
+  vi.stubGlobal('localStorage', { getItem: () => 'device-1', setItem: vi.fn() });
+  vi.mocked(api.registerDevice).mockImplementation(async () => {
+    useSessionStore.getState().clear();
+    useSessionStore
+      .getState()
+      .setAuthenticated({ ...account, id: change === 'switch' ? 'account-2' : account.id });
+    return { device_id: 'device-1', registered_at: new Date().toISOString() };
+  });
+  await expect(bootstrapSync(account)).rejects.toThrow(/changed/i);
+  expect(await db.accountCache.get('current')).toBeUndefined();
+});
+
+it('aborts cache writes if the session changes inside the bootstrap transaction', async () => {
+  useSessionStore.getState().setAuthenticated(account);
+  vi.stubGlobal('localStorage', { getItem: () => 'device-1', setItem: vi.fn() });
+  vi.mocked(api.registerDevice).mockResolvedValue({
+    device_id: 'device-1',
+    registered_at: new Date().toISOString(),
+  });
+  const put = db.accountCache.put.bind(db.accountCache);
+  const spy = vi.spyOn(db.accountCache, 'put').mockImplementation((...args) =>
+    put(...args).then((result) => {
+      useSessionStore.getState().clear();
+      return result;
+    }),
+  );
+  try {
+    await expect(bootstrapSync(account)).rejects.toThrow(/changed/i);
+    expect(await db.accountCache.get('current')).toBeUndefined();
+  } finally {
+    spy.mockRestore();
+  }
+});
+
 it('does not move nextLocalSeq backwards when a local write happens during device registration', async () => {
   useSessionStore.getState().setAuthenticated(account);
   await db.syncMeta.put({

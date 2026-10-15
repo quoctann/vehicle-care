@@ -17,6 +17,37 @@ Mô hình chính là **local-first, đồng bộ eventual consistency**:
 
 Khi mở app, client thử xác minh session online. Nếu mất mạng/server lỗi và đã có account cache, người dùng vẫn mở được workspace local. Phản hồi 401 yêu cầu đăng nhập lại; cache không cấp quyền gọi API. Chưa hỗ trợ dùng guest trước lần đăng nhập đầu tiên.
 
+### Account timezone changes
+
+The picker is a static list of supported fixed UTC-offset presets, with UTC+7 cities
+grouped as `UTC+07:00 — Bangkok, Hanoi, Jakarta`. It does not load timezone datasets,
+enumerate all zones, search, or calculate seasonal labels. New preferences are
+stored as readable canonical `UTC±HH:MM` strings; zero is `UTC+00:00`.
+All Intl and Temporal consumers convert these to runtime `±HH:MM` identifiers.
+New choices do not observe DST; location/IANA names are display hints only. The
+backend accepts only values in the supported fixed-offset list, with no legacy
+compatibility or data backfill. Fresh databases and new accounts default to
+`UTC+07:00`, without changing event timestamps. The device button snapshots its
+current offset on click, including listed fractional offsets, and never rounds.
+
+Settings → select a fixed-offset preset (or snapshot the device offset once) →
+explicit Save → `POST /account/timezone` with cookie session + CSRF → validated
+account-scoped PostgreSQL update → returned account replaces session state and
+IndexedDB account metadata without changing device identity. Reminders, history,
+costs and date/time inputs read the same account preference. Existing UTC logs
+and date-only baselines remain unchanged; no outbox mutations are created.
+Saving needs connectivity, while cached settings remain usable offline. Session
+generation guards prevent late saves/hydration from reviving a logged-out account;
+bootstrap uses current account metadata rather than a stale captured timezone.
+Other devices obtain the preference on their next session refresh.
+
+Timezone regression checks (run in `client/`): `npm run test:coverage:timezone`
+gates the new selection/persistence/conversion logic at 80% coverage, and
+`npm run test:e2e` exercises Chromium settings, reload/cache, failures and calendar
+effects. Browser tests mock the API; API and PostgreSQL behavior are covered by
+the Go integration tests. The offline browser test keeps app assets reachable
+while simulating an unavailable API, rather than testing full PWA navigation.
+
 ## 2. Các thành phần và trách nhiệm
 
 ```mermaid

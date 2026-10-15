@@ -5,7 +5,7 @@ CREATE TABLE
         id uuid PRIMARY KEY,
         email citext NOT NULL,
         name text NULL,
-        timezone text NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+        timezone text NOT NULL DEFAULT 'UTC+07:00',
         email_verified boolean NOT NULL DEFAULT false,
         password_hash bytea NULL,
         created_at timestamptz NOT NULL DEFAULT now (),

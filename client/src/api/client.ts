@@ -16,6 +16,8 @@ import type {
   SessionResponse,
   SignupRequest,
   SignupResponse,
+  UpdateAccountTimezoneRequest,
+  UpdateAccountTimezoneResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
 } from './contract.types';
@@ -82,6 +84,12 @@ export function resetPassword(req: ResetPasswordRequest): Promise<ResetPasswordR
 /** Gọi 1 lần lúc app khởi động để biết còn phiên hợp lệ hay không (ném ApiError 401 nếu không). */
 export function getSession(): Promise<SessionResponse> {
   return request('GET', '/auth/session');
+}
+
+export function updateAccountTimezone(
+  req: UpdateAccountTimezoneRequest,
+): Promise<UpdateAccountTimezoneResponse> {
+  return request('POST', '/account/timezone', req);
 }
 
 /** Danh mục part_type — nguồn sự thật duy nhất cho UUID, xem `contract.types.ts` mục 2.14. */

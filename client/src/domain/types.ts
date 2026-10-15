@@ -15,7 +15,7 @@ export type IsoDateTime = string;
 /** ISO-8601 calendar date string "YYYY-MM-DD", diễn giải theo timezone của Account. */
 export type IsoDate = string;
 
-/** IANA timezone identifier, vd "Asia/Ho_Chi_Minh". */
+/** Canonical fixed UTC offset selected from the supported timezone list. */
 export type IanaTimezone = string;
 
 export type Account = {

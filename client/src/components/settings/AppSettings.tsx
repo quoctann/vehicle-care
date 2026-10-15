@@ -12,6 +12,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { PREFERENCE_KEYS, useLocalStoragePreference } from './preferences';
 import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
+import { TimezoneSetting } from './TimezoneSetting';
 
 function SettingsRow({
   icon: Icon,
@@ -41,11 +42,11 @@ function SettingsRow({
 export function AppSettings() {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
-  const [askForOdometer, setAskForOdometer] = useLocalStoragePreference(
+  const [askForOdometer, setAskForOdometer] = useLocalStoragePreference<boolean>(
     PREFERENCE_KEYS.askForOdometer,
     true,
   );
-  const [quietHours, setQuietHours] = useLocalStoragePreference(PREFERENCE_KEYS.quietHours, true);
+  const [quietHours, setQuietHours] = useLocalStoragePreference<boolean>(PREFERENCE_KEYS.quietHours, true);
   const [units, setUnits] = useLocalStoragePreference<'km' | 'mi'>(PREFERENCE_KEYS.units, 'km');
   return (
     <div className="space-y-5">
@@ -104,6 +105,7 @@ export function AppSettings() {
               </SelectContent>
             </Select>
           </SettingsRow>
+          <TimezoneSetting />
           <SettingsRow
             icon={SunMoon}
             title={t('settings.appearance')}

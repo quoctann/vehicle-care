@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { createReminderConfig } from '@/data/repositories/reminderRepository';
 import type { PartType } from '@/domain/types';
+import { toCalendarDateInTimezone } from '@/domain/datetime';
+import { useSessionStore } from '@/stores/useSessionStore';
 
 type ReminderEditorProps = {
   open: boolean;
@@ -54,6 +56,7 @@ export function ReminderEditor({
   configuredPartTypeIds,
 }: ReminderEditorProps) {
   const { t } = useTranslation();
+  const timezone = useSessionStore((state) => state.account?.timezone ?? 'UTC');
   const availablePartTypes = partTypes.filter(
     (partType) => partType.active && !configuredPartTypeIds.has(partType.id),
   );
@@ -63,7 +66,9 @@ export function ReminderEditor({
   const [baselineKm, setBaselineKm] = useState(
     currentOdometerKm == null ? '' : String(currentOdometerKm),
   );
-  const [baselineDate, setBaselineDate] = useState(new Date().toISOString().slice(0, 10));
+  const [baselineDate, setBaselineDate] = useState(() =>
+    toCalendarDateInTimezone(new Date().toISOString(), timezone),
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -167,7 +172,9 @@ export function ReminderEditor({
               ) : null}
               {intervalDays ? (
                 <div className="space-y-2">
-                  <Label htmlFor="new-reminder-baseline-date">{t('reminder.startingDate')}</Label>
+                  <Label htmlFor="new-reminder-baseline-date">
+                    {t('reminder.startingDate')} ({timezone})
+                  </Label>
                   <Input
                     id="new-reminder-baseline-date"
                     type="date"

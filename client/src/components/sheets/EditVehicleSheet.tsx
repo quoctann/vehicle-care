@@ -72,17 +72,17 @@ export function EditVehicleSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="gap-0 rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:inset-x-0 md:mx-auto md:max-w-[600px] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[440px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
+        className="max-h-[calc(100dvh-max(1rem,env(safe-area-inset-top)))] gap-0 overflow-hidden rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:mx-auto md:max-w-[600px] lg:mx-0 lg:max-h-[calc(100dvh-2rem)] lg:data-[side=bottom]:inset-x-auto lg:data-[side=bottom]:bottom-auto lg:data-[side=bottom]:left-1/2 lg:top-1/2 lg:w-[440px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
       >
-        <div className="mx-auto mb-3.5 h-1 w-9 rounded-full bg-border lg:hidden" />
-        <SheetTitle className="mx-0.5 text-[15px] font-semibold tracking-[-0.01em]">
+        <div className="mx-auto mb-3.5 h-1 w-9 shrink-0 rounded-full bg-border lg:hidden" />
+        <SheetTitle className="mx-0.5 shrink-0 text-[15px] font-semibold tracking-[-0.01em]">
           {t('vehicle.settingsTitle')}
         </SheetTitle>
-        <SheetDescription className="mx-0.5 mt-0.5 text-xs leading-5">
+        <SheetDescription className="mx-0.5 mt-0.5 shrink-0 text-xs leading-5">
           {t('vehicle.settingsDescription')}
         </SheetDescription>
 
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex min-h-0 flex-col gap-3 overflow-y-auto">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="vehicle-name">{t('vehicle.name')}</Label>
             <Input
@@ -102,7 +102,7 @@ export function EditVehicleSheet({
             />
           </div>
 
-          <div className="mt-1 rounded-xl border border-border-subtle bg-card p-3.5">
+          <div className="mt-1 shrink-0 rounded-xl border border-border-subtle bg-card p-3.5">
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{t('vehicle.customThreshold')}</p>
@@ -140,13 +140,13 @@ export function EditVehicleSheet({
           </div>
         </div>
 
-        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+        {error ? <p className="mt-3 shrink-0 text-sm text-destructive">{error}</p> : null}
 
         <button
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-primary font-display text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="mt-4 flex h-12 w-full shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {saving ? t('common.saving') : t('common.save')}
         </button>

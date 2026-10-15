@@ -43,7 +43,7 @@ func newAccount(t *testing.T, store *postgres.Store) string {
 	t.Helper()
 	id := uuid.NewString()
 	err := store.CreateAccount(context.Background(), domain.Account{
-		ID: id, Email: id + "@example.test", Timezone: "Asia/Ho_Chi_Minh",
+		ID: id, Email: id + "@example.test", Timezone: "UTC+07:00",
 	})
 	if err != nil {
 		t.Fatalf("create account: %v", err)

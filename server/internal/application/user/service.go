@@ -82,7 +82,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 		ID:           uuid.NewString(),
 		Email:        email,
 		Name:         name,
-		Timezone:     "Asia/Ho_Chi_Minh",
+		Timezone:     "UTC+07:00",
 		PasswordHash: passwordHash,
 	}
 	if err := s.ports.CreateAccount(ctx, account); err != nil {

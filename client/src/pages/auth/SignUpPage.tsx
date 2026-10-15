@@ -77,6 +77,7 @@ export function SignUpPage() {
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            tabIndex={1}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -88,6 +89,7 @@ export function SignUpPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            tabIndex={2}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -99,6 +101,7 @@ export function SignUpPage() {
             minLength={MIN_PASSWORD_LENGTH}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            tabIndex={3}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -109,10 +112,11 @@ export function SignUpPage() {
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            tabIndex={4}
           />
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={submitting} className="mt-1">
+        <Button type="submit" disabled={submitting} className="mt-1" tabIndex={5}>
           {submitting ? t('auth.creatingAccount') : t('auth.createAccount')}
         </Button>
       </form>
