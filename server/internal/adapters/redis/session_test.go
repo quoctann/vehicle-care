@@ -20,7 +20,7 @@ func TestCreateSessionAndGetAndRefreshSession(t *testing.T) {
 
 	newExpiresAt := now.Add(2 * time.Hour)
 	got, ok, err := store.GetAndRefreshSession(ctx, "session-1", now, newExpiresAt)
-	if err != nil || !ok {
+	if err != nil || !ok || got == nil {
 		t.Fatalf("get and refresh session: ok=%v err=%v", ok, err)
 	}
 	if got.AccountID != "account-1" || got.CSRFToken != "csrf-1" {
@@ -33,7 +33,7 @@ func TestCreateSessionAndGetAndRefreshSession(t *testing.T) {
 	// A plain read afterwards should observe the refreshed expiry, proving
 	// the best-effort value/index rewrite in refreshSessionValue landed.
 	reread, ok, err := store.Session(ctx, "session-1", now)
-	if err != nil || !ok {
+	if err != nil || !ok || reread == nil {
 		t.Fatalf("re-read session: ok=%v err=%v", ok, err)
 	}
 	if !reread.ExpiresAt.Equal(newExpiresAt) {
@@ -46,8 +46,8 @@ func TestGetAndRefreshSessionMissingReturnsNotFound(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	_, ok, err := store.GetAndRefreshSession(ctx, "does-not-exist", now, now.Add(time.Hour))
-	if err != nil || ok {
+	got, ok, err := store.GetAndRefreshSession(ctx, "does-not-exist", now, now.Add(time.Hour))
+	if err != nil || ok || got != nil {
 		t.Fatalf("expected not-found for missing session: ok=%v err=%v", ok, err)
 	}
 }

@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { Archive, Car, Plus, RotateCcw, Settings, Trash2 } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EditVehicleSheet } from "@/components/sheets/EditVehicleSheet";
-import type { Vehicle } from "@/domain/types";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { useState } from 'react';
+import { Archive, Car, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { EditVehicleSheet } from '@/components/sheets/EditVehicleSheet';
+import type { Vehicle } from '@/domain/types';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 
-type PendingAction = { kind: "archive" | "delete"; vehicle: Vehicle } | null;
+type PendingAction = { kind: 'archive' | 'delete'; vehicle: Vehicle } | null;
 
 export function GarageList({
   vehicles,
@@ -48,7 +48,7 @@ export function GarageList({
     if (!pending) return;
     setBusyId(pending.vehicle.id);
     try {
-      if (pending.kind === "archive") await onArchive(pending.vehicle);
+      if (pending.kind === 'archive') await onArchive(pending.vehicle);
       else await onDelete(pending.vehicle);
       setPending(null);
     } catch {
@@ -84,7 +84,7 @@ export function GarageList({
             return (
               <div
                 key={vehicle.id}
-                className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${index > 0 ? "border-t border-border-subtle" : ""}`}
+                className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${index > 0 ? 'border-t border-border-subtle' : ''}`}
               >
                 <button
                   type="button"
@@ -93,25 +93,20 @@ export function GarageList({
                   disabled={archived}
                 >
                   <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${archived ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${archived ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}
                   >
                     <Car className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-semibold">
-                        {vehicle.name}
-                      </span>
+                      <span className="truncate text-sm font-semibold">{vehicle.name}</span>
                       {isActive && (
                         <Badge variant="secondary" className="h-5">
                           {t('common.active')}
                         </Badge>
                       )}
                       {archived && (
-                        <Badge
-                          variant="outline"
-                          className="h-5 text-muted-foreground"
-                        >
+                        <Badge variant="outline" className="h-5 text-muted-foreground">
                           {t('settings.archived')}
                         </Badge>
                       )}
@@ -136,7 +131,7 @@ export function GarageList({
                       variant="ghost"
                       size="sm"
                       disabled={busyId === vehicle.id}
-                      onClick={() => setPending({ kind: "archive", vehicle })}
+                      onClick={() => setPending({ kind: 'archive', vehicle })}
                     >
                       <Archive /> {t('settings.archive')}
                     </Button>
@@ -156,7 +151,7 @@ export function GarageList({
                     className="text-destructive hover:text-destructive"
                     aria-label={t('settings.deleteVehicleLabel', { name: vehicle.name })}
                     disabled={busyId === vehicle.id}
-                    onClick={() => setPending({ kind: "delete", vehicle })}
+                    onClick={() => setPending({ kind: 'delete', vehicle })}
                   >
                     <Trash2 />
                   </Button>
@@ -170,26 +165,26 @@ export function GarageList({
       <ConfirmActionDialog
         open={pending != null}
         title={
-          pending?.kind === "delete"
+          pending?.kind === 'delete'
             ? t('settings.deleteVehicleTitle', { name: pending.vehicle.name })
             : t('settings.archiveVehicleTitle', { name: pending?.vehicle.name ?? '' })
         }
         description={
-          pending?.kind === "delete"
+          pending?.kind === 'delete'
             ? t('settings.deleteVehicleDescription')
             : t('settings.archiveVehicleDescription')
         }
         confirmLabel={
-          pending?.kind === "delete" ? t('settings.deleteVehicle') : t('settings.archiveVehicle')
+          pending?.kind === 'delete' ? t('settings.deleteVehicle') : t('settings.archiveVehicle')
         }
-        destructive={pending?.kind === "delete"}
+        destructive={pending?.kind === 'delete'}
         busy={pending != null && busyId === pending.vehicle.id}
         onOpenChange={(open) => !open && setPending(null)}
         onConfirm={() => void confirm()}
       />
 
       <EditVehicleSheet
-        key={editingVehicle?.id ?? "none"}
+        key={editingVehicle?.id ?? 'none'}
         open={editingVehicle != null}
         onOpenChange={(open) => !open && setEditingVehicle(null)}
         accountId={accountId}

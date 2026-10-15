@@ -1,33 +1,37 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { DueSoonSection } from '@/components/home/DueSoonSection'
-import { OdometerCard } from '@/components/home/OdometerCard'
-import { OverdueSection } from '@/components/home/OverdueSection'
-import { RecentlyLoggedSection } from '@/components/home/RecentlyLoggedSection'
-import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge'
-import { UpdateOdometerSheet } from '@/components/sheets/UpdateOdometerSheet'
-import { useHistoryEntries } from '@/hooks/useHistory'
-import { useCurrentOdometer, useReminderStatuses } from '@/hooks/useReminders'
-import { useSessionStore } from '@/stores/useSessionStore'
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { DueSoonSection } from '@/components/home/DueSoonSection';
+import { OdometerCard } from '@/components/home/OdometerCard';
+import { OverdueSection } from '@/components/home/OverdueSection';
+import { RecentlyLoggedSection } from '@/components/home/RecentlyLoggedSection';
+import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
+import { UpdateOdometerSheet } from '@/components/sheets/UpdateOdometerSheet';
+import { useHistoryEntries } from '@/hooks/useHistory';
+import { useCurrentOdometer, useReminderStatuses } from '@/hooks/useReminders';
+import { useSessionStore } from '@/stores/useSessionStore';
 
 export function HomePage() {
-  const { t } = useTranslation()
-  const { vehicleId } = useParams()
-  const account = useSessionStore((state) => state.account)
-  const timezone = account?.timezone ?? 'UTC'
-  const currentOdometerKm = useCurrentOdometer(account?.id, vehicleId)
-  const reminders = useReminderStatuses(account?.id, vehicleId, timezone)
-  const historyEntries = useHistoryEntries(account?.id, vehicleId)
-  const [odometerOpen, setOdometerOpen] = useState(false)
+  const { t } = useTranslation();
+  const { vehicleId } = useParams();
+  const account = useSessionStore((state) => state.account);
+  const timezone = account?.timezone ?? 'UTC';
+  const currentOdometerKm = useCurrentOdometer(account?.id, vehicleId);
+  const reminders = useReminderStatuses(account?.id, vehicleId, timezone);
+  const historyEntries = useHistoryEntries(account?.id, vehicleId);
+  const [odometerOpen, setOdometerOpen] = useState(false);
 
   if (!vehicleId) {
-    return <div className="p-6 text-sm text-muted-foreground">{t('vehicle.chooseDashboard')}</div>
+    return <div className="p-6 text-sm text-muted-foreground">{t('vehicle.chooseDashboard')}</div>;
   }
 
-  const overdue = reminders.filter((reminder) => reminder.result.status === 'overdue')
-  const dueSoon = reminders.filter((reminder) => reminder.result.status === 'due_soon')
+  // Hạng mục đã tắt (partType.active === false) không còn được user theo dõi — không nhắc
+  // nữa dù ReminderConfig cũ vẫn còn (không auto-xoá/pause, xem setPartTypeActive), tránh
+  // nhắc nhở "ma" cho thứ user đã chủ động ẩn khỏi picker.
+  const activeReminders = reminders.filter((reminder) => reminder.partType.active);
+  const overdue = activeReminders.filter((reminder) => reminder.result.status === 'overdue');
+  const dueSoon = activeReminders.filter((reminder) => reminder.result.status === 'due_soon');
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -64,5 +68,5 @@ export function HomePage() {
         />
       ) : null}
     </div>
-  )
+  );
 }

@@ -9,16 +9,16 @@ import {
   Wrench,
   Zap,
   type LucideIcon,
-} from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { resolvePartTypeDisplay, type PartTypeIconKey } from '@/domain/partType'
-import type { PartType } from '@/domain/types'
+} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { resolvePartTypeDisplay, type PartTypeIconKey } from '@/domain/partType';
+import type { PartType } from '@/domain/types';
 
 type PartTypeSelectorProps = {
-  partTypes: PartType[]
-  value: string | null
-  onChange: (partTypeId: string) => void
-}
+  partTypes: PartType[];
+  value: string | null;
+  onChange: (partTypeId: string) => void;
+};
 
 const icons: Record<PartTypeIconKey, LucideIcon> = {
   engine_oil: Droplet,
@@ -32,10 +32,10 @@ const icons: Record<PartTypeIconKey, LucideIcon> = {
   chain_sprocket_set: Cog,
   battery: BatteryFull,
   unknown: Wrench,
-}
+};
 
 export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelectorProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
   return (
     <fieldset>
       <legend className="mb-2 px-0.5 text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
@@ -48,29 +48,37 @@ export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelecto
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {partTypes.map((partType) => {
-            const display = resolvePartTypeDisplay(partType.code, partTypes)
-            const Icon = icons[display.icon]
-            const selected = value === partType.id
+            const display = resolvePartTypeDisplay(partType.code, partTypes);
+            const Icon = icons[display.icon];
+            const selected = value === partType.id;
 
             return (
               <button
                 key={partType.id}
                 type="button"
                 aria-pressed={selected}
+                disabled={!partType.active}
                 onClick={() => onChange(partType.id)}
-                className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none ${
+                className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed ${
                   selected
                     ? 'border-foreground shadow-sm ring-2 ring-background'
                     : 'border-border-subtle text-muted-foreground hover:border-border hover:text-foreground'
                 }`}
               >
                 <Icon className={`size-5 ${selected ? 'text-primary' : ''}`} aria-hidden="true" />
-                <span className="mt-3 text-xs font-semibold leading-tight text-foreground">{display.displayName}</span>
+                <span className="mt-3 text-xs font-semibold leading-tight text-foreground">
+                  {display.displayName}
+                </span>
+                {!partType.active ? (
+                  <span className="mt-1 text-[10px] font-medium text-muted-foreground">
+                    {t('partType.disabled')}
+                  </span>
+                ) : null}
               </button>
-            )
+            );
           })}
         </div>
       )}
     </fieldset>
-  )
+  );
 }

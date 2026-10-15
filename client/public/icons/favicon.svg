@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1417 1133" width="1417" height="1133">
+  <defs>
+    <linearGradient id="arcTop" x1="0.1" y1="1" x2="0.9" y2="0">
+      <stop offset="0" stop-color="#0a5cff"/>
+      <stop offset="0.4" stop-color="#00c4ff"/>
+      <stop offset="0.75" stop-color="#40f5d0"/>
+      <stop offset="1" stop-color="#1ae8d8"/>
+    </linearGradient>
+    <linearGradient id="arcBottom" x1="0.05" y1="0" x2="0.95" y2="1">
+      <stop offset="0" stop-color="#78f7c0"/>
+      <stop offset="0.35" stop-color="#10f5f5"/>
+      <stop offset="0.7" stop-color="#00a8ff"/>
+      <stop offset="1" stop-color="#0058ff"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0.3" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#00f5ff"/>
+      <stop offset="0.5" stop-color="#00b4ff"/>
+      <stop offset="1" stop-color="#0a78ff"/>
+    </linearGradient>
+    <linearGradient id="handleShade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a78ff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0030c8" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00f5ff"/>
+      <stop offset="1" stop-color="#0a9bff"/>
+    </linearGradient>
+    <linearGradient id="neck" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a70d8"/>
+      <stop offset="1" stop-color="#0a9cf0"/>
+    </linearGradient>
+    <linearGradient id="wrench" x1="0.9" y1="0" x2="0.1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#cfeafc"/>
+      <stop offset="1" stop-color="#f4faff"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0.1" y1="0.2" x2="0.9" y2="0.9">
+      <stop offset="0" stop-color="#00f5ff"/>
+      <stop offset="0.5" stop-color="#00a2ff"/>
+      <stop offset="1" stop-color="#0048ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Vòng cung trên -->
+  <path d="M347,340 A455,455 0 0 1 1110,390" fill="none" stroke="url(#arcTop)" stroke-width="76" stroke-linecap="round"/>
+  <!-- Vòng cung dưới -->
+  <path d="M272,752 A455,455 0 0 0 1112,845" fill="none" stroke="url(#arcBottom)" stroke-width="76" stroke-linecap="round"/>
+
+  <!-- Nắp và cổ bình -->
+  <rect x="606" y="436" width="84" height="50" fill="url(#neck)"/>
+  <rect x="543" y="356" width="211" height="82" rx="22" fill="url(#cap)"/>
+
+  <!-- Thân bình + tay cầm + vòi -->
+  <path id="canBody" fill-rule="evenodd" fill="url(#body)" d="
+    M515,485 L765,485 Q800,490 820,512 L865,565 Q880,575 895,568 L1100,478 Q1115,470 1130,470
+    L1190,470 Q1208,472 1211,490 L1217,530 Q1217,546 1200,548 L1140,549 Q1128,552 1115,567
+    L890,832 Q870,855 840,857 L490,857 Q445,850 428,800 L425,797 L215,578
+    Q195,550 197,525 Q200,510 210,495 L235,448 Q250,422 275,420 L400,420 Q425,422 445,440
+    L470,462 Q495,484 515,485 Z
+    M300,497 L390,497 Q400,498 410,508 L420,518 Q425,525 425,535 L425,690 L285,540
+    Q275,530 282,518 L295,502 Q298,497 300,497 Z"/>
+  <!-- Đổ bóng đoạn dưới tay cầm -->
+  <path d="M425,690 L425,797 L300,665 Z" fill="url(#handleShade)"/>
+
+  <!-- Cờ lê -->
+  <path fill="url(#wrench)" d="
+    M750,557 L716,592 Q708,602 712,615 Q720,634 738,634 Q745,634 752,628 L788,595
+    Q795,610 793,625 Q788,665 748,688 Q730,694 710,690 Q700,688 692,695 L592,790
+    Q568,808 548,790 Q530,770 543,747 L648,650 Q656,642 654,630 Q650,595 672,570
+    Q700,545 750,557 Z"/>
+
+  <!-- Giọt dầu -->
+  <path fill="url(#drop)" d="
+    M1183,577 Q1190,578 1195,590 Q1255,670 1260,730 Q1262,775 1220,800 Q1185,818 1150,800
+    Q1105,780 1105,735 Q1108,690 1175,590 Q1178,577 1183,577 Z"/>
+  <path fill="#ffffff" fill-opacity="0.35" d="M1170,665 Q1130,710 1130,735 Q1132,755 1147,755 Q1162,752 1160,738 Q1155,705 1170,665 Z"/>
+</svg>

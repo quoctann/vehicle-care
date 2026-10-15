@@ -1,19 +1,27 @@
-import { BellRing, History, Home, UserRound } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { BellRing, History, Home, UserRound } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 type BottomTabBarProps = {
-  vehicleId?: string
-}
+  vehicleId?: string;
+};
 
 export function BottomTabBar({ vehicleId }: BottomTabBarProps) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
   const items = [
     { label: t('navigation.home'), icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
-    { label: t('navigation.reminders'), icon: BellRing, to: vehicleId ? `/v/${vehicleId}/reminders` : '/' },
-    { label: t('navigation.history'), icon: History, to: vehicleId ? `/v/${vehicleId}/history` : '/' },
+    {
+      label: t('navigation.reminders'),
+      icon: BellRing,
+      to: vehicleId ? `/v/${vehicleId}/reminders` : '/',
+    },
+    {
+      label: t('navigation.history'),
+      icon: History,
+      to: vehicleId ? `/v/${vehicleId}/history` : '/',
+    },
     { label: t('navigation.account'), icon: UserRound, to: '/settings' },
-  ]
+  ];
 
   return (
     <nav
@@ -43,5 +51,5 @@ export function BottomTabBar({ vehicleId }: BottomTabBarProps) {
         </NavLink>
       ))}
     </nav>
-  )
+  );
 }

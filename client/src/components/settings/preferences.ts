@@ -1,29 +1,26 @@
-import { useState } from "react";
+import { useState } from 'react';
 
 export const PREFERENCE_KEYS = {
-  askForOdometer: "vehicle.preferences.askForOdometer",
-  quietHours: "vehicle.preferences.quietHours",
-  units: "vehicle.preferences.units",
+  askForOdometer: 'vehicle.preferences.askForOdometer',
+  quietHours: 'vehicle.preferences.quietHours',
+  units: 'vehicle.preferences.units',
 } as const;
 
-export function readUnitsPreference(): "km" | "mi" {
+export function readUnitsPreference(): 'km' | 'mi' {
   try {
     const stored = localStorage.getItem(PREFERENCE_KEYS.units);
-    if (stored == null) return "km";
+    if (stored == null) return 'km';
     try {
-      return JSON.parse(stored) === "mi" ? "mi" : "km";
+      return JSON.parse(stored) === 'mi' ? 'mi' : 'km';
     } catch {
-      return stored === "mi" ? "mi" : "km";
+      return stored === 'mi' ? 'mi' : 'km';
     }
   } catch {
-    return "km";
+    return 'km';
   }
 }
 
-export function useLocalStoragePreference<T extends string | boolean>(
-  key: string,
-  fallback: T,
-) {
+export function useLocalStoragePreference<T extends string | boolean>(key: string, fallback: T) {
   const [value, setValueState] = useState<T>(() => {
     try {
       const stored = localStorage.getItem(key);

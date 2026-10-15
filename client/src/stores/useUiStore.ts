@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 
 /**
  * CHỈ cho state UI cross-cutting thật sự không hợp với route hay local state —
@@ -8,13 +8,13 @@ import { create } from 'zustand'
  * vào đây — tránh store phình to không cần thiết.
  */
 type UiStore = {
-  vehicleSwitcherOpen: boolean
-  openVehicleSwitcher: () => void
-  closeVehicleSwitcher: () => void
-}
+  vehicleSwitcherOpen: boolean;
+  openVehicleSwitcher: () => void;
+  closeVehicleSwitcher: () => void;
+};
 
 export const useUiStore = create<UiStore>((set) => ({
   vehicleSwitcherOpen: false,
   openVehicleSwitcher: () => set({ vehicleSwitcherOpen: true }),
   closeVehicleSwitcher: () => set({ vehicleSwitcherOpen: false }),
-}))
+}));

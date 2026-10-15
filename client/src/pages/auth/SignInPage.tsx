@@ -1,43 +1,43 @@
-import { type FormEvent, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import * as api from '@/api/client'
-import { AuthLayout } from '@/components/auth/AuthLayout'
-import { GoogleButton } from '@/components/auth/GoogleButton'
-import { PasswordInput } from '@/components/auth/PasswordInput'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore'
-import { getUserError } from '@/lib/userError'
+import * as api from '@/api/client';
+import { AuthLayout } from '@/components/auth/AuthLayout';
+import { GoogleButton } from '@/components/auth/GoogleButton';
+import { PasswordInput } from '@/components/auth/PasswordInput';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { getUserError } from '@/lib/userError';
+import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore';
+import { type FormEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 
 export function SignInPage() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSubmitting(true)
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
     try {
-      const { account } = await api.login({ email, password })
-      setAuthenticated(mapAccountDto(account))
-      navigate('/', { replace: true })
+      const { account } = await api.login({ email, password });
+      setAuthenticated(mapAccountDto(account));
+      navigate('/', { replace: true });
     } catch (err) {
-      setError(getUserError(err, t))
-      setSubmitting(false)
+      setError(getUserError(err, t));
+      setSubmitting(false);
     }
   }
 
   function handleGoogle() {
-    setError(null)
-    setSubmitting(true)
-    window.location.href = api.googleStartUrl()
+    setError(null);
+    setSubmitting(true);
+    window.location.href = api.googleStartUrl();
   }
 
   return (
@@ -62,12 +62,16 @@ export function SignInPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            tabIndex={1}
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">{t('common.password')}</Label>
-            <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-medium text-primary hover:underline"
+            >
               {t('auth.forgotPasswordQuestion')}
             </Link>
           </div>
@@ -77,10 +81,11 @@ export function SignInPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            tabIndex={2}
           />
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit" disabled={submitting} className="mt-1">
+        <Button type="submit" disabled={submitting} className="mt-1" tabIndex={3}>
           {submitting ? t('auth.signingIn') : t('auth.signIn')}
         </Button>
       </form>
@@ -93,5 +98,5 @@ export function SignInPage() {
 
       <GoogleButton onClick={handleGoogle} loading={submitting} />
     </AuthLayout>
-  )
+  );
 }

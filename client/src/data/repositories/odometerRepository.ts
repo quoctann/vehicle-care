@@ -1,10 +1,10 @@
-import { generateId } from '@/lib/uuid'
-import { validateOdometerReading } from '@/domain/validation'
-import type { OdometerLog } from '@/domain/types'
-import { db } from '../db'
-import { odometerLogToPayload } from '../mappers'
-import { enqueueMutation } from '../outbox'
-import { assertVehicleOwned } from './ownership'
+import { generateId } from '@/lib/uuid';
+import { validateOdometerReading } from '@/domain/validation';
+import type { OdometerLog } from '@/domain/types';
+import { db } from '../db';
+import { odometerLogToPayload } from '../mappers';
+import { enqueueMutation } from '../outbox';
+import { assertVehicleOwned } from './ownership';
 
 /**
  * D-02: caller (UI) chịu trách nhiệm hỏi/hiển thị cảnh báo "thấp hơn hiện tại"
@@ -12,18 +12,19 @@ import { assertVehicleOwned } from './ownership'
  * chặn lại lần nữa vì cảnh báo không phải lỗi.
  */
 export async function addOdometerLog(input: {
-  accountId: string
-  vehicleId: string
-  odometerKm: number
-  recordedAt?: string
-  note?: string | null
-  source?: OdometerLog['source']
+  accountId: string;
+  vehicleId: string;
+  odometerKm: number;
+  recordedAt?: string;
+  note?: string | null;
+  source?: OdometerLog['source'];
 }): Promise<OdometerLog> {
-  const validation = validateOdometerReading(input.odometerKm, null)
-  if (!validation.valid) throw new Error(`Odometer không hợp lệ: ${validation.error}`)
-  if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt))) throw new Error('Recorded time is invalid.')
+  const validation = validateOdometerReading(input.odometerKm, null);
+  if (!validation.valid) throw new Error(`Odometer không hợp lệ: ${validation.error}`);
+  if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt)))
+    throw new Error('Recorded time is invalid.');
 
-  const now = new Date().toISOString()
+  const now = new Date().toISOString();
   const log: OdometerLog = {
     id: generateId(),
     accountId: input.accountId,
@@ -33,18 +34,19 @@ export async function addOdometerLog(input: {
     note: input.note ?? null,
     source: input.source ?? 'manual',
     createdAtClient: now,
-    receivedAtServer: null,
+    serverSyncedAt: null,
     serverSeq: null,
-  }
-  await db.transaction('rw', db.vehicles, db.odometerLogs, db.outbox, async () => {
-    await assertVehicleOwned(input.accountId, input.vehicleId)
-    await db.odometerLogs.add(log)
+  };
+  await db.transaction('rw', [db.vehicles, db.odometerLogs, db.outbox, db.syncMeta], async () => {
+    await assertVehicleOwned(input.accountId, input.vehicleId);
+    await db.odometerLogs.add(log);
     await enqueueMutation({
+      accountId: input.accountId,
       entityType: 'odometer_log',
       operation: 'create',
       entityId: log.id,
       payload: odometerLogToPayload(log),
-    })
-  })
-  return log
+    });
+  });
+  return log;
 }

@@ -1,12 +1,12 @@
-import { ChevronDown } from 'lucide-react'
-import type { Vehicle } from '@/domain/types'
-import { useTranslation } from 'react-i18next'
-import { useUiStore } from '@/stores/useUiStore'
+import { ChevronDown } from 'lucide-react';
+import type { Vehicle } from '@/domain/types';
+import { useTranslation } from 'react-i18next';
+import { useUiStore } from '@/stores/useUiStore';
 
 type VehicleSwitcherProps = {
-  vehicle?: Vehicle
-  variant?: 'sidebar' | 'header'
-}
+  vehicle?: Vehicle;
+  variant?: 'sidebar' | 'header';
+};
 
 function initials(name: string): string {
   const value = name
@@ -15,14 +15,15 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((part) => part[0])
     .join('')
-    .toUpperCase()
-  return value || 'V'
+    .toUpperCase();
+  return value || 'V';
 }
 
 export function VehicleSwitcher({ vehicle, variant = 'sidebar' }: VehicleSwitcherProps) {
-  const { t } = useTranslation()
-  const openVehicleSwitcher = useUiStore((state) => state.openVehicleSwitcher)
-  const avatarSize = variant === 'header' ? 'size-10 rounded-xl text-[13px]' : 'size-9 rounded-[11px] text-xs'
+  const { t } = useTranslation();
+  const openVehicleSwitcher = useUiStore((state) => state.openVehicleSwitcher);
+  const avatarSize =
+    variant === 'header' ? 'size-10 rounded-xl text-[13px]' : 'size-9 rounded-[11px] text-xs';
 
   return (
     <button
@@ -40,7 +41,9 @@ export function VehicleSwitcher({ vehicle, variant = 'sidebar' }: VehicleSwitche
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1">
-          <span className={`${variant === 'header' ? 'text-[14.5px]' : 'text-[13.5px]'} truncate font-semibold leading-tight`}>
+          <span
+            className={`${variant === 'header' ? 'text-[14.5px]' : 'text-[13.5px]'} truncate font-semibold leading-tight`}
+          >
             {vehicle?.name ?? t('vehicle.select')}
           </span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
@@ -50,5 +53,5 @@ export function VehicleSwitcher({ vehicle, variant = 'sidebar' }: VehicleSwitche
         </span>
       </span>
     </button>
-  )
+  );
 }

@@ -1,11 +1,11 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { toast } from 'sonner'
-import { registerSW } from 'virtual:pwa-register'
-import { ThemeProvider } from '@/components/theme/ThemeProvider'
-import App from './App.tsx'
-import i18n from './i18n'
-import './index.css'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { toast } from 'sonner';
+import { registerSW } from 'virtual:pwa-register';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
+import App from './App.tsx';
+import i18n from './i18n';
+import './index.css';
 
 /**
  * `registerType: 'autoUpdate'` (vite.config.ts) cài service worker mới (skipWaiting +
@@ -20,21 +20,27 @@ const updateSW = registerSW({
     toast.info(i18n.t('common.updateAvailable'), {
       action: { label: i18n.t('common.update'), onClick: () => void updateSW(true) },
       duration: Infinity,
-    })
+    });
   },
   onRegisteredSW(_swUrl, registration) {
-    if (!registration) return
-    setInterval(() => void registration.update(), 60 * 60 * 1000)
+    if (!registration) return;
+    setInterval(() => void registration.update(), 60 * 60 * 1000);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') void registration.update()
-    })
+      if (document.visibilityState === 'visible') void registration.update();
+    });
   },
-})
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange storageKey="vehicle.preferences.theme">
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem={false}
+      disableTransitionOnChange
+      storageKey="vehicle.preferences.theme"
+    >
       <App />
     </ThemeProvider>
   </StrictMode>,
-)
+);
