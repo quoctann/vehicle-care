@@ -1,1 +1,0 @@
-account_sequences: thông tin phiên bản dữ liệu được server chấp nhận, các client sẽ hỏi phiên bản này để biết cần sync những gì

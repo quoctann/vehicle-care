@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test --project=chromium",
-    "test:coverage:timezone": "vitest run --config vitest.timezone.config.ts --maxWorkers=4 --coverage"
+    "test:coverage:contracts": "vitest run --config vitest.contract.config.ts --maxWorkers=4 --coverage"
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",

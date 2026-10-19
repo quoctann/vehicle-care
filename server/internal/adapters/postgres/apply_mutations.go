@@ -208,7 +208,7 @@ func (s *Store) applyMutableMutation(ctx context.Context, tx *sqlx.Tx, queries *
 
 // applyAppendOnlyMutation handles "odometer_log": it is immutable once
 // created (editing/deleting a reading would shift baseline_odometer_km for
-// every reminder — see .docs/20260919-feedback.md Feature #3 scope), so a
+// derived reminder baselines), so a
 // prior snapshot by the same entity ID is always a duplicate, never a
 // conflict. fuel_log/service_log used to be handled here too but are now
 // mutable (applyMutableMutation) so users can edit/delete them.

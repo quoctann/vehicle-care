@@ -1,4 +1,3 @@
-/** Placeholder tạm cho các trang chưa triển khai ở giai đoạn hiện tại (M4-M8 của plan). */
 import { useTranslation } from 'react-i18next';
 
 export function ComingSoon({ title }: { title: string }) {

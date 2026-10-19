@@ -22,12 +22,16 @@ export async function addFuelLog(input: {
   odometerKm: number | null;
   isFullTank: boolean;
 }): Promise<{ fuelLog: FuelLog; odometerLog: OdometerLog | null }> {
-  if (input.liters != null && (!Number.isFinite(input.liters) || input.liters <= 0))
+  if (input.liters != null && (!Number.isFinite(input.liters) || input.liters <= 0)) {
     throw new Error('Fuel amount must be positive.');
-  if (input.cost != null && !isValidCost(input.cost))
+  }
+  if (input.cost != null && !isValidCost(input.cost)) {
     throw new Error('Fuel cost must be between 0 and 99999999.99 with at most two decimals.');
-  if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt)))
+  }
+  if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt))) {
     throw new Error('Recorded time is invalid.');
+  }
+
   if (input.odometerKm != null) {
     const validation = validateOdometerReading(input.odometerKm, null);
     if (!validation.valid) throw new Error(`Odometer không hợp lệ: ${validation.error}`);

@@ -26,21 +26,21 @@ export type CalculateReminderStatusInput = {
   lastServiceLog: LastServiceLogInput;
   now: IsoDateTime;
   accountTimezone: IanaTimezone;
-  /** Ngưỡng "sắp đến hạn" — caller truyền `vehicle.dueSoonRatio ?? DUE_SOON_REMAINING_RATIO` (feedback #Feature-1, per-vehicle thay vì hardcode toàn hệ thống). */
+  /** Tỷ lệ chu kỳ đã dùng; caller truyền ngưỡng của xe hoặc mặc định hệ thống. */
   dueSoonRatio: number;
 };
 
 /**
- * B5 — tính trạng thái reminder. Function THUẦN: không đọc DB/đồng hồ hệ thống,
+ * Tính trạng thái reminder. Function THUẦN: không đọc DB/đồng hồ hệ thống,
  * mọi input đến từ tham số để test được deterministic.
  *
- * Quy tắc cốt lõi (xem decision.md mục 6.1, implementation-plan-section-5.md D-01..D-07):
+ * Quy tắc cốt lõi (xem `.docs/decision.md`):
  * - Baseline (mốc bắt đầu) ưu tiên lấy từ ServiceLog gần nhất nếu có, fallback về
- *   baseline user nhập lúc tạo reminder (D-05).
+ *   baseline user nhập lúc tạo reminder.
  * - `used = max(0, current - baseline)`: clamp về 0 để tránh giá trị âm vô nghĩa
- *   khi odometer bị nhập lệch thứ tự hoặc thấp hơn baseline (D-01/D-02).
+ *   khi odometer bị nhập lệch thứ tự hoặc thấp hơn baseline.
  * - `overdue` nếu MỘT TRONG HAI điều kiện (km/ngày) đã cấu hình vượt chu kỳ.
- * - `due_soon` nếu không overdue và MỘT TRONG HAI điều kiện còn lại ≤10% chu kỳ
+ * - `due_soon` nếu không overdue và một chiều đạt tỷ lệ đã dùng cấu hình (mặc định 90%)
  *   (ngưỡng theo từng XE — `dueSoonRatio` ở input, fallback `DUE_SOON_REMAINING_RATIO`
  *   nếu xe chưa tùy chỉnh; không cấu hình theo từng reminder riêng lẻ).
  * - `insufficient_data` CHỈ khi MỌI điều kiện đã cấu hình đều thiếu dữ liệu cần thiết

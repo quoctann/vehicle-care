@@ -1,15 +1,12 @@
 /**
  * ĐÂY LÀ HỢP ĐỒNG DÙNG CHUNG FE/BE (nguồn sự thật phía TypeScript).
  *
- * Mirror nội dung current implementation ở `.docs/sync-api-contract.md`. Sửa tài liệu đó TRƯỚC, rồi
- * đồng bộ tay các type ở file này SAU — không tự ý đổi shape ở đây mà không cập
- * nhật doc. Field trên "wire" (JSON thật sự trao đổi qua HTTP) dùng snake_case
- * đúng như response server trả về; việc map sang domain type (camelCase, ở
- * `src/domain/types.ts`) diễn ra ở `src/api/client.ts` và `src/sync/applyChange.ts`,
- * KHÔNG lẫn lộn 2 tầng field-naming này ở nơi khác.
+ * Contract hiện hành được mô tả ở `.docs/decision.md`; thay đổi JSON phải cập nhật
+ * cả tài liệu và types. Wire dùng snake_case; domain/Dexie dùng camelCase qua
+ * `data/mappers.ts`. TypeScript không thay thế validation JSON tại runtime.
  */
 
-// ─────────────────────────── Auth & device (D1) ───────────────────────────
+// MARK: Auth & device
 
 export type AccountDto = {
   id: string;
@@ -19,44 +16,173 @@ export type AccountDto = {
   email_verified: boolean;
 };
 
-export type SignupRequest = { email: string; password: string; name?: string };
-export type SignupResponse = { status: 'verification_required'; email: string };
+export type SignupRequest = {
+  email: string;
+  password: string;
+  name?: string;
+};
 
-export type VerifyEmailRequest = { token: string };
-export type VerifyEmailResponse = { status: 'verified' };
+export type SignupResponse = {
+  status: 'verification_required';
+  email: string;
+};
 
-export type ResendVerificationRequest = { email: string };
+export type VerifyEmailRequest = {
+  token: string;
+};
 
-export type LoginRequest = { email: string; password: string };
-export type LoginResponse = { account: AccountDto };
+export type VerifyEmailResponse = {
+  status: 'verified';
+};
 
-export type ForgotPasswordRequest = { email: string };
+export type ResendVerificationRequest = {
+  email: string;
+};
 
-export type ResetPasswordRequest = { token: string; new_password: string };
-export type ResetPasswordResponse = { status: 'reset' };
+export type LoginRequest = {
+  email: string;
+  password: string;
+};
+
+export type LoginResponse = {
+  account: AccountDto;
+};
+
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  new_password: string;
+};
+
+export type ResetPasswordResponse = {
+  status: 'reset';
+};
 
 /** 200 = còn phiên hợp lệ; 401 (ApiErrorBody) = chưa đăng nhập/hết hạn. */
-export type SessionResponse = { account: AccountDto };
+export type SessionResponse = {
+  account: AccountDto;
+};
 
-export type UpdateAccountTimezoneRequest = { timezone: string; expected_account_id?: string };
-export type UpdateAccountTimezoneResponse = { account: AccountDto };
+export type UpdateAccountTimezoneRequest = {
+  timezone: string;
+  expected_account_id?: string;
+};
 
-export type RegisterDeviceRequest = { device_id: string; platform: string; app_version: string };
-export type RegisterDeviceResponse = { device_id: string; registered_at: string };
+export type UpdateAccountTimezoneResponse = {
+  account: AccountDto;
+};
 
-// ────────────────────────────── Sync (D2, D4) ──────────────────────────────
+export type RegisterDeviceRequest = {
+  device_id: string;
+  platform: string;
+  app_version: string;
+};
 
-export type SyncEntityType =
-  'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log' | 'part_type';
-export type SyncOperation = 'create' | 'update';
+export type RegisterDeviceResponse = {
+  device_id: string;
+  registered_at: string;
+};
 
-export type PushMutation = {
+// MARK: Sync
+
+export const SyncEntityType = {
+  Vehicle: 'vehicle',
+  ReminderConfig: 'reminder_config',
+  OdometerLog: 'odometer_log',
+  FuelLog: 'fuel_log',
+  ServiceLog: 'service_log',
+  PartType: 'part_type',
+} as const;
+export type SyncEntityType = (typeof SyncEntityType)[keyof typeof SyncEntityType];
+
+export const SyncOperation = { Create: 'create', Update: 'update' } as const;
+export type SyncOperation = (typeof SyncOperation)[keyof typeof SyncOperation];
+
+// Full outgoing snake_case snapshots. Incoming JSON still needs runtime checks;
+// these types neither validate JSON nor replace the mappers' legacy defaults.
+export type VehiclePayload = {
+  name: string;
+  plate_number: string | null;
+  archived_at: string | null;
+  deleted_at: string | null;
+  due_soon_ratio: number | null;
+};
+
+export type ReminderConfigPayload = {
+  vehicle_id: string;
+  part_type_id: string;
+  interval_km: number | null;
+  interval_days: number | null;
+  baseline_odometer_km: number | null;
+  baseline_date: string | null;
+  enabled: boolean;
+  deleted_at: string | null;
+};
+
+export type OdometerLogPayload = {
+  vehicle_id: string;
+  odometer_km: number;
+  recorded_at: string;
+  note: string | null;
+  source: 'manual' | 'fuel';
+};
+
+export type FuelLogPayload = {
+  vehicle_id: string;
+  recorded_at: string;
+  liters: number | null;
+  cost: number | null;
+  note: string | null;
+  odometer_log_id: string | null;
+  is_full_tank: boolean;
+  deleted_at: string | null;
+};
+
+export type ServiceLogPayload = {
+  vehicle_id: string;
+  part_type_id: string;
+  serviced_at: string;
+  odometer_km_snapshot: number | null;
+  cost: number | null;
+  note: string | null;
+  deleted_at: string | null;
+};
+
+export type PartTypePayload = {
+  /** Open vocabulary: server seed codes and user-created UUID codes. */
+  code: string;
+  name: string;
+  display_order: number;
+  active: boolean;
+};
+
+export type SyncPayloadMap = {
+  vehicle: VehiclePayload;
+  reminder_config: ReminderConfigPayload;
+  odometer_log: OdometerLogPayload;
+  fuel_log: FuelLogPayload;
+  service_log: ServiceLogPayload;
+  part_type: PartTypePayload;
+};
+
+export type SyncOperationFor<E extends SyncEntityType> = E extends 'odometer_log'
+  ? typeof SyncOperation.Create
+  : SyncOperation;
+
+type SyncEntityEnvelope = {
+  [E in SyncEntityType]: {
+    entity_type: E;
+    operation: SyncOperationFor<E>;
+    payload: SyncPayloadMap[E];
+  };
+}[SyncEntityType];
+
+export type PushMutation = SyncEntityEnvelope & {
   mutation_id: string;
-  entity_type: SyncEntityType;
-  operation: SyncOperation;
   entity_id: string;
-  /** Snapshot đầy đủ entity tại thời điểm mutation — shape khớp domain type tương ứng, field snake_case. */
-  payload: Record<string, unknown>;
 };
 
 export type PushRequest = {
@@ -64,7 +190,13 @@ export type PushRequest = {
   mutations: PushMutation[];
 };
 
-export type MutationResultStatus = 'applied' | 'duplicate' | 'rejected' | 'retryable_error';
+export const MutationResultStatus = {
+  Applied: 'applied',
+  Duplicate: 'duplicate',
+  Rejected: 'rejected',
+  RetryableError: 'retryable_error',
+} as const;
+export type MutationResultStatus = (typeof MutationResultStatus)[keyof typeof MutationResultStatus];
 
 export type MutationResult = {
   mutation_id: string;
@@ -76,14 +208,13 @@ export type MutationResult = {
   retryable?: boolean;
 };
 
-export type PushResponse = { results: MutationResult[] };
+export type PushResponse = {
+  results: MutationResult[];
+};
 
-export type PullChange = {
+export type PullChange = SyncEntityEnvelope & {
   server_seq: number;
-  entity_type: SyncEntityType;
   entity_id: string;
-  operation: SyncOperation;
-  payload: Record<string, unknown>;
   server_synced_at: string;
 };
 
@@ -96,7 +227,7 @@ export type PullResponse = {
   server_time: string;
 };
 
-// ────────────────────────── Part type catalog (2.14) ──────────────────────────
+// MARK: Part type catalog
 
 /**
  * Entity mutable thật đi qua push/pull như vehicle. Seed rows cũng có server sequence
@@ -113,17 +244,23 @@ export type PartTypeDto = {
   server_synced_at: string;
 };
 
-export type PartTypesResponse = { part_types: PartTypeDto[] };
+export type PartTypesResponse = {
+  part_types: PartTypeDto[];
+};
 
-// ──────────────────────────────── Errors (D6) ────────────────────────────────
+//
+// MARK: Errors
+//
 
-export type ApiErrorCode =
-  | 'auth_invalid'
-  | 'session_expired'
-  | 'validation_failed'
-  | 'ownership_invalid'
-  | 'rate_limited'
-  | 'internal_error';
+export const ApiErrorCode = {
+  AuthInvalid: 'auth_invalid',
+  SessionExpired: 'session_expired',
+  ValidationFailed: 'validation_failed',
+  OwnershipInvalid: 'ownership_invalid',
+  RateLimited: 'rate_limited',
+  InternalError: 'internal_error',
+} as const;
+export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode];
 
 export type ApiErrorBody = {
   error: {

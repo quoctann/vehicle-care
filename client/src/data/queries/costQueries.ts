@@ -2,7 +2,12 @@ import { toCalendarDateInTimezone } from '@/domain/datetime';
 import type { IanaTimezone } from '@/domain/types';
 import { db } from '../db';
 
-export type MonthlyCost = { month: string; fuelVnd: number; serviceVnd: number; totalVnd: number };
+export type MonthlyCost = {
+  month: string;
+  fuelVnd: number;
+  serviceVnd: number;
+  totalVnd: number;
+};
 
 function monthKey(instant: string, timezone: IanaTimezone): string {
   return toCalendarDateInTimezone(instant, timezone).slice(0, 7); // "YYYY-MM"
@@ -56,9 +61,8 @@ export async function getMonthlyCosts(
 }
 
 /**
- * Chi phí trung bình / km trong N tháng gần nhất — thống kê tham khảo (KHÔNG phải
- * business rule trong decision.md), dùng cutoff theo UTC (xấp xỉ tháng lịch, đủ
- * chính xác cho 1 stat card).
+ * Chi phí trung bình / km trong N tháng gần nhất — ước tính tham khảo, dùng cutoff
+ * theo UTC, không phải cùng cửa sổ tháng lịch theo timezone ở bảng chi phí tháng.
  */
 export async function getCostPerKm(
   accountId: string,

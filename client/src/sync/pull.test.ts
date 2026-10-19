@@ -31,6 +31,7 @@ function vehicleChange(serverSeq: number, entityId: string) {
       plate_number: null,
       archived_at: null,
       deleted_at: null,
+      due_soon_ratio: null,
     },
     server_synced_at: `2026-09-17T10:00:0${serverSeq}.000Z`,
   };

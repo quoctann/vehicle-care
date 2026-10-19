@@ -6,8 +6,8 @@ import { ApiError } from '@/api/errors';
 import { getOrCreateDeviceId } from '@/lib/deviceId';
 
 /**
- * `useSessionStore` chỉ giữ TRẠNG THÁI ĐĂNG NHẬP hiện tại (mỏng, đúng nguyên tắc
- * store trong plan) — KHÔNG chứa token: session thật là cookie `httpOnly` do trình
+ * `useSessionStore` chỉ giữ TRẠNG THÁI ĐĂNG NHẬP hiện tại — KHÔNG chứa token:
+ * session thật là cookie `httpOnly` do trình
  * duyệt tự quản lý, JS không đọc/lưu được và không cần. Biết "đã đăng nhập chưa"
  * bằng cách gọi `GET /auth/session` (cookie tự đính kèm), không bằng cách soi local storage.
  */

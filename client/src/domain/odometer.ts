@@ -17,7 +17,7 @@ function compareTimestamps(a: string, b: string): number {
 }
 
 /**
- * D-01: odometer hiện tại = log có `recordedAt` mới nhất; nếu trùng `recordedAt`,
+ * Odometer hiện tại = log có `recordedAt` mới nhất; nếu trùng `recordedAt`,
  * log được SERVER tiếp nhận sau cùng thắng. Với 2 log cùng `recordedAt` mà cả 2
  * đều CHƯA sync (`serverSyncedAt` null — chưa có thứ tự server để phân định),
  * dùng `createdAtClient` để phân định giữa các nguồn. Nếu vẫn trùng, dùng vị trí

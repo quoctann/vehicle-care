@@ -47,7 +47,7 @@ type Config struct {
 	// AutoMigrate applies pending schema migrations before the API starts
 	// listening. Local dev convenience only — defaults off so production/k8s
 	// keeps migrations as a separate, explicit deploy step (see
-	// .docs/architecture.md). Safe even if left on with multiple replicas:
+	// .docs/decision.md). Safe even if left on with multiple replicas:
 	// migrations.Up takes a Postgres advisory lock for the duration of the
 	// run.
 	AutoMigrate bool `env:"AUTO_MIGRATE" envDefault:"false"`

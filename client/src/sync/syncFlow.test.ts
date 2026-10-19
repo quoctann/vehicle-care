@@ -22,6 +22,10 @@ const accountId = 'account-1';
 const vehicleId = 'vehicle-1';
 const timestamp = '2026-09-23T10:00:00.000Z';
 
+function vehiclePayload(name: string) {
+  return { name, plate_number: null, archived_at: null, deleted_at: null, due_soon_ratio: null };
+}
+
 beforeEach(async () => {
   useSessionStore.getState().setAuthenticated({
     id: accountId,
@@ -92,7 +96,7 @@ it('applies canonical odometer fields after the ACK set the same server version'
       vehicle_id: vehicleId,
       odometer_km: 123.46,
       recorded_at: timestamp,
-      source: 'manual',
+      source: 'manual' as const,
       note: null,
     },
     server_seq: 11,
@@ -127,7 +131,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
           entity_type: 'vehicle',
           operation: 'update',
           entity_id: vehicleId,
-          payload: { name: 'Remote edit' },
+          payload: vehiclePayload('Remote edit'),
           server_seq: 11,
           server_synced_at: timestamp,
         },
@@ -165,7 +169,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
         entity_type: 'vehicle',
         operation: 'update',
         entity_id: vehicleId,
-        payload: { name: 'New local edit' },
+        payload: vehiclePayload('New local edit'),
         server_seq: 12,
         server_synced_at: timestamp,
       },
@@ -239,7 +243,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
         entity_type: 'vehicle',
         operation: 'update',
         entity_id: vehicleId,
-        payload: { name: 'Fixed' },
+        payload: vehiclePayload('Fixed'),
         server_seq: 11,
         server_synced_at: timestamp,
       },
@@ -284,7 +288,7 @@ it('restores a blocked workspace from cursor zero through the real pull pipeline
         entity_type: 'vehicle',
         operation: 'create',
         entity_id: vehicleId,
-        payload: { name: 'Server truth' },
+        payload: vehiclePayload('Server truth'),
         server_seq: 2,
         server_synced_at: timestamp,
       },
@@ -332,7 +336,7 @@ it('retries the same device and envelope after a lost response and changed local
         entity_type: 'vehicle',
         operation: 'update',
         entity_id: vehicleId,
-        payload: { name: 'Committed before timeout' },
+        payload: vehiclePayload('Committed before timeout'),
         server_seq: 11,
         server_synced_at: timestamp,
       },

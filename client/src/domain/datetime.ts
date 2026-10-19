@@ -2,10 +2,9 @@ import type { IanaTimezone, IsoDate, IsoDateTime } from './types';
 import { toRuntimeTimezone } from './timezone';
 
 /**
- * D-07: reminder theo ngày phải tính theo timezone của Account, không phải UTC
- * hay timezone trình duyệt. Hàm này quy 1 instant UTC về ngày lịch "YYYY-MM-DD"
- * theo đúng timezone account — dùng `Intl` thay vì tự tính offset để đúng cả khi
- * có DST.
+ * Reminder theo ngày dùng timezone của Account, không phải timezone trình duyệt.
+ * Chuyển UTC instant thành ngày lịch "YYYY-MM-DD" bằng Intl; lựa chọn mới của
+ * account là fixed UTC offset, không tự đổi theo DST.
  */
 export function toCalendarDateInTimezone(instant: IsoDateTime, timezone: IanaTimezone): IsoDate {
   const formatter = new Intl.DateTimeFormat('en-CA', {

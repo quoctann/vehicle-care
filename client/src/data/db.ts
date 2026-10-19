@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import type { SyncEntityType, SyncOperation as WireSyncOperation } from '@/api/contract.types';
 import type {
   FuelLog,
   IanaTimezone,
@@ -15,11 +16,12 @@ import type {
  * (đây là sổ sách nội bộ của client để biết mình cần push/pull gì).
  */
 
-export type OutboxEntityType =
-  'vehicle' | 'reminder_config' | 'odometer_log' | 'fuel_log' | 'service_log' | 'part_type';
-export type OutboxOperation = 'create' | 'update';
-export type OutboxStatus = 'pending' | 'blocked';
-export type OutboxFailureKind = 'retryable' | 'terminal';
+export type OutboxEntityType = SyncEntityType;
+export type OutboxOperation = WireSyncOperation;
+export const OutboxStatus = { Pending: 'pending', Blocked: 'blocked' } as const;
+export type OutboxStatus = (typeof OutboxStatus)[keyof typeof OutboxStatus];
+export const OutboxFailureKind = { Retryable: 'retryable', Terminal: 'terminal' } as const;
+export type OutboxFailureKind = (typeof OutboxFailureKind)[keyof typeof OutboxFailureKind];
 
 /**
  * 1 dòng outbox = 1 lần thao tác cần đẩy lên server (không phải 1 entity — 1 entity
@@ -33,7 +35,8 @@ export type OutboxItem = {
   entityType: OutboxEntityType;
   operation: OutboxOperation;
   entityId: string;
-  /** Snapshot payload tại thời điểm ghi — JSON-serializable, gửi nguyên vẹn lên server khi push. */
+  /** Persisted snapshots include historical/repair data, not necessarily current typed payloads.
+   * Keep this boundary unknown; enqueueMutation checks new envelopes at compile time. */
   payload: unknown;
   /** Revision used to build this envelope. It must not be read again during retry. */
   baseServerSeq: number | null;
@@ -44,11 +47,26 @@ export type OutboxItem = {
   createdAt: IsoDateTime;
 };
 
-export type BootstrapState = 'empty' | 'bootstrapping' | 'ready';
-export type SyncOperation = 'idle' | 'restoring' | 'restore_failed';
-export type SyncFailureKind = 'retryable' | 'blocked' | 'terminal' | null;
+export const BootstrapState = {
+  Empty: 'empty',
+  Bootstrapping: 'bootstrapping',
+  Ready: 'ready',
+} as const;
+export type BootstrapState = (typeof BootstrapState)[keyof typeof BootstrapState];
+export const SyncOperation = {
+  Idle: 'idle',
+  Restoring: 'restoring',
+  RestoreFailed: 'restore_failed',
+} as const;
+export type SyncOperation = (typeof SyncOperation)[keyof typeof SyncOperation];
+export const SyncFailureKind = {
+  Retryable: 'retryable',
+  Blocked: 'blocked',
+  Terminal: 'terminal',
+} as const;
+export type SyncFailureKind = (typeof SyncFailureKind)[keyof typeof SyncFailureKind] | null;
 
-/** 1 dòng duy nhất mỗi account — sống CÙNG Dexie DB với data, xem ghi chú bootstrap trong plan. */
+/** 1 dòng mỗi account, sống cùng Dexie DB với entity/outbox để commit cursor atomically. */
 export type SyncMeta = {
   accountId: string;
   deviceId: string;
@@ -89,7 +107,7 @@ class VehicleMaintenanceDb extends Dexie {
 
   constructor() {
     super('vehicle-maintenance');
-    // Index tối thiểu đối chiếu A6 (implementation-plan-section-5.md). `&code` = unique.
+    // Schema lịch sử v1; giữ nguyên để nâng cấp workspace cũ. `&code` = unique.
     this.version(1).stores({
       vehicles: 'id, accountId, archivedAt, deletedAt',
       partTypes: 'id, &code, active',

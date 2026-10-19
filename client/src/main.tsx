@@ -13,7 +13,7 @@ import './index.css';
  * homescreen (standalone) có thể không đóng hẳn trong nhiều ngày, nên không bao giờ
  * biết có bản mới. `onRegisteredSW` chủ động `registration.update()` định kỳ + mỗi lần
  * app quay lại foreground; `onNeedRefresh` báo qua toast thay vì tự reload đột ngột
- * giữa lúc user đang nhập liệu (xem .docs/20260919-feedback.md mục 5).
+ * giữa lúc user đang nhập liệu. Không coi đây là bảo đảm cập nhật tức thì trên iOS.
  */
 const updateSW = registerSW({
   onNeedRefresh() {

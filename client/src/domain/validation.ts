@@ -1,8 +1,7 @@
 /**
- * D-02: cho phép lưu KM thấp hơn hiện tại (không âm thầm loại bỏ dữ liệu nhập
+ * Cho phép lưu KM thấp hơn hiện tại (không âm thầm loại bỏ dữ liệu nhập
  * offline), nhưng phải cảnh báo trước khi xác nhận — validation ở đây KHÔNG BAO
- * GIỜ chặn cứng vì lý do "thấp hơn hiện tại", chỉ chặn giá trị âm (bất khả thi
- * vật lý — A3: "Giá trị odometer phải không âm").
+ * GIỜ chặn cứng vì lý do "thấp hơn hiện tại", chỉ chặn số âm hoặc không hữu hạn.
  */
 export type OdometerValidationResult =
   | { valid: true; warning: null }
@@ -22,8 +21,8 @@ export function validateOdometerReading(
 }
 
 /**
- * A3: `interval_km`/`interval_days` phải dương nếu có giá trị; reminder đang
- * hoạt động phải có ÍT NHẤT MỘT trong hai.
+ * Interval phải dương nếu có; số ngày phải là số nguyên an toàn. Mỗi cấu hình
+ * phải có ít nhất một chu kỳ, kể cả khi tắt nhắc nhở.
  */
 export type ReminderIntervalValidationResult =
   | { valid: true }

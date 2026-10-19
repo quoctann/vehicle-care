@@ -5,9 +5,9 @@ import { partTypeToPayload } from '../mappers';
 import { enqueueMutation } from '../outbox';
 
 /**
- * Tạo hạng mục bảo dưỡng tuỳ chỉnh (feedback Feature #2). `code` LUÔN bằng chính `id`
- * (server validate + từ chối nếu khác — xem `.docs/sync-api-contract.md` mục 2.14) để
- * tránh đụng độ `UNIQUE(code)` toàn cục mà không cần đổi schema. `displayOrder` dùng
+ * Tạo hạng mục tuỳ chỉnh với `code === id` (server kiểm tra khi create) để tránh
+ * đụng độ `UNIQUE(account_id, code)`. Hạng mục seed vẫn giữ code của template.
+ * `displayOrder` dùng
  * hằng số cố định — custom part type luôn hiển thị sau danh mục mặc định, thứ tự giữa
  * các custom type với nhau theo `createdAtClient` (không cần user sắp xếp thủ công).
  */
@@ -74,7 +74,7 @@ export function updatePartTypeName(
   return writePartTypePatch(accountId, id, { displayName: name });
 }
 
-/** Soft-delete = `active: false` (khuyến nghị đã chốt ở Stage 1) — ẩn khỏi picker, giữ nguyên log/reminder đã tham chiếu. */
+/** `active: false` ẩn khỏi picker, giữ nguyên log/reminder đã tham chiếu. */
 export function setPartTypeActive(accountId: string, id: string, active: boolean): Promise<void> {
   return writePartTypePatch(accountId, id, { active });
 }

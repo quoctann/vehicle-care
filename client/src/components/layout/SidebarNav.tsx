@@ -9,7 +9,11 @@ type SidebarNavProps = {
 export function SidebarNav({ vehicleId }: SidebarNavProps) {
   const { t } = useTranslation();
   const items = [
-    { label: t('navigation.home'), icon: Home, to: vehicleId ? `/v/${vehicleId}/home` : '/' },
+    {
+      label: t('navigation.home'),
+      icon: Home,
+      to: vehicleId ? `/v/${vehicleId}/home` : '/',
+    },
     {
       label: t('navigation.reminders'),
       icon: BellRing,
@@ -20,7 +24,11 @@ export function SidebarNav({ vehicleId }: SidebarNavProps) {
       icon: History,
       to: vehicleId ? `/v/${vehicleId}/history` : '/',
     },
-    { label: t('navigation.account'), icon: UserRound, to: '/settings' },
+    {
+      label: t('navigation.account'),
+      icon: UserRound,
+      to: '/settings',
+    },
   ];
 
   return (

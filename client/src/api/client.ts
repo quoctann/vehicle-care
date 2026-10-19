@@ -55,7 +55,7 @@ async function request<TResponse>(
   return (await response.json()) as TResponse;
 }
 
-// ─────────────────────────── Auth & device (D1) ───────────────────────────
+// Auth & device
 
 export function signup(req: SignupRequest): Promise<SignupResponse> {
   return request('POST', '/auth/signup', req);
@@ -92,7 +92,7 @@ export function updateAccountTimezone(
   return request('POST', '/account/timezone', req);
 }
 
-/** Danh mục part_type — nguồn sự thật duy nhất cho UUID, xem `contract.types.ts` mục 2.14. */
+/** Catalog đọc phụ trợ; client nhận PartType qua changefeed, không bootstrap riêng. */
 export function listPartTypes(): Promise<PartTypesResponse> {
   return request('GET', '/part-types');
 }
@@ -113,7 +113,7 @@ export function registerDevice(req: RegisterDeviceRequest): Promise<RegisterDevi
   return request('POST', '/devices/register', req);
 }
 
-// ────────────────────────────── Sync (D2, D4) ──────────────────────────────
+// Sync
 
 export function pushMutations(req: PushRequest): Promise<PushResponse> {
   return request('POST', '/sync/push', req);

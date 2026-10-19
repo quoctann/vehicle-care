@@ -33,8 +33,8 @@ func validateMutation(mutation domain.Mutation) (domain.MutationErrorCode, strin
 			// is a cheap way to keep the UNIQUE(account_id, code) constraint
 			// collision-free for custom rows without an extra existence/
 			// uniqueness query: a fresh client-generated UUID as code can't
-			// collide with anything (see .docs/20260919-feedback.md
-			// Feature #2). Seeded rows (code like "engine_oil", id a random
+			// collide with another account-local code. Seeded rows (code
+			// like "engine_oil", id a random
 			// uuid) never go through create — only update — so this must not
 			// apply there, or renaming/toggling a seeded row would always
 			// fail validation.

@@ -2,7 +2,7 @@ const CSRF_COOKIE_NAME = 'csrf_token';
 export const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 /**
- * Đọc cookie CSRF (double-submit pattern — xem `.docs/sync-api-contract.md`).
+ * Đọc cookie CSRF (double-submit pattern — xem `.docs/decision.md`).
  * Đây là cookie KHÔNG httpOnly nên JS đọc được — session thật (`sid`) thì không,
  * trình duyệt tự đính kèm khi `credentials: 'include'`.
  */

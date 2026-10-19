@@ -102,7 +102,7 @@ func nullDate(payload map[string]any, key string) (sql.NullTime, error) {
 }
 
 // buildUpsertVehicleParams decodes a validated vehicle payload (see
-// validatePayload in internal/application/service.go) into UPSERT
+// validatePayload in internal/application/datasync/validation.go) into UPSERT
 // parameters.
 func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertVehicleParams, error) {
 	archivedAt, err := nullTime(payload, "archived_at")
@@ -128,11 +128,8 @@ func buildUpsertVehicleParams(accountID, entityID string, payload map[string]any
 }
 
 // buildUpsertPartTypeParams decodes a validated part_type payload into UPSERT
-// parameters. Unlike other entities, the payload IS the full snapshot the
-// client itself built (code == entityID, enforced in validateMutation) —
-// nothing here is server-derived, so change_feed replay to other devices
-// reconstructs the full row from the payload alone (see
-// .docs/20260919-feedback.md Feature #2).
+// parameters. Custom creates require code == entityID; seeded updates retain
+// their template code. The changefeed uses the canonical persisted snapshot.
 func buildUpsertPartTypeParams(accountID, entityID string, payload map[string]any, seq int64, receivedAt time.Time) (sqlcgen.UpsertPartTypeParams, error) {
 	return sqlcgen.UpsertPartTypeParams{
 		ID:             entityID,

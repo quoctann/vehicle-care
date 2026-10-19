@@ -1,57 +1,35 @@
 # Vehicle Care
 
-Ứng dụng local-first gồm React frontend và Go API. Backend dùng PostgreSQL (account + sync data) và Redis (session/token) thật; xem mục "Chạy nhanh" để khởi động cả hai qua Docker Compose trước khi chạy backend.
+Ứng dụng quản lý KM, bảo dưỡng và chi phí xe máy, local-first: React/TypeScript +
+IndexedDB, Go/Gin API, PostgreSQL (account/sync) và Redis (session/token).
 
-## Yêu cầu
-
-- Go 1.24+
-- Node.js 22+
-- npm
-- GNU Make và Bash
+**Tài liệu cập nhật 2026-10-19:** [Quyết định, kiến trúc, dữ liệu và API](.docs/decision.md).
+Đây là tài liệu Markdown có thẩm quyền duy nhất trong `.docs/`; hai HTML chỉ là prototype.
 
 ## Chạy nhanh
 
+Yêu cầu Go 1.24+, Node.js 22+, npm, GNU Make/Bash và Docker Compose.
+
 ```bash
 make install
-make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
-make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
+make dev-infra
+make migrate-up
 make dev
 ```
 
-Các địa chỉ mặc định:
+Tham khảo [`.env.example`](.env.example) cho DB/Redis/cookie/origin. Backend đọc `.env`
+ở server/root nếu có, không override environment có sẵn. FE http://localhost:5173,
+API http://localhost:8080, health `/health/live` và `/health/ready` (ping PG + Redis).
+Ctrl+C dừng hai process; hạ tầng dừng riêng bằng `make dev-infra-down`.
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:8080
-- Liveness: http://localhost:8080/health/live
-- Readiness: http://localhost:8080/health/ready
+`make dev-be`/`make dev-fe` chạy riêng; Vite trực tiếp `npm run dev --prefix client`
+vẫn cần backend thật, không MSW. `make dev` cấu hình FE gọi localhost:8080.
+Không có demo account: signup mới sẽ seed 10 hạng mục riêng account, sửa/tắt/thêm được.
+Đăng nhập cùng account ở profile thứ hai để kiểm tra sync đa thiết bị.
 
-`make dev` cấu hình frontend gọi backend Go thật. Nhấn `Ctrl+C` để dừng cả hai process.
-
-Muốn khỏi phải nhớ chạy `make migrate-up` mỗi lần đổi migration lúc dev, set `AUTO_MIGRATE=true` trong `.env` (xem `.env.example`) — backend tự áp dụng schema còn thiếu ngay lúc khởi động, trước khi bắt đầu lắng nghe request. Mặc định tắt và chỉ nên bật ở local: production/Kubernetes vẫn giữ migration là một bước deploy tách biệt, tự chạy (xem `.docs/architecture.md`).
-
-Tạo tài khoản mới qua màn hình đăng ký (không còn tài khoản demo dựng sẵn). Signup tự seed sẵn 10 `part_types` mặc định cho account mới (sửa/tắt/thêm tự do sau đó, không phải danh mục đóng cứng). Sau khi đăng nhập, frontend tự đăng ký `device_id`, push dữ liệu local và pull changefeed. Có thể mở tab hoặc browser profile thứ hai, đăng nhập cùng tài khoản và đồng bộ để kiểm tra dữ liệu đa thiết bị.
-
-## Chạy riêng
-
-Backend:
-
-```bash
-make dev-be
-```
-
-Frontend (kết nối backend thật):
-
-```bash
-make dev-fe
-```
-
-hoặc chạy trực tiếp Vite (cần backend đã chạy sẵn, hoặc set `VITE_API_BASE_URL` trỏ backend khác):
-
-```bash
-npm run dev --prefix client
-```
-
-Backend tự đọc `.env` ở `server/` hoặc repository root nếu file tồn tại nhưng không ghi đè environment variables đã có. Có thể dùng `.env.example` làm danh sách cấu hình tham khảo. Với Kubernetes, inject environment variables trực tiếp và không mount `.env`.
+Nếu không giữ session, kiểm tra FRONTEND_ORIGIN khớp origin/port frontend và
+COOKIE_SECURE=false khi dùng HTTP local. Production inject env trực tiếp, không mount
+`.env`; chạy migration bước deploy riêng. AUTO_MIGRATE mặc định false, true chỉ tiện local.
 
 ## Kiểm tra
 
@@ -59,62 +37,43 @@ Backend tự đọc `.env` ở `server/` hoặc repository root nếu file tồn
 make test
 make lint
 make build
-make test-integration # cần Docker; thiếu Docker sẽ fail thay vì skip
+make test-integration
+npm run test:coverage:contracts --prefix client
+npm run test:e2e --prefix client
 ```
 
-`make test-be` chạy Go tests với race detector. PostgreSQL adapter/seed tests dùng testcontainers và có thể skip khi Docker không sẵn sàng. Dùng `make test-integration` để bắt buộc chạy DB thật (không dùng kết quả test cache). Client sync-flow tests chạy repository/outbox/push/pull thật với HTTP mock; chưa thay thế browser E2E hay HTTP contract tests toàn hệ thống.
+Go tests dùng race detector. Test PG tùy chọn trong `make test` có thể skip nếu Docker
+thiếu; `make test-integration` bắt buộc PG testcontainers thật, tắt cache và fail nếu
+Docker không chạy. Vitest sync-flow mock HTTP không thay browser E2E.
+Playwright cần browser đã cài: `cd client && npx playwright install chromium` (và FFmpeg
+cho video nếu chưa có). Nếu dùng Google Chrome hệ thống, chạy
+`PLAYWRIGHT_CHANNEL=chrome npm run test:e2e --prefix client` từ repository root.
+E2E dùng API mock, không kiểm thử backend/PWA offline navigation thật. Coverage gate
+chỉ áp dụng contract/persistence; không phải coverage toàn source hoặc gate timezone riêng.
+Xem [phạm vi và tình trạng kiểm chứng](.docs/decision.md#9-kiểm-chứng-và-nghiệm-thu).
 
-## API hiện tại
+## Contract và giới hạn
 
-- Auth: signup, verify/resend email, login, session, logout, forgot/reset password.
-- Google: `GET /auth/google/start` hiện luôn trả lỗi 400 `validation_failed` ("not implemented yet") — OAuth thật chưa được build.
-- Device: `POST /devices/register`.
-- Sync: `POST /sync/push` và `GET /sync/pull`.
-- Session dùng cookie `sid`; request ghi đã xác thực cần cookie và header `X-CSRF-Token`.
-- Push hỗ trợ idempotency, sequence theo account và LWW cho mutable entity.
-- Pull dùng `until_seq` stateless trong suốt một phiên phân trang.
+- Email/password, cookie sid HttpOnly; protected POST cần cookie + X-CSRF-Token.
+- Account timezone là fixed UTC offset, không IANA/DST; save online có stale-account guard.
+- Entity + immutable outbox atomic local; push FIFO từng mutation, idempotent retry,
+  mutable full-record server-order LWW. Pull phân trang cùng until_seq, canonical equal-seq.
+- Odometer chỉ thêm; Fuel/Service sửa/xóa mềm không cascade sửa/xóa KM.
+- Có repair blocked và restore local từ server cần xác nhận; không tự reset dữ liệu.
+- Chưa email delivery/notification worker, Google OAuth (start trả 400), rate limiting,
+  export/import, guest, OCR, Plus hoặc fuel efficiency. reminder_notification mới có schema.
+- Contract TS dùng const-derived types, sáu payload map và discriminated push/pull/enqueue;
+  tăng kiểm tra compile-time, không thay wire/storage, không thay runtime validation.
 
-## Persistence
+## Migration và tài liệu
 
-Backend luôn dùng PostgreSQL (account + sync data) và Redis (session/token) thật — không còn backend giả lập trong process. Cần chạy trước khi `make dev-be`:
+- [Contract, payload/constraints, auth/security, sync và recovery](.docs/decision.md)
+- [Runbook migration/deploy và reset dev thủ công](.docs/decision.md#8-local-migration-deploy-và-reset)
+- [Quy trình migration/query/sqlc](server/db/README.md)
 
-```bash
-make dev-infra    # docker compose up -d cho postgres + redis (xem server/docker-compose.yml)
-make migrate-up   # áp dụng schema (đọc DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME)
-```
-
-Biến môi trường liên quan xem `.env.example` (`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_SSLMODE`, `REDIS_*`). `/health/ready` ping cả Postgres và Redis, trả 503 nếu 1 trong 2 không sẵn sàng.
-
-## Giới hạn phase này
-
-- Email verification, password reset và Google OAuth chưa gửi email hoặc gọi provider thật.
-- Chưa có rate limiting.
-- `ApplyMutations` ở adapter Postgres chỉ hỗ trợ đúng 1 mutation/lần gọi (khớp caller thực tế hiện tại là `application.Service.Push`); xem plan tại `.claude/plans` để biết trade-off nếu cần batch thật sau này.
-- `reminder_notification` đã có migration nhưng chưa có code nào dùng (schema chuẩn bị cho tính năng nhắc lịch/notification, chưa implement).
-
-Nếu frontend không giữ session, kiểm tra frontend đang ở đúng `http://localhost:5173`, `FRONTEND_ORIGIN` khớp chính xác và `COOKIE_SECURE=false` khi chạy HTTP local. Nếu port frontend thay đổi, cập nhật cả `FRONTEND_ORIGIN` và URL frontend.
-
-## Hướng phát triển backend
-
-Application định nghĩa port tại `server/internal/application/user/port.go` và `server/internal/application/datasync/port.go`. PostgreSQL adapter (`server/internal/adapters/postgres`) dùng sqlc cho typed query, sqlx cho connection/transaction orchestration. Redis adapter (`server/internal/adapters/redis`) đảm nhiệm session/token. Migration chạy qua `go run ./cmd/migrate up|down|status|create <name>` (hoặc
-`make migrate-up`/`migrate-down`/`migrate-status`/`migrate-create
-name=<name>`) — API chỉ tự chạy migration khi bật `AUTO_MIGRATE=true`. `part_types` không còn
-seed global qua migrate nữa — mỗi account tự có bộ 10 dòng mặc định riêng, được tạo
-trong transaction lúc signup (`postgres.Store.CreateAccount`, xem
-`internal/adapters/postgres/seed`). File migration đặt
-tên theo unix timestamp (`<unix_timestamp>_<name>.up.sql`/`.down.sql`, ví dụ
-`1789663949_create_accounts.up.sql`) để tránh xung đột số thứ tự khi nhiều người cùng
-thêm migration trên các branch khác nhau; `migrate create` tự sinh timestamp và tên đã
-chuẩn hoá snake_case.
-
-Chi tiết contract nằm tại `.docs/sync-api-contract.md`; định hướng adapter nằm tại `.docs/architecture.md`.
-
-## Tài liệu hệ thống và review
-
-- [Hệ thống và luồng nghiệp vụ hiện tại](.docs/system-flow.md): kiến trúc, mô hình dữ liệu, nghiệp vụ và vòng đời push/pull theo implementation ngày 23/09/2026.
-- [Review structure, convention và giải pháp sync](.docs/structure-sync-review.md): phát hiện ưu tiên, các phương án đơn giản hóa và lộ trình breaking changes đề xuất.
-- [Plan incremental sync A](.docs/incremental-sync-plan.md): invariants, checklist nghiệm thu và runbook reset dev thủ công.
-
-> Schema PostgreSQL hiện được consolidate thành baseline `1790121600_baseline` dùng Unix timestamp, cùng convention với `migrate create`. Nếu database dev đã chạy bộ migration cũ (kể cả baseline thử nghiệm `20260923000000`), hãy dùng database mới hoặc chủ động reset database, Redis session và IndexedDB/PWA storage theo [runbook](.docs/incremental-sync-plan.md#manual-dev-reset-runbook) trước khi chạy `make migrate-up`. Project không tự drop schema hoặc xóa dữ liệu.
-
-**Lưu ý khi đổi baseline DB/contract:** kể cả khi DB đã chạy cùng version `1790121600` trước khi schema được sửa (cột `cost_vnd`/`name_vi`/`received_at_server`), `make migrate-up` sẽ không chạy lại version này. Chỉ dùng DB dev mới hoặc tự sao lưu/reset **cả** PostgreSQL và browser IndexedDB/PWA theo runbook; outbox cũ có payload bất biến không tương thích, không được giữ lại. API hiện dùng `cost` (VND trong phase này), `name` và `server_synced_at`; device ID phải là UUID.
+Baseline `1790121600_baseline` chỉ cho DB sạch. DB dùng lịch sử cũ (kể cả
+`20260923000000`) hoặc đã apply cùng version trước khi sửa không tự upgrade bằng
+migrate-up. Cảnh báo upgrade không tương thích: `received_at_server`, `cost_vnd`,
+`name_vi`/`seed_version` cũ thay bằng server_synced_at, cost (VND), name; device UUID,
+Fuel bỏ shop. Outbox legacy bất biến không được giữ lại khi thay DB. Chỉ chủ động dùng
+DB/workspace dev sạch sau backup, theo runbook; **không tự drop schema khi deploy**.

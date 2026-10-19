@@ -1,4 +1,11 @@
-import type { PartTypeDto } from '@/api/contract.types';
+import type {
+  VehiclePayload,
+  ReminderConfigPayload,
+  OdometerLogPayload,
+  FuelLogPayload,
+  ServiceLogPayload,
+  PartTypePayload,
+} from '@/api/contract.types';
 import { isValidCost } from '@/domain/cost';
 import type {
   FuelLog,
@@ -11,13 +18,13 @@ import type {
 
 /**
  * Domain object (camelCase, dùng nội bộ app/Dexie) → wire payload (snake_case,
- * đúng shape trong `.docs/sync-api-contract.md`) để ghi vào `outbox.payload` và
+ * đúng shape trong `.docs/decision.md`) để ghi vào `outbox.payload` và
  * gửi nguyên vẹn ở `sync/push.ts`. KHÔNG bao gồm `id` (đã có ở `entity_id` của
- * mutation), `account_id` (server tự suy từ session — D7), hay field server-owned
+ * mutation), `account_id` (server tự suy từ session), hay field server-owned
  * (`server_seq`, `server_synced_at`).
  */
 
-export function vehicleToPayload(v: Vehicle): Record<string, unknown> {
+export function vehicleToPayload(v: Vehicle): VehiclePayload {
   return {
     name: v.name,
     plate_number: v.plateNumber,
@@ -27,7 +34,7 @@ export function vehicleToPayload(v: Vehicle): Record<string, unknown> {
   };
 }
 
-export function reminderConfigToPayload(r: ReminderConfig): Record<string, unknown> {
+export function reminderConfigToPayload(r: ReminderConfig): ReminderConfigPayload {
   return {
     vehicle_id: r.vehicleId,
     part_type_id: r.partTypeId,
@@ -40,7 +47,7 @@ export function reminderConfigToPayload(r: ReminderConfig): Record<string, unkno
   };
 }
 
-export function odometerLogToPayload(o: OdometerLog): Record<string, unknown> {
+export function odometerLogToPayload(o: OdometerLog): OdometerLogPayload {
   return {
     vehicle_id: o.vehicleId,
     odometer_km: o.odometerKm,
@@ -50,7 +57,7 @@ export function odometerLogToPayload(o: OdometerLog): Record<string, unknown> {
   };
 }
 
-export function fuelLogToPayload(f: FuelLog): Record<string, unknown> {
+export function fuelLogToPayload(f: FuelLog): FuelLogPayload {
   return {
     vehicle_id: f.vehicleId,
     recorded_at: f.recordedAt,
@@ -63,7 +70,7 @@ export function fuelLogToPayload(f: FuelLog): Record<string, unknown> {
   };
 }
 
-export function serviceLogToPayload(s: ServiceLog): Record<string, unknown> {
+export function serviceLogToPayload(s: ServiceLog): ServiceLogPayload {
   return {
     vehicle_id: s.vehicleId,
     part_type_id: s.partTypeId,
@@ -214,34 +221,7 @@ export function fuelLogFieldsFromPayload(
   };
 }
 
-/**
- * `PartTypeDto` (wire, `GET /part-types` — xem `contract.types.ts` mục 2.14) →
- * `PartType` (domain). Khác các hàm `*FieldsFromPayload` ở trên vì nguồn là response
- * JSON đã typed (không phải `Record<string, unknown>` từ change-feed) nên không cần
- * validate runtime lại.
- *
- * `serverSeq`/`serverSyncedAt` LẤY THẲNG từ DTO (không để `null`) — bug thật đã xảy ra:
- * để `null` khiến `push.ts` coi mọi dòng bootstrap qua `GET /part-types` là "chưa từng
- * thấy từ server", gửi lại mọi lần sửa dưới dạng `operation: "create"` thay vì `"update"`,
- * mà `create` bắt buộc `code === id` — không bao giờ đúng với hạng mục seed (`code` kiểu
- * `"engine_oil"`, `id` là UUID) → server từ chối vĩnh viễn mọi lần sửa hạng mục seed. Xem
- * `contract.types.ts` (`PartTypeDto`) và `refreshPartTypesFromServer` (merge logic).
- */
-export function partTypeFromDto(dto: PartTypeDto): PartType {
-  return {
-    id: dto.id,
-    code: dto.code,
-    displayName: dto.name,
-    displayOrder: dto.display_order,
-    active: dto.active,
-    accountId: dto.account_id,
-    createdAtClient: new Date().toISOString(),
-    serverSyncedAt: dto.server_synced_at,
-    serverSeq: dto.server_seq,
-  };
-}
-
-export function partTypeToPayload(p: PartType): Record<string, unknown> {
+export function partTypeToPayload(p: PartType): PartTypePayload {
   return {
     code: p.code,
     name: p.displayName,

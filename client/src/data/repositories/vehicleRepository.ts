@@ -103,7 +103,7 @@ export function restoreVehicle(accountId: string, id: string): Promise<void> {
   return writeVehiclePatch(accountId, id, { archivedAt: null });
 }
 
-/** Tombstone — không xóa vật lý (3.5 decision.md). */
+/** Tombstone — không xóa vật lý; đồng bộ như một update bình thường. */
 export function deleteVehicle(accountId: string, id: string): Promise<void> {
   return writeVehiclePatch(accountId, id, { deletedAt: new Date().toISOString() });
 }

@@ -1,9 +1,8 @@
 /**
  * Domain types — nguồn sự thật cho toàn bộ business entity.
  *
- * Field naming khớp 1:1 với data dictionary ở `.docs/implementation-plan-section-5.md`
- * (mục A1/A2). Mọi datetime là chuỗi ISO-8601 UTC (`created_at_client` phía server,
- * ở đây gọi là `createdAtClient` — KHÔNG dùng để phân xử conflict, chỉ để hiển thị).
+ * Data dictionary: `.docs/decision.md`. Timestamp là UTC instant; `createdAtClient`
+ * chỉ lưu local để hiển thị/tie-break, không gửi lên server để phân xử conflict.
  *
  * File này KHÔNG import React/Dexie/fetch — domain logic phải test được mà không
  * cần trình duyệt hay database thật.
@@ -47,8 +46,8 @@ export type Vehicle = {
 
 /**
  * PartType — mỗi account có bộ dòng riêng của mình: 10 dòng được seed sẵn lúc tạo
- * account (từ template server, xem `seed/manifest.go`) CỘNG hạng mục tự thêm sau đó
- * (feedback Feature #2). Không còn tầng "mặc định dùng chung không sửa được" — mọi dòng
+ * account (từ template server, xem `seed/manifest.go`) CỘNG hạng mục tự thêm sau đó.
+ * Không còn tầng "mặc định dùng chung không sửa được" — mọi dòng
  * đều thuộc sở hữu và sửa/xoá được bởi chính account, đi qua sync/push+pull như `Vehicle`.
  * Client PHẢI xử lý được code chưa biết một cách graceful (xem `partType.ts`), không
  * hard-code enum đóng cứng.
@@ -103,7 +102,7 @@ export type OdometerLog = {
   serverSeq: number | null;
 };
 
-/** FuelLog — append-only. Nếu có nhập KM, `odometerLogId` trỏ tới OdometerLog tạo cùng lúc. */
+/** FuelLog — mutable, xóa mềm. Sửa/xóa không thay đổi OdometerLog tạo kèm. */
 export type FuelLog = {
   id: string;
   accountId: string;
@@ -122,7 +121,7 @@ export type FuelLog = {
   serverSeq: number | null;
 };
 
-/** ServiceLog — append-only. MVP chỉ có 1 loại sự kiện: hoàn tất thay/bảo dưỡng. */
+/** ServiceLog — mutable, xóa mềm; sự kiện hoàn tất thay/bảo dưỡng dùng làm mốc reminder. */
 export type ServiceLog = {
   id: string;
   accountId: string;
@@ -131,7 +130,6 @@ export type ServiceLog = {
   servicedAt: IsoDateTime;
   /** Snapshot odometer tại thời điểm service, để tính reminder ổn định về sau. */
   odometerKmSnapshot: number | null;
-  /** Không thuộc scope quyết định ở decision.md nhưng cần cho màn Costs — optional, không ảnh hưởng domain reminder logic. */
   /** Hiện hiển thị bằng VND; currency riêng sẽ được thêm ở giai đoạn sau. */
   cost: number | null;
   note: string | null;
@@ -141,7 +139,7 @@ export type ServiceLog = {
   serverSeq: number | null;
 };
 
-/** 4 trạng thái reminder theo B5 của implementation-plan-section-5.md. */
+/** Trạng thái suy ra từ log, chu kỳ và mốc ban đầu; không lưu như entity riêng. */
 export type ReminderStatus = 'insufficient_data' | 'not_due' | 'due_soon' | 'overdue';
 
 export type ReminderProgress = {

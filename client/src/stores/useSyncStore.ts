@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 /**
  * Chỉ giữ TRẠNG THÁI hiển thị của sync ("Đang đồng bộ"/"Đã đồng bộ lúc..."/"Chưa
- * đồng bộ" — D-09 decision.md) — KHÔNG giữ `pendingCount` (đọc trực tiếp từ
+ * đồng bộ") — KHÔNG giữ `pendingCount` (đọc trực tiếp từ
  * `db.outbox` qua `useLiveQuery`, xem `hooks/useOutboxPendingCount.ts`, để Dexie
  * luôn là nguồn sự thật duy nhất). Việc TRIGGER sync thật (`runSync()`) sống ở
  * `sync/syncOrchestrator.ts` — store này chỉ là nơi orchestrator ghi kết quả vào

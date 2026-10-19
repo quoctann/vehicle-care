@@ -9,7 +9,7 @@ import {
   markOutboxRetryable,
 } from '@/data/outbox';
 import { assertActiveSyncAccount } from './sessionGuard';
-import { entityTable, updateEntitySyncMeta } from './types';
+import { entityTable, updateEntitySyncMeta } from '@/data/entityTable';
 
 export class SyncBlockedError extends Error {
   readonly code = 'sync_blocked';
@@ -111,13 +111,16 @@ export async function pushOutbox(deviceId: string, accountId: string): Promise<v
     if (item.status === 'blocked')
       throw new SyncBlockedError(item, item.lastError ?? 'Mutation needs attention');
 
-    const mutation: PushMutation = {
+    // IndexedDB is a persistence boundary, not a validator: historical and repaired
+    // envelopes may predate current types. Send the exact stored snapshot for
+    // idempotency; server validation still decides whether it can be applied.
+    const mutation = {
       mutation_id: item.mutationId,
       entity_type: item.entityType,
       operation: item.operation,
       entity_id: item.entityId,
-      payload: item.payload as Record<string, unknown>,
-    };
+      payload: item.payload,
+    } as PushMutation;
     const response = await api.pushMutations({
       device_id: deviceId,
       mutations: [mutation],

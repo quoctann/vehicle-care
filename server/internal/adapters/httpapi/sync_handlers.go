@@ -51,10 +51,8 @@ func (s *Server) push(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
-// listPartTypes returns the fixed part-type catalog. Clients use this as the
-// single source of truth for part_type IDs instead of hardcoding their own
-// (see .docs/20260919-feedback.md #1 — the previous mismatch caused
-// reminder_configs/service_logs FK violations on sync push).
+// listPartTypes returns this account's mutable catalog as an auxiliary read API.
+// Normal client replication, including signup seeds, uses the changefeed.
 func (s *Server) listPartTypes(c *gin.Context) {
 	partTypes, err := s.datasyncService.ListPartTypes(c.Request.Context(), mustAccount(c).ID)
 	if err != nil {

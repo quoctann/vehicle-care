@@ -2,6 +2,12 @@
 
 Tài liệu này mô tả quy trình thay đổi schema/query PostgreSQL và cập nhật code Go trong project.
 
+**Cập nhật: 2026-10-19.** Contract, schema nghiệp vụ, transaction invariants và runbook
+vận hành có thẩm quyền tại [decision.md](../../.docs/decision.md), đặc biệt mục 3, 6, 8.
+Baseline `1790121600_baseline` chỉ cho DB sạch; không tự upgrade DB đã áp dụng lịch sử
+hoặc cùng version schema cũ. Không tự reset dữ liệu; xem cảnh báo không tương thích và
+reset dev thủ công ở mục 8. Production dùng migration mới có kế hoạch backup/rollback.
+
 ## Các thư mục liên quan
 
 - `server/db/migrations/`: lịch sử schema, mỗi migration có cặp `.up.sql`/`.down.sql`.
@@ -31,9 +37,9 @@ Tài liệu này mô tả quy trình thay đổi schema/query PostgreSQL và c�
    trong `server/db/queries/` (hoặc tạo file mới). Ví dụ:
 
    ```sql
-   -- name: GetServiceNote :one
+   -- name: GetServiceLogNote :one
    SELECT id, vehicle_id, note
-   FROM service_notes
+   FROM service_logs
    WHERE account_id = $1 AND id = $2;
    ```
 
@@ -87,3 +93,10 @@ liệu nếu cần, rồi mới xóa cấu trúc cũ trong migration riêng.
 
 Migration mới chỉ được áp dụng khi chạy `make migrate-up` (hoặc `AUTO_MIGRATE=true` ở
 local). Generate sqlc không chạy migration và migrate không generate Go code.
+
+Production nên giữ AUTO_MIGRATE=false và migrate ở bước deploy riêng. Account sequence,
+entity, canonical changefeed và processed-mutation ACK phải commit trong cùng một
+transaction, lock account trước dedupe/stateful validation. Không xóa feed/dedupe tùy
+tuổi khi chưa có retention/retry horizon. Contract TS mới tăng type safety, không yêu
+cầu đổi wire hoặc migration. Lệnh test ở trên là hướng dẫn chạy, không bằng chứng đã
+nghiệm thu working tree; xem tình trạng kiểm chứng ở mục 9 của decision.md.

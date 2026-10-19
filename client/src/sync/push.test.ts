@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api/client';
+import type { PushResponse } from '@/api/contract.types';
 import { db, type OutboxItem } from '@/data/db';
 import { repairBlockedMutation } from '@/data/outbox';
 import { clearAllTables } from '@/data/testUtils';
@@ -61,6 +62,42 @@ function outboxItem(overrides: Partial<OutboxItem>): OutboxItem {
 }
 
 describe('pushOutbox', () => {
+  it.each([
+    { results: [] },
+    { results: [undefined] },
+    { results: [{ mutation_id: 'wrong', status: 'applied' }] },
+    { results: [{ mutation_id: 'mutation-1', status: 'applied' }] },
+    {
+      results: [
+        { mutation_id: 'mutation-1', status: 'duplicate', server_seq: 0, server_synced_at: 'bad' },
+      ],
+    },
+    {
+      results: [
+        { mutation_id: 'mutation-1', status: 'applied', server_seq: 1, server_synced_at: 'bad' },
+      ],
+    },
+  ])(
+    'keeps the immutable envelope when runtime ACK metadata is malformed: %j',
+    async (response) => {
+      const original = outboxItem({ payload: { name: 'Legacy', unknown_field: ['🔧'] } });
+      await db.outbox.add(original);
+      // Deliberately malformed HTTP JSON: static declarations do not validate it.
+      vi.mocked(api.pushMutations).mockResolvedValue(response as unknown as PushResponse);
+      await expect(pushOutbox('device', accountId)).rejects.toThrow();
+      expect(await db.outbox.get(original.mutationId)).toEqual(original);
+      expect(vi.mocked(api.pushMutations).mock.calls[0][0].mutations[0].payload).toEqual(
+        original.payload,
+      );
+    },
+  );
+
+  it('does not resend an already blocked FIFO head', async () => {
+    await db.outbox.add(outboxItem({ status: 'blocked' }));
+    await expect(pushOutbox('device', accountId)).rejects.toThrow('Mutation needs attention');
+    expect(api.pushMutations).not.toHaveBeenCalled();
+  });
+
   it('sends the unversioned push request expected by the server', async () => {
     const deviceId = 'b3c2ecf4-52d0-47f3-80f2-5a1955a75fd1';
     await db.vehicles.put(vehicle('vehicle-1', 'Local'));
