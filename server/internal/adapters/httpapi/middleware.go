@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
+	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +61,7 @@ func (s *Server) requestID() gin.HandlerFunc {
 			requestID = "req_" + uuid.NewString()
 		}
 		c.Set(requestIDKey, requestID)
+		c.Request = c.Request.WithContext(logging.WithRequestID(c.Request.Context(), requestID))
 		c.Header("X-Request-ID", requestID)
 		c.Next()
 	}
@@ -96,7 +98,7 @@ func (s *Server) recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				s.logger.Error("request panic", zap.Any("panic", recovered), zap.String("request_id", c.GetString(requestIDKey)))
+				s.logger.Error("request panic", logging.ContextFields(c.Request.Context())...)
 				s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
 				c.Abort()
 			}
@@ -109,12 +111,12 @@ func (s *Server) accessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		started := time.Now()
 		c.Next()
-		s.logger.Info("http request",
-			zap.String("request_id", c.GetString(requestIDKey)),
-			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
+		fields := append(logging.ContextFields(c.Request.Context()),
+			zap.String("method", boundedMethod(c.Request.Method)),
+			zap.String("route", telemetryRoute(c)),
 			zap.Int("status", c.Writer.Status()),
 			zap.Duration("latency", time.Since(started)),
 		)
+		s.logger.Info("http request", fields...)
 	}
 }

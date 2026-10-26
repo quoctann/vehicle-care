@@ -1,0 +1,33 @@
+// Local file collection only: no Docker socket or host-wide log access.
+local.file_match "api" {
+  path_targets = [{__path__ = "/logs/api.json", service_name = sys.env("OTEL_SERVICE_NAME"), environment = sys.env("APP_ENV")}]
+}
+
+loki.source.file "api" {
+  targets    = local.file_match.api.targets
+  forward_to = [loki.process.api.receiver]
+}
+
+loki.process "api" {
+  stage.json {
+    expressions = {trace_id = "trace_id", span_id = "span_id", level = "level", ts = "ts"}
+  }
+  stage.timestamp {
+    source = "ts"
+    format = "Unix"
+  }
+  stage.labels {
+    values = {level = ""}
+  }
+  // Correlation IDs are metadata, never indexed stream labels.
+  stage.structured_metadata {
+    values = {trace_id = "", span_id = ""}
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://lgtm:3100/loki/api/v1/push"
+  }
+}

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AccountCard } from '@/components/settings/AccountCard';
+import { GoogleAccountCard } from '@/components/settings/GoogleAccountCard';
+import { useGoogleCallback } from '@/hooks/useGoogleCallback';
 import { AppSettings } from '@/components/settings/AppSettings';
 import { GarageList } from '@/components/settings/GarageList';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,8 @@ import { db } from '@/data/db';
 export function SettingsPage() {
   const { t } = useTranslation();
   const account = useSessionStore((s) => s.account);
+  const generation = useSessionStore((s) => s.sessionGeneration);
+  const google = useGoogleCallback();
   const clear = useSessionStore((s) => s.clear);
   const navigate = useNavigate();
   const vehicleQuery = useVehicles(account?.id, { includeArchived: true });
@@ -115,11 +119,22 @@ export function SettingsPage() {
           <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em]">{t('settings.title')}</h1>
         </header>
         <div className="space-y-5">
+          {google.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {t(`google.errors.${google.error}`)}
+            </p>
+          ) : null}
+          {google.linked ? (
+            <p role="status" className="text-sm text-primary">
+              {t('google.success')}
+            </p>
+          ) : null}
           <AccountCard
             account={account}
             signingOut={signingOut}
             onSignOut={() => void handleSignOut()}
           />
+          <GoogleAccountCard key={`${account.id}:${generation}`} accountId={account.id} />
           <GarageList
             vehicles={vehicles}
             activeVehicleId={activeVehicleId}

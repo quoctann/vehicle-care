@@ -20,6 +20,7 @@ const (
 )
 
 type Service struct {
+	mail       *mailDelivery
 	ports      IPorts
 	sessionTTL time.Duration
 	now        func() time.Time
@@ -42,7 +43,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Acc
 		return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
 	}
 
-	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
+	sessionID, csrfToken, err := s.createSession(ctx, *account)
 
 	return *account, sessionID, csrfToken, err
 }
@@ -84,6 +85,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 		Name:         name,
 		Timezone:     "UTC+07:00",
 		PasswordHash: passwordHash,
+		AuthVersion:  1,
 	}
 	if err := s.ports.CreateAccount(ctx, account); err != nil {
 		if errors.Is(err, ErrAccountExists) {
@@ -96,14 +98,23 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 	if err := s.ports.CreateToken(ctx, "verification", verificationToken, account.ID, s.now().Add(verificationTokenTTL)); err != nil {
 		return domain.Account{}, "", "", "", err
 	}
-	sessionID, csrfToken, err := s.createSession(ctx, account.ID)
+	sessionID, csrfToken, err := s.createSession(ctx, account)
+
+	if err == nil && s.allowMail(ctx, account.Email) {
+		s.sendTokenMail(ctx, account.Email, TokenKindVerification, verificationToken)
+	}
 
 	return account, sessionID, csrfToken, verificationToken, err
 }
 
 // CreateVerificationToken creates a token when an account exists.
 func (s *Service) CreateVerificationToken(ctx context.Context, email string) (string, bool, error) {
-	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
+	email = strings.ToLower(strings.TrimSpace(email))
+	if !s.allowMail(ctx, email) {
+		return "", false, nil
+	}
+
+	account, err := s.ports.AccountByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
@@ -111,13 +122,26 @@ func (s *Service) CreateVerificationToken(ctx context.Context, email string) (st
 		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
 
+	if account == nil || account.EmailVerified {
+		return "", false, nil
+	}
+
 	token := uuid.NewString()
-	return token, true, s.ports.CreateToken(ctx, TokenKindVerification, token, account.ID, s.now().Add(verificationTokenTTL))
+	if err := s.ports.CreateToken(ctx, TokenKindVerification, token, account.ID, s.now().Add(verificationTokenTTL)); err != nil {
+		return "", false, err
+	}
+	s.sendTokenMail(ctx, account.Email, TokenKindVerification, token)
+	return token, true, nil
 }
 
 // CreateResetToken creates a password reset token when an account exists.
 func (s *Service) CreateResetToken(ctx context.Context, email string) (string, bool, error) {
-	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
+	email = strings.ToLower(strings.TrimSpace(email))
+	if !s.allowMail(ctx, email) {
+		return "", false, nil
+	}
+
+	account, err := s.ports.AccountByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
@@ -125,8 +149,18 @@ func (s *Service) CreateResetToken(ctx context.Context, email string) (string, b
 		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
 
+	// Google-only accounts remain passwordless; forgot-password is still generic.
+	if account == nil || len(account.PasswordHash) == 0 {
+		return "", false, nil
+	}
 	token := uuid.NewString()
-	return token, true, s.ports.CreateToken(ctx, TokenKindReset, token, account.ID, s.now().Add(resetTokenTTL))
+	if err := s.ports.CreateToken(ctx, TokenKindReset, token, resetSubject(*account), s.now().Add(resetTokenTTL)); err != nil {
+		return "", false, err
+	}
+
+	s.sendTokenMail(ctx, account.Email, TokenKindReset, token)
+
+	return token, true, nil
 }
 
 // ResetPassword consumes a token, changes the password, and revokes all sessions.
@@ -140,7 +174,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return err
 	}
 
-	accountID, ok, err := s.ports.ConsumeToken(ctx, TokenKindReset, token, s.now())
+	subject, ok, err := s.ports.ConsumeToken(ctx, TokenKindReset, token, s.now())
 	if err != nil {
 		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
@@ -148,11 +182,29 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return validation("Password reset token is invalid or expired.")
 	}
 
-	if err := s.ports.SetPassword(ctx, accountID, passwordHash); err != nil {
+	accountID, version, ok := parseResetSubject(subject)
+	if !ok {
+		return validation("Password reset token is invalid or expired.")
+	}
+	account, err := s.ports.AccountByID(ctx, accountID)
+	if err != nil {
+		return &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+	}
+	if account == nil || len(account.PasswordHash) == 0 || account.AuthVersion != version {
+		return validation("Password reset token is invalid or expired.")
+	}
+
+	if err := s.ports.SetPassword(ctx, accountID, passwordHash, version); err != nil {
+		if errors.Is(err, ErrAuthVersionChanged) {
+			return validation("Password reset token is invalid or expired.")
+		}
 		return err
 	}
 
-	return s.ports.DeleteAccountSessions(ctx, accountID)
+	// PostgreSQL is the revocation authority. Do not delete every Redis session:
+	// a login using the new credentials may already have created a fresh version.
+	// Old session records expire through their normal Redis TTL.
+	return nil
 }
 
 // ResolveSession returns the session and account represented by an opaque ID.
@@ -171,7 +223,7 @@ func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.
 		}
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
-	if account == nil {
+	if account == nil || session.AuthVersion <= 0 || session.AuthVersion != account.AuthVersion {
 		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
 	}
 
@@ -191,12 +243,17 @@ func (s *Service) RegisterDevice(ctx context.Context, accountID, deviceID string
 	return s.ports.RegisterDevice(ctx, accountID, deviceID)
 }
 
-func (s *Service) createSession(ctx context.Context, accountID string) (string, string, error) {
+func (s *Service) createSession(ctx context.Context, account domain.Account) (string, string, error) {
 	sessionID := uuid.NewString()
 	csrfToken := uuid.NewString()
+
 	err := s.ports.CreateSession(ctx, sessionID, domain.Session{
-		AccountID: accountID, CSRFToken: csrfToken, ExpiresAt: s.now().Add(s.sessionTTL),
+		AccountID:   account.ID,
+		AuthVersion: account.AuthVersion,
+		CSRFToken:   csrfToken,
+		ExpiresAt:   s.now().Add(s.sessionTTL),
 	})
+
 	return sessionID, csrfToken, err
 }
 

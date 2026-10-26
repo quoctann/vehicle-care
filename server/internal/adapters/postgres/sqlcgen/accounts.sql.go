@@ -11,7 +11,7 @@ import (
 )
 
 const accountByEmail = `-- name: AccountByEmail :one
-SELECT id, email, name, timezone, email_verified, password_hash
+SELECT id, email, name, timezone, email_verified, password_hash, auth_version
 FROM accounts
 WHERE email = $1
 `
@@ -23,6 +23,7 @@ type AccountByEmailRow struct {
 	Timezone      string         `json:"timezone"`
 	EmailVerified bool           `json:"email_verified"`
 	PasswordHash  []byte         `json:"password_hash"`
+	AuthVersion   int64          `json:"auth_version"`
 }
 
 func (q *Queries) AccountByEmail(ctx context.Context, email string) (AccountByEmailRow, error) {
@@ -35,12 +36,13 @@ func (q *Queries) AccountByEmail(ctx context.Context, email string) (AccountByEm
 		&i.Timezone,
 		&i.EmailVerified,
 		&i.PasswordHash,
+		&i.AuthVersion,
 	)
 	return i, err
 }
 
 const accountByID = `-- name: AccountByID :one
-SELECT id, email, name, timezone, email_verified, password_hash
+SELECT id, email, name, timezone, email_verified, password_hash, auth_version
 FROM accounts
 WHERE id = $1
 `
@@ -52,6 +54,7 @@ type AccountByIDRow struct {
 	Timezone      string         `json:"timezone"`
 	EmailVerified bool           `json:"email_verified"`
 	PasswordHash  []byte         `json:"password_hash"`
+	AuthVersion   int64          `json:"auth_version"`
 }
 
 func (q *Queries) AccountByID(ctx context.Context, id string) (AccountByIDRow, error) {
@@ -64,6 +67,7 @@ func (q *Queries) AccountByID(ctx context.Context, id string) (AccountByIDRow, e
 		&i.Timezone,
 		&i.EmailVerified,
 		&i.PasswordHash,
+		&i.AuthVersion,
 	)
 	return i, err
 }
@@ -94,6 +98,17 @@ func (q *Queries) InsertAccount(ctx context.Context, arg InsertAccountParams) er
 	return err
 }
 
+const lockAccountAuthVersion = `-- name: LockAccountAuthVersion :one
+SELECT auth_version FROM accounts WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockAccountAuthVersion(ctx context.Context, id string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, lockAccountAuthVersion, id)
+	var auth_version int64
+	err := row.Scan(&auth_version)
+	return auth_version, err
+}
+
 const setEmailVerified = `-- name: SetEmailVerified :exec
 UPDATE accounts SET email_verified = true, updated_at = now() WHERE id = $1
 `
@@ -103,23 +118,28 @@ func (q *Queries) SetEmailVerified(ctx context.Context, id string) error {
 	return err
 }
 
-const setPassword = `-- name: SetPassword :exec
-UPDATE accounts SET password_hash = $2, updated_at = now() WHERE id = $1
+const setPassword = `-- name: SetPassword :execrows
+UPDATE accounts SET password_hash = $2, auth_version = auth_version + 1, updated_at = now()
+WHERE id = $1 AND auth_version = $3 AND password_hash IS NOT NULL
 `
 
 type SetPasswordParams struct {
 	ID           string `json:"id"`
 	PasswordHash []byte `json:"password_hash"`
+	AuthVersion  int64  `json:"auth_version"`
 }
 
-func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
-	_, err := q.db.ExecContext(ctx, setPassword, arg.ID, arg.PasswordHash)
-	return err
+func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setPassword, arg.ID, arg.PasswordHash, arg.AuthVersion)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateAccountTimezone = `-- name: UpdateAccountTimezone :one
 UPDATE accounts SET timezone = $2, updated_at = now() WHERE id = $1
-RETURNING id, email, name, timezone, email_verified, password_hash
+RETURNING id, email, name, timezone, email_verified, password_hash, auth_version
 `
 
 type UpdateAccountTimezoneParams struct {
@@ -134,6 +154,7 @@ type UpdateAccountTimezoneRow struct {
 	Timezone      string         `json:"timezone"`
 	EmailVerified bool           `json:"email_verified"`
 	PasswordHash  []byte         `json:"password_hash"`
+	AuthVersion   int64          `json:"auth_version"`
 }
 
 func (q *Queries) UpdateAccountTimezone(ctx context.Context, arg UpdateAccountTimezoneParams) (UpdateAccountTimezoneRow, error) {
@@ -146,6 +167,7 @@ func (q *Queries) UpdateAccountTimezone(ctx context.Context, arg UpdateAccountTi
 		&i.Timezone,
 		&i.EmailVerified,
 		&i.PasswordHash,
+		&i.AuthVersion,
 	)
 	return i, err
 }
