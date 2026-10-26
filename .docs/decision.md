@@ -11,14 +11,15 @@ xem reminder, lịch sử và chi phí. **Local-first, eventual consistency**, k
 UI đọc/ghi IndexedDB trước; chỉ sau sync thành công dữ liệu mới có trên server/thiết bị khác.
 Không nội suy KM, không tự điền chu kỳ theo thông số hãng.
 
-Đã triển khai: email/password + session cookie, catalog riêng account, xe/reminder,
+Đã triển khai: email/password và Google OIDC + session cookie, liên kết Google có
+xác thực lại password, catalog riêng account, xe/reminder,
 Odometer chỉ thêm, Fuel/Service sửa/xóa mềm, outbox FIFO, push/pull, repair/restore,
 PWA app-shell cache, healthcheck, migration và regression tests. Màn hình chính: Auth,
 onboarding, Home, History, Costs, Settings và Log Entry. Hạng mục đặt trong Settings,
 không cần tab điều hướng chính thứ năm.
 
 **Chưa triển khai:** email delivery (verify/reset/nhắc lịch), notification worker,
-Google OAuth thật, rate limiting, export/import, guest trước lần đăng nhập đầu tiên
+export/import, guest trước lần đăng nhập đầu tiên
 và guest-to-account merge, OCR/Scan, Plus/Upgrade, fuel efficiency.
 Schema/token/placeholder không phải tính năng hoàn chỉnh. Không còn memory backend,
 MSW hoặc tài khoản demo dựng sẵn.
@@ -62,7 +63,7 @@ Không cần CRDT, command bus, generic registry/repository hay queue phân tán
 
 | Entity | Quy tắc |
 |---|---|
-| Account | Email duy nhất không phân biệt hoa/thường, bcrypt hash, tên, timezone, verified |
+| Account | Email duy nhất không phân biệt hoa/thường, bcrypt hash nullable (Google-only), tên, timezone, verified |
 | Device | UUID đăng ký theo account trước push; PK `(account_id,id)` |
 | Vehicle | Mutable; tên, biển số, ngưỡng; archive có thể mở lại; tombstone `deleted_at` |
 | PartType | Mutable, riêng account; thêm/sửa/tắt `active`, không xóa cứng |
@@ -135,7 +136,7 @@ level và runtime server. Đây là tăng độ chắc kỹ thuật, **không đ
 TS types không tự validate JSON mạng/IndexedDB; runtime checks/mapper vẫn cần thiết.
 PartType code là vocabulary mở, không enum đóng chỉ gồm seed.
 
-### 3.3. Seed và 12 bảng PostgreSQL
+### 3.3. Seed và bảng PostgreSQL
 
 Signup transaction tạo account + sequence + 10 PartType có seq/changefeed:
 
@@ -151,7 +152,9 @@ Signup transaction tạo account + sequence + 10 PartType có seq/changefeed:
 | `battery` | Ắc quy |
 
 Sáu bảng nghiệp vụ: `vehicles`, `part_types`, `reminder_configs`, `odometer_logs`,
-`fuel_logs`, `service_logs`; danh tính: `accounts`, `devices`.
+`fuel_logs`, `service_logs`; danh tính: `accounts`, `devices`, `auth_identities`.
+`auth_identities` liên kết Google `sub` với account, unique provider/subject và
+account/provider; thêm bằng migration riêng, không thay baseline.
 `account_sequences` giữ current seq; `change_feed` là canonical changes cho pull,
 có nhiều dòng cho cùng entity; `processed_mutations` lưu ACK theo account/device/mutation
 cho retry push. `reminder_notification` chỉ schema dự phòng idempotency lần gửi,
@@ -211,7 +214,13 @@ Không bearer/JWT. Protected POST so cookie và `X-CSRF-Token` với CSRF token 
 public auth POST không qua middleware CSRF này. CORS origin chính xác/credentials,
 body tối đa 1 MiB. Authorization lấy account từ session, device đăng ký cùng account;
 không lộ entity account khác. Không log password/token/payload nhạy cảm; trace bằng
-request ID, không trả lỗi SQL. **Rate limiting chưa có**, cần trước public release.
+request ID, không trả lỗi SQL. Auth có rate limiting qua Redis, lỗi limiter fail closed;
+không coi đây là rate limiting toàn bộ API sync/account.
+Các auth POST công khai, Google start và link chung quota 30 request/IP/phút;
+link thêm quota 5 request/account/15 phút. Vượt quota trả 429 `rate_limited`, Redis
+limiter lỗi trả 503 `internal_error`; Google start redirect `unavailable` trong cả
+hai trường hợp. Callback không tiêu quota IP, nhưng phải consume state hợp lệ trước
+mọi token exchange hoặc ghi danh tính.
 
 Account response chung:
 
@@ -227,7 +236,10 @@ Account response chung:
 | `POST /auth/verify-email/resend` | `{email}` | 200 `{}` kể cả không tồn tại, chưa gửi email |
 | `POST /auth/password/forgot` | `{email}` | 200 `{}` generic, chưa gửi email |
 | `POST /auth/password/reset` | `{token,new_password}` | 200 `{status:"reset"}`, revoke mọi session account, clear cookie hiện tại |
-| `GET /auth/google/start` | — | 400 validation_failed, chưa implement, không callback |
+| `GET /auth/google/start` | — | Redirect toàn trang tới Google; không dùng fetch |
+| `GET /auth/google/callback` | `code,state` hoặc lỗi provider | Xác minh OIDC, tạo session hiện có rồi redirect về frontend; không chuyển token sang client |
+| `GET /auth/google/status` | cookie + `?expected_account_id=<account ID>` | `{enabled,linked,has_password}` cho Settings; thiếu precondition 400, account khác phiên 409 |
+| `POST /auth/google/link` | `{password,expected_account_id}` + cookie/CSRF | Xác thực lại password; trả `{authorization_url}` để điều hướng toàn trang |
 | `GET /auth/session` | cookie | 200 account; thiếu/hết phiên 401 session_expired |
 | `POST /auth/logout` | cookie + CSRF | 204, xóa session/cookie |
 | `POST /account/timezone` | `{timezone,expected_account_id?}` + cookie/CSRF | 200 account; timezone sai 400; stale expected account 409 trước write |
@@ -248,7 +260,7 @@ không tuyên bố flow email end-to-end đã vận hành.
 | `validation_failed` | 400; CSRF 403; body quá lớn 413; duplicate email/stale account 409 / false |
 | `ownership_invalid` | 403 / false; có thể là per-mutation error trong push HTTP 200 |
 | `internal_error` | 500; unknown error/panic trả true, nhưng application error qua writeError hiện trả false |
-| `rate_limited` | Code dự phòng trong type, **chưa có limiter/429 vận hành** |
+| `rate_limited` | 429 cho auth JSON endpoints; OAuth redirect dùng mã lỗi frontend allowlist |
 
 Health có body riêng: `/health/live` 200 `{status:"ok"}`;
 `/health/ready` ping PG+Redis, 200 ready hoặc 503 unavailable.
@@ -280,6 +292,42 @@ cookie B; expected-account chặn request lệch workspace/session, không giả
 thứ tự `Set-Cookie`. Bỏ cookie renewal sẽ đổi browser expiry và chưa được chọn.
 Generation guard cũng không phân biệt được login mới cùng account ở tab khác;
 không coi #1/#6 là bảo đảm mọi race đăng nhập xuyên tab đã được loại bỏ.
+
+### 5.1. Google login và liên kết danh tính
+
+Google là phương thức xác thực bổ sung, không thay session opaque/CSRF bằng JWT.
+Chỉ xin `openid email profile`, không xin quyền Gmail/Drive, không giữ access/refresh
+token lâu dài. Khóa danh tính là `(provider, subject)` với Google `sub`,
+không phải email. Mỗi account tối đa một danh tính Google.
+
+- Danh tính đã liên kết đăng nhập đúng account, kể cả khi email Google thay đổi;
+  không tự ghi đè email account.
+- Danh tính mới/email mới tạo account không password cùng sequence, catalog mặc định,
+  changefeed và identity trong một transaction PostgreSQL.
+- Account Google-only không được thêm password thông qua forgot/reset password;
+  cần một luồng thêm password có xác thực riêng nếu mở rộng sau này. Public forgot
+  vẫn trả generic. Google `email_verified` bắt buộc cho danh tính, nhưng chỉ đánh dấu
+  email account đã verified khi Google có thẩm quyền (Gmail hoặc Workspace `hd`);
+  địa chỉ bên thứ ba không tự nhận quyền email-recovery dựa vào claim đó.
+- Email đã thuộc account khác: từ chối đăng nhập Google (`email_exists`), **không tự
+  liên kết theo email**, không gộp account/dữ liệu. Người dùng đăng nhập bằng password,
+  vào Settings và chủ động liên kết sau khi nhập lại password.
+- Luồng liên kết ràng buộc account và session đã xác thực lại; callback có session
+  khác hoặc phiên đã hết hạn không được gắn danh tính. Không có unlink trong phạm vi này.
+- OAuth transaction ngắn hạn ở Redis, single-use atomic, browser-bound cookie
+  HttpOnly/SameSite=Lax, mỗi transaction có cookie riêng (suffix SHA-256 của state);
+  production dùng prefix `__Host-`. Callback chỉ xóa cookie transaction của mình,
+  không làm mất binding của tab khác; đổi session vẫn làm flow cũ hết hiệu lực an toàn.
+  Dùng state, nonce và PKCE S256. Xác minh chữ ký ID token,
+  issuer, audience, expiry, nonce và email đã verified tại backend.
+- Callback thành công login về `/`, link về `/settings?google=linked`. Lỗi chỉ đưa
+  mã allowlist lên query `google_error`: `cancelled`, `expired`, `email_exists`,
+  `identity_linked`, `already_linked`, `unavailable`, `failed`. UI không dùng query
+  để kết luận authenticated, vẫn hydrate `/auth/session` như trước.
+- Không log code/state/token/secret; reverse proxy callback không ghi query vào
+  access/error log, kể cả upstream lỗi. Hạ tầng ingress/CDN ngoài repo cũng phải
+  tắt/redact query callback. Backend giữ request ID/path/status để quan sát lỗi.
+- Đổi phương thức đăng nhập không xóa IndexedDB/outbox và không đổi sync protocol.
 
 ## 6. Sync A — FIFO và full-record server-order LWW
 
@@ -384,7 +432,7 @@ runtime, **không bảo đảm xuyên tab** nếu browser thiếu Web Locks.
 
 ## 8. Local, migration, deploy và reset
 
-Go 1.24+, Node 22+, npm, GNU Make/Bash; Docker Compose cho PG/Redis, Docker cho testcontainers.
+Go 1.25.11, Node 22+, npm, GNU Make/Bash; Docker Compose cho PG/Redis, Docker cho testcontainers.
 
 ```bash
 make install
@@ -420,6 +468,64 @@ deploy step riêng để kiểm soát thay đổi, không phải thiếu locking
 Redis Compose tắt persistence, chỉ dành dev; production cần quyết định persistence/HA
 phù hợp (ví dụ AOF) vì mất Redis làm mất session/token, không mất dữ liệu xe PostgreSQL.
 SQL/codegen: [server/db/README.md](../server/db/README.md).
+
+### Cấu hình Google Auth Platform
+
+1. Tạo/chọn Google Cloud project, khuyến nghị tách development và production.
+   Chỉ đăng nhập không cần bật Gmail/Drive/People API, API key hoặc service account.
+2. Google Auth Platform → Branding: tên app, support/developer email; production
+   thêm homepage, privacy policy và domain sở hữu theo yêu cầu Google.
+3. Audience: External cho Gmail thông thường; Internal chỉ dùng cho tổ chức Workspace
+   phù hợp. Nếu Console yêu cầu trong Testing, thêm tài khoản thử vào Test users.
+4. Data Access: chỉ `openid`, `email`, `profile`. Hoàn tất verification/publishing
+   theo yêu cầu thực tế của Console, không suy luận basic scopes miễn mọi xác minh.
+5. Clients → Create client → **Web application**. Authorized redirect URIs:
+   - Local: `http://localhost:8080/auth/google/callback`.
+   - Production: `https://<public-api-origin>/auth/google/callback`; với nginx cùng
+     origin dùng domain frontend công khai, không dùng hostname backend nội bộ.
+   URI phải khớp chính xác scheme, host, port, path và trailing slash. Không wildcard;
+   `localhost` khác `127.0.0.1`. Authorized JavaScript origins không cần cho redirect
+   backend này; không đặt callback là frontend `/sign-in`.
+6. Inject riêng backend: `GOOGLE_OAUTH_ENABLED=true`, `GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL` đúng URI đã đăng ký.
+   `FRONTEND_REDIRECT_URL` là origin frontend (local `http://localhost:5173`),
+   `FRONTEND_ORIGIN` khớp origin đó. Production HTTPS và `COOKIE_SECURE=true`;
+   local HTTP dùng `false`. Tham khảo `.env.example`, không ghi đè `.env` đang có.
+   Không đưa secret vào `VITE_*`, Git, log hoặc chat; lưu bằng secret manager/inject env.
+   Lưu Client Secret ngay khi tạo: Google chỉ hiển thị/cho tải secret tại thời điểm
+   tạo, không thể xem hoặc tải lại sau đó; mất secret thì tạo/rotate secret mới.
+7. Apply migration mới riêng trước deploy backend, production `AUTO_MIGRATE=false`.
+   Cấu hình credentials rồi bật flag; thiếu cấu hình khi bật phải fail startup.
+   Rollback bằng tắt flag trước, giữ nguyên bảng identity và dữ liệu đã tạo;
+   không chạy down migration để tắt đăng nhập Google. Khi tắt, account Google-only
+   không thể đăng nhập mới đến khi bật lại; email/password vẫn hoạt động. Không
+   chữa tình huống này bằng reset password hoặc xóa account/dữ liệu.
+
+CI repo này chỉ build/publish images rồi dispatch sang `quoctann/pisces-infra`;
+Google credentials và public callback phải được inject ở hạ tầng deploy bên đó.
+Không bake secret vào image hoặc truyền Google secret làm frontend build argument.
+Backend cần outbound HTTPS tới Google discovery, token và JWKS endpoints
+(`accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`); hạn chế egress
+phải cho phép các endpoint đó và DNS tương ứng.
+Production dùng nginx cùng origin như cấu hình repo, hoặc frontend/API cùng site
+đã kiểm chứng cookie và CSRF. Hai domain khác site không được hỗ trợ chỉ bằng CORS:
+cookie `SameSite=Lax` không đi theo cross-site fetch; hỗ trợ topology đó cần thiết kế
+cookie/CSRF riêng, không đổi tùy tiện sang `SameSite=None` để bỏ qua kiểm chứng.
+Rate limiting auth dùng IP kết nối mặc định. Sau nginx/load balancer cần inject
+`TRUSTED_PROXIES` (IP/CIDR phân cách dấu phẩy) chỉ gồm proxy/network hẹp tin cậy,
+để Gin lấy đúng client IP từ forwarding headers; để trống thì bỏ qua các header đó
+và mọi request sau cùng proxy sẽ chung IP bucket. Không dùng `0.0.0.0/0` hoặc `::/0`.
+
+Kiểm tra staging Google thật: tài khoản mới/đăng nhập lại, hủy consent, email trùng,
+liên kết sau password, đổi phiên giữa start/callback và nhiều tab. Browser mock không
+chứng minh provider/cookie topology thật. `redirect_uri_mismatch` thường do URI sai;
+`invalid_client` do credentials sai; `org_internal` do audience; đăng nhập Google xong
+nhưng session lỗi cần kiểm tra cookie/domain/HTTPS/CORS và `/auth/session`.
+Kiểm tra ingress/proxy/CDN không log query callback. Rotation secret theo Google Console,
+inject secret mới và restart rollout; không yêu cầu người dùng cung cấp token.
+
+Tham khảo: [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect),
+[OAuth Web Server](https://developers.google.com/identity/protocols/oauth2/web-server).
 
 ### Baseline không tương thích / reset dev thủ công
 
@@ -458,6 +564,26 @@ python3 client/tests/nginx-routing/smoke.py
 # PWA worker thật, production A/B builds; working directory client/
 PLAYWRIGHT_CHANNEL=chrome npx playwright test --config playwright.pwa.config.ts
 ```
+
+**Báo cáo Google OAuth 26/10/2026:** login/signup và Settings link có password
+reauth đã triển khai; không auto-link email, không sửa sync/outbox hoặc prototype HTML.
+`make lint`, `make build`, frontend 325 tests và toàn bộ Go `-race` pass;
+`make test-integration` pass PostgreSQL bắt buộc, Redis integration thật pass trong
+Go suite. Chrome E2E mock toàn bộ 15/15 pass khi chạy tuần tự; lỗi mạng tải module
+ở lượt chạy song song trước đó không được coi là lỗi OAuth hay bỏ qua kiểm thử.
+Lượt kiểm tra cuối chạy browser đồng thời Docker testcontainers có 3 test cũ lỗi,
+trace cả ba có `ERR_NETWORK_CHANGED` khi tải module; rerun riêng browser sau Docker
+đạt 15/15. Không chạy hai nhóm này đồng thời trong môi trường hiện tại.
+Nginx thật smoke pass cả callback thành công và upstream 502; kiểm tra cả stdout/stderr
+không chứa code/state. Review Go, client, DB và security không còn finding medium+.
+
+Coverage tập Google mới: frontend 98.98% statements / 96.20% branches / 100% functions
+trên `googleAuth.ts`, `googleAccount.ts`, `useGoogleCallback.ts`, `GoogleAccountCard.tsx`;
+Go 89.73% statements (297/331) trên năm file implementation Google application,
+provider, HTTP, Redis và PostgreSQL. Đây **không phải coverage toàn source ≥80%**.
+Contract gate vẫn 91.70% statements / 86.30% branches / 100% functions / 93.82% lines.
+Google thật, branding/consent và cookie topology staging chưa nghiệm thu vì chưa có
+credentials; Chrome mock và fake OIDC issuer/JWKS không thay bước đó.
 
 **Báo cáo phiên 2026-10-25–26 (client review fixes):** register/push/pull đã có required
 expected-account precondition, success response identity và client runtime check;
@@ -515,7 +641,14 @@ worker thật như trên; không thay bằng nghiệm thu toàn diện real-back
 
 Checklist trước đóng thay đổi/phát hành:
 
-- [x] Full unit/integration test, lint/build và PG bắt buộc trên working tree phiên này.
+- [x] Full unit/integration test, lint/build và PG bắt buộc trên snapshot client-review
+  25–26/10 báo cáo ở trên; không dùng kết quả này thay kiểm chứng thay đổi OAuth.
+- [ ] Google thật trên staging: credentials, consent, callback, cookie và liên kết
+  account; **chưa nghiệm thu vì chưa có Google Client ID/Secret trong phiên triển khai**.
+- [ ] Google account mới có đúng một identity/account/catalog; callback đồng thời
+  không để account mồ côi; lỗi Redis sau PG commit không tạo thêm account khi thử lại.
+- [ ] State replay/hết hạn/browser khác, nonce sai và link sau logout/reset/relogin
+  bị từ chối; email trùng không tự liên kết; danh tính cũ vẫn resolve qua `sub`.
 - [ ] Browser thật: offline cold start/cache vs 401/logout, PWA iOS/install/update.
 - [ ] Xe → KM → đổi tên offline: FIFO cha trước con kể cả timestamp bằng nhau.
 - [ ] Mất push response/concurrent retry: một feed change, ACK gốc, device ổn định.
@@ -550,7 +683,8 @@ offline đa thiết bị, không phải tính năng bảo dưỡng riêng; khôn
 
 Export tương lai nên có schema_version, phân biệt backup account/chia sẻ cấu hình;
 chưa API/UI hay restore file. Email reminder tương lai chỉ dùng dữ liệu đã sync,
-idempotency theo mốc đến hạn. OAuth cần state/callback/provider thật. Đề xuất không
+idempotency theo mốc đến hạn. Google OAuth có contract riêng tại mục 5.1; nghiệm thu
+provider thật trên staging vẫn bắt buộc. Đề xuất không
 thay contract hiện hành và không cho phép tự reset/sửa migration đã áp dụng.
 
 ## 11. Inventory hợp nhất tài liệu

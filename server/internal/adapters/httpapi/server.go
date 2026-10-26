@@ -35,11 +35,15 @@ type Server struct {
 
 	userService     *user.Service
 	datasyncService *datasync.Service
+	googleService   *user.GoogleService
+	authLimiter     AuthLimiter
 }
 
 type Service struct {
-	User     *user.Service
-	DataSync *datasync.Service
+	User        *user.Service
+	DataSync    *datasync.Service
+	Google      *user.GoogleService
+	AuthLimiter AuthLimiter
 }
 
 func New(svc *Service, cfg config.Config, logger *zap.Logger, pingers ...IPinger) *Server {
@@ -53,9 +57,18 @@ func New(svc *Service, cfg config.Config, logger *zap.Logger, pingers ...IPinger
 		pingers:         pingers,
 		userService:     svc.User,
 		datasyncService: svc.DataSync,
+		googleService:   svc.Google,
+		authLimiter:     svc.AuthLimiter,
 	}
 
 	router := gin.New()
+	// Never trust attacker-controlled forwarding headers by default.
+	if err := cfg.ValidateTrustedProxies(); err != nil {
+		panic("invalid trusted proxy configuration")
+	}
+	if err := router.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		panic("invalid trusted proxy configuration")
+	}
 	router.Use(
 		s.requestID(),
 		s.cors(),
@@ -77,23 +90,26 @@ func (s *Server) routes() {
 	s.router.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	s.router.GET("/health/ready", s.ready)
 
-	s.router.POST("/auth/signup", s.signup)
-	s.router.POST("/auth/login", s.login)
-	s.router.POST("/auth/verify-email", s.verifyEmail)
-	s.router.POST("/auth/verify-email/resend", s.resendVerification)
-	s.router.POST("/auth/password/forgot", s.forgotPassword)
-	s.router.POST("/auth/password/reset", s.resetPassword)
-	s.router.GET("/auth/google/start", s.googleStart)
+	s.router.POST("/auth/signup", s.rateAuth(), s.signup)
+	s.router.POST("/auth/login", s.rateAuth(), s.login)
+	s.router.POST("/auth/verify-email", s.rateAuth(), s.verifyEmail)
+	s.router.POST("/auth/verify-email/resend", s.rateAuth(), s.resendVerification)
+	s.router.POST("/auth/password/forgot", s.rateAuth(), s.forgotPassword)
+	s.router.POST("/auth/password/reset", s.rateAuth(), s.resetPassword)
+	s.router.GET("/auth/google/start", s.rateAuth(), s.googleStart)
+	s.router.GET("/auth/google/callback", s.googleCallback)
 
 	authenticated := s.router.Group("")
 	authenticated.Use(s.requireSession())
 	authenticated.GET("/auth/session", s.getSession)
+	authenticated.GET("/auth/google/status", s.googleStatus)
 	authenticated.GET("/sync/pull", s.pull)
 	authenticated.GET("/part-types", s.listPartTypes)
 
 	protected := authenticated.Group("")
 	protected.Use(s.requireCSRF())
 	protected.POST("/auth/logout", s.logout)
+	protected.POST("/auth/google/link", s.rateAuth(), s.googleLink)
 	protected.POST("/account/timezone", s.updateTimezone)
 	protected.POST("/devices/register", s.registerDevice)
 	protected.POST("/sync/push", s.push)

@@ -25,6 +25,13 @@ type AccountSequence struct {
 	CurrentSeq int64  `json:"current_seq"`
 }
 
+type AuthIdentity struct {
+	AccountID string    `json:"account_id"`
+	Provider  string    `json:"provider"`
+	Subject   string    `json:"subject"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type ChangeFeed struct {
 	ID             int64     `json:"id"`
 	AccountID      string    `json:"account_id"`

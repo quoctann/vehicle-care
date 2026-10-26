@@ -3,7 +3,9 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -34,6 +36,11 @@ func (d Database) DSN() string {
 }
 
 type Config struct {
+	TrustedProxies      []string      `env:"TRUSTED_PROXIES"`
+	GoogleOAuthEnabled  bool          `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
+	GoogleClientID      string        `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret  string        `env:"GOOGLE_CLIENT_SECRET"`
+	GoogleRedirectURL   string        `env:"GOOGLE_REDIRECT_URL"`
 	Environment         string        `env:"APP_ENV" envDefault:"development"`
 	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
 	HTTPPort            string        `env:"HTTP_PORT" envDefault:"8080"`
@@ -74,7 +81,54 @@ func Load() (Config, error) {
 	if err := env.Parse(&cfg); err != nil {
 		return Config{}, err
 	}
-	return cfg, nil
+	if err := cfg.ValidateTrustedProxies(); err != nil {
+		return Config{}, err
+	}
+	return cfg, cfg.ValidateGoogle()
+}
+
+// Only explicit IPs/CIDRs are accepted; an empty list trusts no proxy.
+func (c Config) ValidateTrustedProxies() error {
+	for _, raw := range c.TrustedProxies {
+		if _, err := netip.ParseAddr(raw); err == nil {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || prefix.Bits() == 0 {
+			return fmt.Errorf("TRUSTED_PROXIES requires explicit IPs or non-global CIDRs")
+		}
+	}
+	return nil
+}
+
+func (c Config) ValidateGoogle() error {
+	if !c.GoogleOAuthEnabled {
+		return nil
+	}
+	if c.Environment == "production" && !c.CookieSecure {
+		return fmt.Errorf("Google OAuth requires COOKIE_SECURE=true in production")
+	}
+	if strings.TrimSpace(c.GoogleClientID) == "" || strings.TrimSpace(c.GoogleClientSecret) == "" {
+		return fmt.Errorf("Google OAuth requires client ID and secret")
+	}
+	for _, raw := range []string{c.GoogleRedirectURL, c.FrontendRedirectURL} {
+		u, err := url.Parse(raw)
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
+			return fmt.Errorf("invalid Google OAuth redirect configuration")
+		}
+		if c.Environment == "production" && u.Scheme != "https" {
+			return fmt.Errorf("Google OAuth requires HTTPS redirects in production")
+		}
+	}
+	u, _ := url.Parse(c.GoogleRedirectURL)
+	if u.Path != "/auth/google/callback" {
+		return fmt.Errorf("Google redirect must use /auth/google/callback")
+	}
+	frontend, _ := url.Parse(c.FrontendRedirectURL)
+	if frontend.Path != "" && frontend.Path != "/" {
+		return fmt.Errorf("FRONTEND_REDIRECT_URL must be an origin")
+	}
+	return nil
 }
 
 // Address returns the configured listen address.

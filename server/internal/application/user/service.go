@@ -125,6 +125,10 @@ func (s *Service) CreateResetToken(ctx context.Context, email string) (string, b
 		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
 	}
 
+	// Google-only accounts remain passwordless; forgot-password is still generic.
+	if account == nil || len(account.PasswordHash) == 0 {
+		return "", false, nil
+	}
 	token := uuid.NewString()
 	return token, true, s.ports.CreateToken(ctx, TokenKindReset, token, account.ID, s.now().Add(resetTokenTTL))
 }
@@ -145,6 +149,13 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
+		return validation("Password reset token is invalid or expired.")
+	}
+	account, err := s.ports.AccountByID(ctx, accountID)
+	if err != nil {
+		return &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+	}
+	if account == nil || len(account.PasswordHash) == 0 {
 		return validation("Password reset token is invalid or expired.")
 	}
 

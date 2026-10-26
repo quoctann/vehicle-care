@@ -275,3 +275,17 @@ export type ApiErrorBody = {
     request_id: string;
   };
 };
+export interface GoogleStatusResponse {
+  enabled: boolean;
+  linked: boolean;
+  has_password: boolean;
+}
+
+export interface GoogleLinkRequest {
+  password: string;
+  expected_account_id: string;
+}
+
+export interface GoogleLinkResponse {
+  authorization_url: string;
+}

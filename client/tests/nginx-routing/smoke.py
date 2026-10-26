@@ -30,6 +30,9 @@ class Upstream(http.server.BaseHTTPRequestHandler):
     """Disposable echo fixture, not an application/auth implementation."""
 
     def do_GET(self):
+        if self.path.startswith("/auth/google/callback?") and "fail_upstream=1" in self.path:
+            self.close_connection = True
+            return
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         payload = json.dumps({
             "fixture": "routing-upstream",
@@ -111,6 +114,7 @@ def check_routes(base_url):
     )
     check_proxy(base_url, "/account/timezone?probe=preserve%2Bquery")
     check_proxy(base_url, "/auth/session")
+    check_proxy(base_url, "/auth/google/callback?code=secret-google-code&state=secret-google-state")
     check_proxy(base_url, "/auth/login", "POST", b'{"email":"smoke@example.invalid"}')
     check_proxy(base_url, "/devices/register", "POST", b'{"device_id":"smoke-device"}')
     check_proxy(base_url, "/sync/push", "POST", b'{"mutations":[]}')
@@ -197,6 +201,19 @@ def smoke(config):
             base_url = "http://127.0.0.1:" + port
             wait_ready(base_url)
             check_routes(base_url)
+            status, _, _ = request(
+                base_url,
+                "/auth/google/callback?fail_upstream=1&code=secret-google-code&state=secret-google-state",
+            )
+            assert status == 502, "fixture must exercise an upstream failure"
+            log_result = subprocess.run(
+                ["docker", "logs", nginx], check=True, text=True, capture_output=True,
+                timeout=20,
+            )
+            logs = log_result.stdout + log_result.stderr
+            assert "/auth/session" in logs, "access log must be enabled for the control request"
+            assert "secret-google-code" not in logs and "secret-google-state" not in logs, "OAuth credentials must not appear in access or error logs"
+            print("PASS Google callback query excluded from nginx access/error logs, including upstream failure")
     finally:
         for container in reversed(containers):
             subprocess.run(["docker", "rm", "--force", container], capture_output=True)

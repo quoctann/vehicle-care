@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	app "github.com/quoctann/vehicle-care/server/internal/application"
 )
 
 func (s *Server) signup(c *gin.Context) {
@@ -112,10 +111,6 @@ func (s *Server) resetPassword(c *gin.Context) {
 
 	s.clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"status": "reset"})
-}
-
-func (s *Server) googleStart(c *gin.Context) {
-	s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "Google sign-in is not implemented yet.", false)
 }
 
 func (s *Server) getSession(c *gin.Context) {

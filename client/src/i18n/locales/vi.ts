@@ -62,6 +62,32 @@ export const vi = {
       googleSignInFailed: 'Đăng nhập Google thất bại. Vui lòng thử lại.',
       googleSignUpFailed: 'Đăng ký qua Google thất bại. Vui lòng thử lại.',
     },
+    google: {
+      title: 'Đăng nhập với Google',
+      description:
+        'Liên kết Google với tài khoản hiện tại. Dữ liệu xe và dữ liệu chưa đồng bộ được giữ nguyên.',
+      link: 'Liên kết Google',
+      confirm: 'Xác nhận và tiếp tục với Google',
+      password: 'Mật khẩu hiện tại để liên kết Google',
+      reauth:
+        'Nhập mật khẩu của tài khoản hiện tại để xác nhận. Sau đó chọn tài khoản Google bạn muốn liên kết.',
+      linked: 'Đã liên kết Google',
+      success: 'Đã liên kết Google thành công.',
+      loading: 'Đang kiểm tra liên kết Google...',
+      retry: 'Kiểm tra lại liên kết Google',
+      offline: 'Cần kết nối mạng để kiểm tra hoặc liên kết Google.',
+      noPassword: 'Tài khoản này không có mật khẩu để xác nhận liên kết.',
+      errors: {
+        cancelled: 'Bạn đã hủy thao tác với Google. Có thể thử lại khi sẵn sàng.',
+        expired: 'Phiên xác nhận Google đã hết hạn. Vui lòng thử lại.',
+        email_exists:
+          'Email này đã có tài khoản. Hãy đăng nhập bằng mật khẩu, rồi liên kết Google trong Cài đặt.',
+        identity_linked: 'Tài khoản Google này đã liên kết với một tài khoản khác.',
+        already_linked: 'Tài khoản hiện tại đã liên kết Google. Hãy kiểm tra lại trạng thái.',
+        unavailable: 'Đăng nhập Google hiện không khả dụng. Bạn vẫn có thể dùng email và mật khẩu.',
+        failed: 'Không thể hoàn tất thao tác với Google. Vui lòng thử lại.',
+      },
+    },
     navigation: {
       primary: 'Điều hướng chính',
       home: 'Trang chủ',

@@ -10,6 +10,7 @@ const (
 	ECConflict         = "conflict"
 	ECInternalError    = "internal_error"
 	ECValidationFailed = "validation_failed"
+	ECRateLimited      = "rate_limited"
 )
 
 // Error identifies an application failure that the HTTP adapter can map safely.

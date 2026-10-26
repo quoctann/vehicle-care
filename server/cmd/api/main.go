@@ -15,6 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/quoctann/vehicle-care/server/db/migrations"
+	googleadapter "github.com/quoctann/vehicle-care/server/internal/adapters/google"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/httpapi"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	redisadapter "github.com/quoctann/vehicle-care/server/internal/adapters/redis"
@@ -63,10 +64,22 @@ func main() {
 		logger.Fatal("init datasource", zap.Error(err))
 	}
 	defer close()
+	var googleProvider user.GoogleProvider
+	if cfg.GoogleOAuthEnabled {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		googleProvider, err = googleadapter.New(ctx, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
+		cancel()
+		if err != nil {
+			logger.Fatal("initialize Google OIDC")
+		}
+	}
+	userService := user.NewService(source, cfg.SessionTTL)
 
 	svc := &httpapi.Service{
-		User:     user.NewService(source, cfg.SessionTTL),
-		DataSync: datasync.NewService(source, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize),
+		User:        userService,
+		Google:      user.NewGoogleService(userService, source, googleProvider),
+		AuthLimiter: source,
+		DataSync:    datasync.NewService(source, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize),
 	}
 	api := httpapi.New(svc, cfg, logger, pingers...)
 	server := &http.Server{
