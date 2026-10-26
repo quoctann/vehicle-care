@@ -14,9 +14,10 @@ import (
 
 // sessionJSON is the on-the-wire representation stored at session:<id>.
 type sessionJSON struct {
-	AccountID string `json:"account_id"`
-	CSRFToken string `json:"csrf_token"`
-	ExpiresAt string `json:"expires_at"`
+	AuthVersion int64  `json:"auth_version"`
+	AccountID   string `json:"account_id"`
+	CSRFToken   string `json:"csrf_token"`
+	ExpiresAt   string `json:"expires_at"`
 }
 
 // errSessionExpired is an internal sentinel distinguishing "not found / not
@@ -24,11 +25,12 @@ type sessionJSON struct {
 // never escapes to callers; exported methods translate it to (false, nil).
 var errSessionExpired = errors.New("redis: session expired or not found")
 
-func encodeSession(accountID, csrfToken string, expiresAt time.Time) ([]byte, error) {
+func encodeSession(accountID, csrfToken string, expiresAt time.Time, authVersion int64) ([]byte, error) {
 	return json.Marshal(sessionJSON{
-		AccountID: accountID,
-		CSRFToken: csrfToken,
-		ExpiresAt: expiresAt.UTC().Format(time.RFC3339Nano),
+		AuthVersion: authVersion,
+		AccountID:   accountID,
+		CSRFToken:   csrfToken,
+		ExpiresAt:   expiresAt.UTC().Format(time.RFC3339Nano),
 	})
 }
 
@@ -45,7 +47,12 @@ func (stored sessionJSON) toDomain() (domain.Session, error) {
 	if err != nil {
 		return domain.Session{}, err
 	}
-	return domain.Session{AccountID: stored.AccountID, CSRFToken: stored.CSRFToken, ExpiresAt: expiresAt}, nil
+	return domain.Session{
+		AccountID:   stored.AccountID,
+		AuthVersion: stored.AuthVersion,
+		CSRFToken:   stored.CSRFToken,
+		ExpiresAt:   expiresAt,
+	}, nil
 }
 
 // CreateSession stores a login session and records it in the account's
@@ -57,7 +64,7 @@ func (s *Store) CreateSession(ctx context.Context, sessionID string, session dom
 	if ttl <= 0 {
 		return nil
 	}
-	payload, err := encodeSession(session.AccountID, session.CSRFToken, session.ExpiresAt)
+	payload, err := encodeSession(session.AccountID, session.CSRFToken, session.ExpiresAt, session.AuthVersion)
 	if err != nil {
 		return wrapErr("create session: encode", err)
 	}
@@ -92,28 +99,36 @@ func (s *Store) Session(ctx context.Context, sessionID string, now time.Time) (*
 	if err != nil {
 		return nil, false, wrapErr("decode session", err)
 	}
-	if !now.Before(session.ExpiresAt) {
+	if stored.AuthVersion <= 0 || !now.Before(session.ExpiresAt) {
 		return nil, false, nil
 	}
 	return &session, true, nil
 }
 
-// refreshSessionValue is the shared implementation behind
-// GetAndRefreshSession and RefreshSession: it does the one round trip that
-// matters for the auth decision (GETEX, atomically reading the value while
-// sliding the key's TTL to newExpiresAt), then best-effort refreshes the
-// stored JSON value and the account's reverse index. That second step is
-// intentionally not atomic with the GETEX: it only affects the accuracy of
-// DeleteAccountSessions (logout-everywhere) bookkeeping, never the
-// correctness of the auth decision itself, which is already settled by the
-// successful GETEX above. A failure there is not reported to the caller.
+// Refresh uses compare-and-set Lua rather than GETEX followed by SET: a logout
+// between the read and refresh must never recreate a deleted session. The
+// version is copied from the original JSON, never upgraded during refresh.
+var refreshSessionScript = goredis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if not current then return 0 end
+if current ~= ARGV[1] then
+  local actual = cjson.decode(current)
+  local expected = cjson.decode(ARGV[1])
+  if actual.account_id ~= expected.account_id or actual.csrf_token ~= expected.csrf_token or actual.auth_version ~= expected.auth_version then return 0 end
+end
+redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
+redis.call('ZADD', KEYS[2], ARGV[4], ARGV[5])
+redis.call('PEXPIRE', KEYS[2], ARGV[6])
+return 1
+`)
+
 func (s *Store) refreshSessionValue(ctx context.Context, sessionID string, newExpiresAt time.Time) (sessionJSON, error) {
 	ttl := time.Until(newExpiresAt)
 	if ttl <= 0 {
 		return sessionJSON{}, errSessionExpired
 	}
 
-	raw, err := s.client.GetEx(ctx, sessionKey(sessionID), ttl).Result()
+	raw, err := s.client.Get(ctx, sessionKey(sessionID)).Result()
 	if errors.Is(err, goredis.Nil) {
 		return sessionJSON{}, errSessionExpired
 	}
@@ -124,25 +139,36 @@ func (s *Store) refreshSessionValue(ctx context.Context, sessionID string, newEx
 	if err != nil {
 		return sessionJSON{}, wrapErr("refresh session: decode", err)
 	}
+	if stored.AuthVersion <= 0 {
+		return sessionJSON{}, errSessionExpired
+	}
 
 	updated := sessionJSON{
-		AccountID: stored.AccountID,
-		CSRFToken: stored.CSRFToken,
-		ExpiresAt: newExpiresAt.UTC().Format(time.RFC3339Nano),
+		AuthVersion: stored.AuthVersion,
+		AccountID:   stored.AccountID,
+		CSRFToken:   stored.CSRFToken,
+		ExpiresAt:   newExpiresAt.UTC().Format(time.RFC3339Nano),
 	}
-	if payload, marshalErr := json.Marshal(updated); marshalErr == nil {
-		pipe := s.client.Pipeline()
-		pipe.Set(ctx, sessionKey(sessionID), payload, ttl)
-		pipe.ZAdd(ctx, accountSessionsKey(stored.AccountID), goredis.Z{Score: float64(newExpiresAt.Unix()), Member: sessionID})
-		pipe.Expire(ctx, accountSessionsKey(stored.AccountID), ttl+time.Hour)
-		_, _ = pipe.Exec(ctx) // best-effort, see doc comment above
+	payload, err := json.Marshal(updated)
+	if err != nil {
+		return sessionJSON{}, wrapErr("refresh session: encode", err)
+	}
+	refreshed, err := refreshSessionScript.Run(ctx, s.client,
+		[]string{sessionKey(sessionID), accountSessionsKey(stored.AccountID)},
+		raw, payload, max(ttl.Milliseconds(), 1), newExpiresAt.Unix(), sessionID,
+		(ttl + time.Hour).Milliseconds()).Int()
+	if err != nil {
+		return sessionJSON{}, wrapErr("refresh session: compare and set", err)
+	}
+	if refreshed != 1 {
+		return sessionJSON{}, errSessionExpired
 	}
 
 	return stored, nil
 }
 
-// GetAndRefreshSession atomically reads a session and slides its expiry to
-// newExpiresAt in a single round trip to Redis (via GetEx). now is part of
+// GetAndRefreshSession reads a session and conditionally slides its expiry
+// without resurrecting a concurrent logout. now is part of
 // the user.SessionStore contract but unused here: Redis's own key TTL is
 // the source of truth for expiration, so there is nothing left for a
 // separately-passed "now" to check.
@@ -154,7 +180,12 @@ func (s *Store) GetAndRefreshSession(ctx context.Context, sessionID string, _ ti
 	if err != nil {
 		return nil, false, err
 	}
-	return &domain.Session{AccountID: stored.AccountID, CSRFToken: stored.CSRFToken, ExpiresAt: newExpiresAt}, true, nil
+	return &domain.Session{
+		AccountID:   stored.AccountID,
+		AuthVersion: stored.AuthVersion,
+		CSRFToken:   stored.CSRFToken,
+		ExpiresAt:   newExpiresAt,
+	}, true, nil
 }
 
 // RefreshSession extends an active session's expiry. It errors if the

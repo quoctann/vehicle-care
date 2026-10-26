@@ -12,13 +12,15 @@ var ErrAccountExists = errors.New("account already exists")
 
 var ErrAccountNotFound = errors.New("account not found")
 
+var ErrAuthVersionChanged = errors.New("authentication version changed")
+
 type IAccountStore interface {
 	CreateAccount(ctx context.Context, account domain.Account) error
 	AccountByEmail(ctx context.Context, email string) (*domain.Account, error)
 	AccountByID(ctx context.Context, id string) (*domain.Account, error)
 	UpdateAccountTimezone(ctx context.Context, accountID, timezone string) (*domain.Account, error)
 	SetEmailVerified(ctx context.Context, accountID string) error
-	SetPassword(ctx context.Context, accountID string, passwordHash []byte) error
+	SetPassword(ctx context.Context, accountID string, passwordHash []byte, expectedAuthVersion int64) error
 	RegisterDevice(ctx context.Context, accountID, deviceID string) (time.Time, error)
 }
 

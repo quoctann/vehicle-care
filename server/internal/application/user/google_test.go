@@ -12,12 +12,13 @@ import (
 
 type googleFake struct {
 	IPorts
-	GooglePorts
+	IGooglePorts
 	states           map[string]GoogleState
 	account          domain.Account
 	linked           bool
 	linkCalls        int
 	created, deleted []string
+	createdVersion   int64
 	sessionOK        bool
 	fail             string
 }
@@ -53,7 +54,7 @@ func (f *googleFake) Session(context.Context, string, time.Time) (*domain.Sessio
 	if f.fail == "session" {
 		return nil, false, errors.New("redis down")
 	}
-	return &domain.Session{AccountID: f.account.ID}, f.sessionOK, nil
+	return &domain.Session{AccountID: f.account.ID, AuthVersion: f.account.AuthVersion}, f.sessionOK, nil
 }
 func (f *googleFake) GoogleAccount(context.Context, string, string, string, bool) (*domain.Account, error) {
 	if f.fail == "email_exists" {
@@ -61,12 +62,16 @@ func (f *googleFake) GoogleAccount(context.Context, string, string, string, bool
 	}
 	return &f.account, nil
 }
-func (f *googleFake) LinkGoogle(context.Context, string, string) error { f.linkCalls++; return nil }
-func (f *googleFake) CreateSession(_ context.Context, id string, _ domain.Session) error {
+func (f *googleFake) LinkGoogle(context.Context, string, string, int64) error {
+	f.linkCalls++
+	return nil
+}
+func (f *googleFake) CreateSession(_ context.Context, id string, session domain.Session) error {
 	if f.fail == "create" {
 		return errors.New("redis down")
 	}
 	f.created = append(f.created, id)
+	f.createdVersion = session.AuthVersion
 	return nil
 }
 func (f *googleFake) DeleteSession(_ context.Context, id string) error {
@@ -191,7 +196,7 @@ func (p providerFake) Verify(context.Context, string, string, string) (GoogleCla
 func googleFixture(t *testing.T) (*GoogleService, *googleFake) {
 	t.Helper()
 	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
-	f := &googleFake{states: map[string]GoogleState{}, account: domain.Account{ID: "account", PasswordHash: hash}, sessionOK: true}
+	f := &googleFake{states: map[string]GoogleState{}, account: domain.Account{ID: "account", PasswordHash: hash, AuthVersion: 1}, sessionOK: true}
 	return NewGoogleService(NewService(f, time.Hour), f, providerFake{}), f
 }
 
@@ -208,6 +213,9 @@ func TestGoogleLoginSingleUseAndRotation(t *testing.T) {
 	}
 	if len(f.created) != 1 || len(f.deleted) != 1 || f.deleted[0] != "old" {
 		t.Fatal("session not rotated")
+	}
+	if f.createdVersion != f.account.AuthVersion {
+		t.Fatal("Google session version missing")
 	}
 	if _, err := s.Complete(ctx, key, "browser", "code", false, "old"); GoogleErrorCode(err) != "expired" {
 		t.Fatal(err)

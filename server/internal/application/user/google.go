@@ -15,18 +15,23 @@ import (
 
 type GoogleService struct {
 	user     *Service
-	ports    GooglePorts
-	provider GoogleProvider
+	ports    IGooglePorts
+	provider IGoogleProvider
 }
 
-func NewGoogleService(u *Service, p GooglePorts, provider GoogleProvider) *GoogleService {
+func NewGoogleService(u *Service, p IGooglePorts, provider IGoogleProvider) *GoogleService {
 	return &GoogleService{user: u, ports: p, provider: provider}
 }
 
-type GoogleResult struct{ Purpose, SessionID, CSRFToken string }
+type GoogleResult struct {
+	Purpose   string
+	SessionID string
+	CSRFToken string
+}
 type googleError string
 
 func (e googleError) Error() string { return string(e) }
+
 func GoogleErrorCode(err error) string {
 	var e googleError
 	if errors.As(err, &e) {
@@ -39,6 +44,7 @@ func GoogleErrorCode(err error) string {
 	}
 	return "failed"
 }
+
 func randomOAuth() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -46,6 +52,7 @@ func randomOAuth() string {
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
 }
+
 func NewGoogleBrowserBinding() string { return randomOAuth() }
 
 func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expected, password string) (string, error) {
@@ -65,7 +72,7 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 		if err != nil {
 			return "", googleError("unavailable")
 		}
-		if a == nil || len(password) > 72 || bcrypt.CompareHashAndPassword(a.PasswordHash, []byte(password)) != nil {
+		if a == nil || session.AuthVersion <= 0 || session.AuthVersion != a.AuthVersion || len(password) > 72 || bcrypt.CompareHashAndPassword(a.PasswordHash, []byte(password)) != nil {
 			return "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid credentials."}
 		}
 		linked, err := s.ports.GoogleLinked(ctx, a.ID)
@@ -76,6 +83,7 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 			return "", ErrGoogleAlreadyLinked
 		}
 		st.AccountID = a.ID
+		st.AuthVersion = a.AuthVersion
 	} else if purpose != "login" {
 		return "", googleError("failed")
 	}
@@ -134,7 +142,11 @@ func (s *GoogleService) Complete(ctx context.Context, key, browser, code string,
 		if err := s.checkLinkSession(ctx, st, sid); err != nil {
 			return r, err
 		}
-		return r, s.ports.LinkGoogle(ctx, st.AccountID, claims.Subject)
+		err := s.ports.LinkGoogle(ctx, st.AccountID, claims.Subject, st.AuthVersion)
+		if errors.Is(err, ErrAuthVersionChanged) {
+			return r, googleError("expired")
+		}
+		return r, err
 	}
 	return s.completeGoogleLogin(ctx, claims, sid)
 }
@@ -145,7 +157,7 @@ func (s *GoogleService) completeGoogleLogin(ctx context.Context, claims GoogleCl
 	if err != nil {
 		return r, err
 	}
-	r.SessionID, r.CSRFToken, err = s.user.createSession(ctx, a.ID)
+	r.SessionID, r.CSRFToken, err = s.user.createSession(ctx, *a)
 	if err != nil {
 		return GoogleResult{Purpose: r.Purpose}, googleError("unavailable")
 	}
@@ -164,6 +176,13 @@ func (s *GoogleService) checkLinkSession(ctx context.Context, st GoogleState, si
 		return googleError("unavailable")
 	}
 	if !ok || session == nil || session.AccountID != st.AccountID {
+		return googleError("expired")
+	}
+	a, err := s.user.ports.AccountByID(ctx, session.AccountID)
+	if err != nil {
+		return googleError("unavailable")
+	}
+	if a == nil || st.AuthVersion <= 0 || session.AuthVersion != st.AuthVersion || session.AuthVersion != a.AuthVersion {
 		return googleError("expired")
 	}
 	return nil

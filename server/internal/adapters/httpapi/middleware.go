@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
+	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +61,7 @@ func (s *Server) requestID() gin.HandlerFunc {
 			requestID = "req_" + uuid.NewString()
 		}
 		c.Set(requestIDKey, requestID)
+		c.Request = c.Request.WithContext(logging.WithRequestID(c.Request.Context(), requestID))
 		c.Header("X-Request-ID", requestID)
 		c.Next()
 	}

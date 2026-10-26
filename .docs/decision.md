@@ -11,14 +11,14 @@ xem reminder, lịch sử và chi phí. **Local-first, eventual consistency**, k
 UI đọc/ghi IndexedDB trước; chỉ sau sync thành công dữ liệu mới có trên server/thiết bị khác.
 Không nội suy KM, không tự điền chu kỳ theo thông số hãng.
 
-Đã triển khai: email/password và Google OIDC + session cookie, liên kết Google có
+Đã triển khai: email/password, SMTP verify/reset và Google OIDC + session cookie, liên kết Google có
 xác thực lại password, catalog riêng account, xe/reminder,
 Odometer chỉ thêm, Fuel/Service sửa/xóa mềm, outbox FIFO, push/pull, repair/restore,
 PWA app-shell cache, healthcheck, migration và regression tests. Màn hình chính: Auth,
 onboarding, Home, History, Costs, Settings và Log Entry. Hạng mục đặt trong Settings,
 không cần tab điều hướng chính thứ năm.
 
-**Chưa triển khai:** email delivery (verify/reset/nhắc lịch), notification worker,
+**Chưa triển khai:** email nhắc lịch, notification worker,
 export/import, guest trước lần đăng nhập đầu tiên
 và guest-to-account merge, OCR/Scan, Plus/Upgrade, fuel efficiency.
 Schema/token/placeholder không phải tính năng hoàn chỉnh. Không còn memory backend,
@@ -233,9 +233,9 @@ Account response chung:
 | `POST /auth/signup` | `{email,password,name?}` | 201 `{status:"verification_required",email}`, hai cookie; email trùng 409 validation_failed |
 | `POST /auth/login` | `{email,password}` | 200 account + cookie; sai credentials 401 auth_invalid chung |
 | `POST /auth/verify-email` | `{token}` | 200 `{status:"verified"}`; token sai/hết hạn 400 |
-| `POST /auth/verify-email/resend` | `{email}` | 200 `{}` kể cả không tồn tại, chưa gửi email |
-| `POST /auth/password/forgot` | `{email}` | 200 `{}` generic, chưa gửi email |
-| `POST /auth/password/reset` | `{token,new_password}` | 200 `{status:"reset"}`, revoke mọi session account, clear cookie hiện tại |
+| `POST /auth/verify-email/resend` | `{email}` | 200 `{}` generic; chỉ gửi cho account chưa verified |
+| `POST /auth/password/forgot` | `{email}` | 200 `{}` generic; chỉ gửi cho account có password |
+| `POST /auth/password/reset` | `{token,new_password}` | 200 `{status:"reset"}`, vô hiệu mọi session của account được reset; không tự login |
 | `GET /auth/google/start` | — | Redirect toàn trang tới Google; không dùng fetch |
 | `GET /auth/google/callback` | `code,state` hoặc lỗi provider | Xác minh OIDC, tạo session hiện có rồi redirect về frontend; không chuyển token sang client |
 | `GET /auth/google/status` | cookie + `?expected_account_id=<account ID>` | `{enabled,linked,has_password}` cho Settings; thiếu precondition 400, account khác phiên 409 |
@@ -247,8 +247,8 @@ Account response chung:
 | `GET /part-types` | cookie | 200 `{part_types:[...]}` toàn catalog account kể cả inactive, chỉ đọc phụ trợ |
 
 PartType DTO: `id,code,name,display_order,active,account_id,server_seq,server_synced_at`.
-Verification token TTL 24 giờ, reset 30 phút, single-use; chưa có email delivery nên
-không tuyên bố flow email end-to-end đã vận hành.
+Verification token TTL 24 giờ, reset 30 phút, single-use; token mới thay token cũ
+cùng mục đích/account. Token lưu dạng hash trong Redis, không trả token qua HTTP API.
 
 ```json
 {"error":{"code":"validation_failed","message":"...","retryable":false,"request_id":"req_..."}}
@@ -328,6 +328,65 @@ không phải email. Mỗi account tối đa một danh tính Google.
   access/error log, kể cả upstream lỗi. Hạ tầng ingress/CDN ngoài repo cũng phải
   tắt/redact query callback. Backend giữ request ID/path/status để quan sát lỗi.
 - Đổi phương thức đăng nhập không xóa IndexedDB/outbox và không đổi sync protocol.
+
+### 5.2. Email verification và password reset
+
+- Application `user` sở hữu mail port và template độc lập transport; SMTP adapter
+  ở `adapters/smtp`, wiring ở `cmd/api`. Đổi nhà cung cấp SMTP bằng cấu hình, HTTP provider sau này thêm adapter
+  mà không sửa nghiệp vụ/frontend. Không gửi email trực tiếp từ HTTP handler.
+- Signup vẫn tạo phiên ngay, **chưa verified không chặn app/sync**. Mail gửi lỗi không
+  rollback account/session; người dùng đăng nhập và yêu cầu gửi lại, không đăng ký lại.
+  Forgot/resend là xác nhận đã tiếp nhận, không bảo đảm mail tới inbox; account không
+  tồn tại, đã verified hoặc Google-only (forgot) không làm lộ trạng thái qua response.
+  Hai endpoint dùng chung response budget bằng `SMTP_TIMEOUT` cho cả no-op và gửi
+  thật, giảm timing oracle; vì vậy yêu cầu vẫn đợi hết budget khi SMTP trả nhanh.
+- Gửi đồng bộ với timeout hữu hạn; chưa có durable queue/worker hoặc retry tự động.
+  SMTP timeout có thể xảy ra sau khi provider nhận mail, không tự gửi lại mù. Link
+  mới thay link cũ ngay khi tạo token, kể cả delivery sau đó thất bại. Recovery là
+  chờ cooldown/rate limit rồi chủ động yêu cầu link mới, dùng email mới nhất.
+- Ngoài quota auth theo IP, delivery có quota theo email đã normalize/hash trong
+  Redis (3 yêu cầu/giờ), dùng chung signup/resend/forgot. Limiter lỗi chặn gửi, không fallback bỏ
+  giới hạn; cooldown frontend chỉ hỗ trợ UX, không phải boundary chống spam.
+- Liên kết lấy từ `MAIL_FRONTEND_URL` cấu hình cố định, không tin request `Host`:
+  `/verify-email#token=...` và `/reset-password#token=...`. Token trong fragment không
+  đi trong request URL tới frontend/proxy; client đọc rồi xóa khỏi address bar,
+  không lưu localStorage/IndexedDB. Verification cần nút xác nhận POST, không consume
+  chỉ vì email scanner GET link. Reset cần mật khẩu UTF-8 8–72 byte và xác nhận.
+- Reset không tự login, không xóa IndexedDB/entity/outbox. Refresh session có guard
+  account/generation, không để response cũ sửa session mới hoặc account khác.
+- Password và `auth_version` đổi atomically trong PostgreSQL. Session giữ version;
+  phiên có version cũ bị từ chối kể cả cleanup Redis thất bại. Migration mới phải
+  chạy trước backend; không sửa baseline. Phiên legacy thiếu version bị từ chối và
+  cần đăng nhập lại. Không chạy down migration để khôi phục các phiên cũ.
+  Reset không xóa hàng loạt session Redis: cleanup sau commit có thể xóa nhầm phiên
+  vừa login bằng password mới. Record phiên cũ hết hạn theo idle TTL khi không còn
+  request; version check luôn
+  từ chối chúng, không dựa vào việc xóa record để thu hồi quyền.
+- Reset token ràng buộc version tại lúc cấp; password update so version đó rồi mới
+  tăng, tránh reset cũ đang chạy ghi đè reset mới đã commit. Login giữ version của
+  account snapshot đã kiểm tra credentials, không lấy version mới sau bcrypt.
+- Redis token consume và PostgreSQL write không có transaction chung. Nếu consume
+  thành công rồi DB lỗi, trả lỗi chứ không giả thành công; yêu cầu link mới để thử lại.
+  Không log token, link, nội dung mail, password, credentials hoặc raw provider error.
+
+**Local không cần mua mail service:** `make dev-infra` có Mailpit, SMTP loopback
+`127.0.0.1:1025` và inbox web `http://localhost:8025`. Theo `.env.example`, dùng
+`SMTP_STARTTLS=false`, credentials trống và `SMTP_FROM` là sender local.
+Mailpit chỉ dành dev, inbox có link xác thực nên không publish ra Internet.
+
+**Production:** inject SMTP host/port, sender và credentials từ secret manager;
+đặt `SMTP_STARTTLS=true`, không dùng plaintext. Adapter hiện hỗ trợ STARTTLS (thường
+port 587), chưa hỗ trợ implicit TLS port 465. Cấu hình thiếu/không an toàn
+phải fail startup, không fallback sang no-op sender. `MAIL_FRONTEND_URL` phải
+là frontend public HTTPS, cookie Secure; kiểm tra domain sender/SPF/DKIM/DMARC và
+egress SMTP. Không bake secret vào image hay `VITE_*`. Thử thật trên staging để kiểm
+tra spam, TLS và hiển thị mail; Mailpit không chứng minh khả năng delivery Internet.
+Provider HTTP như SES/Resend chưa có adapter trong phạm vi này.
+
+Kiểm thử delivery thật riêng: `python3 server/tests/mail-flow/smoke.py` (Docker,
+Python 3 và Go). Script dùng PostgreSQL/Redis/Mailpit disposable với port loopback
+động, không reset DB/local env hiện có; kiểm tra signup → verify và forgot → reset
+qua SMTP/inbox thật. Browser Playwright mock kiểm tra UI, không thay bằng chứng này.
 
 ## 6. Sync A — FIFO và full-record server-order LWW
 
@@ -432,7 +491,7 @@ runtime, **không bảo đảm xuyên tab** nếu browser thiếu Web Locks.
 
 ## 8. Local, migration, deploy và reset
 
-Go 1.25.11, Node 22+, npm, GNU Make/Bash; Docker Compose cho PG/Redis, Docker cho testcontainers.
+Go 1.25.11, Node 22+, npm, GNU Make/Bash; Docker Compose cho PG/Redis/Mailpit, Docker cho testcontainers.
 
 ```bash
 make install
@@ -561,9 +620,25 @@ make test-integration  # REQUIRE_POSTGRES_TESTS=1, -count=1, PG thật; thiếu 
 npm run test:coverage:contracts --prefix client
 npm run test:e2e --prefix client
 python3 client/tests/nginx-routing/smoke.py
+python3 server/tests/mail-flow/smoke.py
 # PWA worker thật, production A/B builds; working directory client/
 PLAYWRIGHT_CHANNEL=chrome npx playwright test --config playwright.pwa.config.ts
 ```
+
+**Báo cáo email verification/reset 26/10/2026:** SMTP plain-text + HTML, Mailpit local,
+route public verify/reset, recovery generic có response budget và auth-version
+hardening đã triển khai. `make lint`, `make build`, `make test` (348 frontend tests,
+toàn bộ Go `-race`) và `make test-integration` PostgreSQL bắt buộc đều pass. Smoke
+`server/tests/mail-flow/smoke.py` pass delivery SMTP thật, fragment link, replay,
+password mới/cũ, nhiều phiên cũ và bảo toàn cookie/phiên account khác.
+Chrome Playwright chạy tuần tự sau Docker đạt **19/19**, gồm 4 test UI email mới;
+browser dùng API mock, không thay cho smoke SMTP thật.
+Contract coverage pass: statements 91,70%, branches 86,30%, lines 93,82%.
+Coverage riêng 6 file UI/helper/hook email: statements 99,29%, branches 98,85%,
+functions/lines 100%; không coi đây là coverage toàn frontend hoặc toàn session store.
+Review Go, database, frontend và security không còn finding medium+ trong phạm vi
+thay đổi. Prototype HTML và sync/outbox contract giữ nguyên. SMTP production/provider
+Internet vẫn cần nghiệm thu staging; Mailpit không chứng minh inbox/spam thật.
 
 **Báo cáo Google OAuth 26/10/2026:** login/signup và Settings link có password
 reauth đã triển khai; không auto-link email, không sửa sync/outbox hoặc prototype HTML.

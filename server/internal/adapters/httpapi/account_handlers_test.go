@@ -23,16 +23,16 @@ type accountDependencies struct {
 
 func (d *accountDependencies) GetAndRefreshSession(_ context.Context, id string, _, _ time.Time) (*domain.Session, bool, error) {
 	if id == "other-session" {
-		return &domain.Session{AccountID: "other", CSRFToken: "csrf"}, true, nil
+		return &domain.Session{AccountID: "other", CSRFToken: "csrf", AuthVersion: 1}, true, nil
 	}
 	if id != "session" && id != "same-account-session" {
 		return nil, false, nil
 	}
-	return &domain.Session{AccountID: "owner", CSRFToken: "csrf"}, true, nil
+	return &domain.Session{AccountID: "owner", CSRFToken: "csrf", AuthVersion: 1}, true, nil
 }
 
 func (d *accountDependencies) AccountByID(_ context.Context, id string) (*domain.Account, error) {
-	return &domain.Account{ID: id, Email: "owner@example.test", Timezone: "Asia/Ho_Chi_Minh"}, nil
+	return &domain.Account{ID: id, Email: "owner@example.test", Timezone: "Asia/Ho_Chi_Minh", AuthVersion: 1}, nil
 }
 
 func (d *accountDependencies) UpdateAccountTimezone(_ context.Context, id, zone string) (*domain.Account, error) {

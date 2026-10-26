@@ -6,9 +6,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/adapters/httpapi"
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres"
 	redisadapter "github.com/quoctann/vehicle-care/server/internal/adapters/redis"
+	smtpadapter "github.com/quoctann/vehicle-care/server/internal/adapters/smtp"
 	"github.com/quoctann/vehicle-care/server/internal/application/datasync"
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/platform/config"
@@ -64,7 +67,8 @@ func main() {
 		logger.Fatal("init datasource", zap.Error(err))
 	}
 	defer close()
-	var googleProvider user.GoogleProvider
+
+	var googleProvider user.IGoogleProvider
 	if cfg.GoogleOAuthEnabled {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		googleProvider, err = googleadapter.New(ctx, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
@@ -73,7 +77,20 @@ func main() {
 			logger.Fatal("initialize Google OIDC")
 		}
 	}
-	userService := user.NewService(source, cfg.SessionTTL)
+
+	mailer := smtpadapter.New(smtpadapter.Options{
+		Address:  net.JoinHostPort(cfg.SMTPHost, strconv.Itoa(cfg.SMTPPort)),
+		Host:     cfg.SMTPHost,
+		From:     cfg.SMTPFrom,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		StartTLS: cfg.SMTPStartTLS,
+		Timeout:  cfg.SMTPTimeout,
+	})
+
+	userService := user.
+		NewService(source, cfg.SessionTTL).
+		WithMailDelivery(smtpadapter.Observe(mailer, logger), source, cfg.MailFrontendURL, cfg.SMTPTimeout)
 
 	svc := &httpapi.Service{
 		User:        userService,

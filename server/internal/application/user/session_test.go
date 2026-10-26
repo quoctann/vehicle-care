@@ -49,7 +49,7 @@ func TestResolveSessionPointerResults(t *testing.T) {
 		})
 	}
 
-	deps := &sessionDependencies{found: true, session: &domain.Session{AccountID: "account", CSRFToken: "token"}, account: &domain.Account{ID: "account"}}
+	deps := &sessionDependencies{found: true, session: &domain.Session{AccountID: "account", CSRFToken: "token", AuthVersion: 1}, account: &domain.Account{ID: "account", AuthVersion: 1}}
 	session, account, err := NewService(deps, time.Hour).ResolveSession(context.Background(), "session")
 	if err != nil || session.CSRFToken != "token" || account.ID != "account" {
 		t.Fatalf("expected resolved session and account, session=%#v account=%#v err=%v", session, account, err)

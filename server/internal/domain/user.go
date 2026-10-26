@@ -10,11 +10,13 @@ type Account struct {
 	Timezone      string  `json:"timezone"`
 	EmailVerified bool    `json:"email_verified"`
 	PasswordHash  []byte  `json:"-"`
+	AuthVersion   int64   `json:"-"`
 }
 
 // Session is an opaque server-side login session.
 type Session struct {
-	AccountID string
-	CSRFToken string
-	ExpiresAt time.Time
+	AuthVersion int64
+	AccountID   string
+	CSRFToken   string
+	ExpiresAt   time.Time
 }

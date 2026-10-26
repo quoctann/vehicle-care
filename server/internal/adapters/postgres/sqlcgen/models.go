@@ -18,6 +18,7 @@ type Account struct {
 	PasswordHash  []byte         `json:"password_hash"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
+	AuthVersion   int64          `json:"auth_version"`
 }
 
 type AccountSequence struct {

@@ -62,6 +62,8 @@ func (s *Server) verifyEmail(c *gin.Context) {
 }
 
 func (s *Server) resendVerification(c *gin.Context) {
+	ctx, cancel := s.recoveryContext(c)
+	defer cancel()
 	var request struct {
 		Email string `json:"email" binding:"required"`
 	}
@@ -69,16 +71,17 @@ func (s *Server) resendVerification(c *gin.Context) {
 		return
 	}
 
-	_, _, err := s.userService.CreateVerificationToken(c.Request.Context(), request.Email)
-	if err != nil {
-		s.writeError(c, err)
-		return
-	}
+	// Recovery endpoints deliberately disclose neither account existence nor
+	// delivery/store failures. Never log token-bearing transport errors.
+	_, _, _ = s.userService.CreateVerificationToken(ctx, request.Email)
+	<-ctx.Done()
 
 	c.JSON(http.StatusOK, gin.H{})
 }
 
 func (s *Server) forgotPassword(c *gin.Context) {
+	ctx, cancel := s.recoveryContext(c)
+	defer cancel()
 	var request struct {
 		Email string `json:"email" binding:"required"`
 	}
@@ -86,11 +89,8 @@ func (s *Server) forgotPassword(c *gin.Context) {
 		return
 	}
 
-	_, _, err := s.userService.CreateResetToken(c.Request.Context(), request.Email)
-	if err != nil {
-		s.writeError(c, err)
-		return
-	}
+	_, _, _ = s.userService.CreateResetToken(ctx, request.Email)
+	<-ctx.Done()
 
 	c.JSON(http.StatusOK, gin.H{})
 }
@@ -109,7 +109,6 @@ func (s *Server) resetPassword(c *gin.Context) {
 		return
 	}
 
-	s.clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"status": "reset"})
 }
 

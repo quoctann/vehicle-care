@@ -33,10 +33,10 @@ func TestGoogleAccountIdentityAndSeed(t *testing.T) {
 		t.Fatal("email must not auto link", err)
 	}
 	other := newAccount(t, s)
-	if err := s.LinkGoogle(ctx, other, "subject"); !errors.Is(err, user.ErrGoogleIdentityLinked) {
+	if err := s.LinkGoogle(ctx, other, "subject", 1); !errors.Is(err, user.ErrGoogleIdentityLinked) {
 		t.Fatal(err)
 	}
-	if err := s.LinkGoogle(ctx, a.ID, "new-subject"); !errors.Is(err, user.ErrGoogleAlreadyLinked) {
+	if err := s.LinkGoogle(ctx, a.ID, "new-subject", 1); !errors.Is(err, user.ErrGoogleAlreadyLinked) {
 		t.Fatal(err)
 	}
 	linked, err := s.GoogleLinked(ctx, a.ID)
@@ -114,14 +114,14 @@ func TestGoogleSignupRollsBackFailedSeedAndInvalidIdentity(t *testing.T) {
 			t.Fatalf("orphan %s: %d %v", table, count, err)
 		}
 	}
-	if err := s.LinkGoogle(ctx, "00000000-0000-4000-8000-000000000099", "missing-account"); err == nil {
+	if err := s.LinkGoogle(ctx, "00000000-0000-4000-8000-000000000099", "missing-account", 1); err == nil {
 		t.Fatal("linked missing account")
 	}
 	_ = s.Close()
 	if _, err := s.GoogleAccount(ctx, "closed", "closed@example.test", "", false); err == nil {
 		t.Fatal("ignored database outage")
 	}
-	if err := s.LinkGoogle(ctx, "00000000-0000-4000-8000-000000000099", "closed"); err == nil {
+	if err := s.LinkGoogle(ctx, "00000000-0000-4000-8000-000000000099", "closed", 1); err == nil {
 		t.Fatal("ignored database outage")
 	}
 }

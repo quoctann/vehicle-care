@@ -26,7 +26,7 @@ func (f *googleRecoveryFake) CreateToken(context.Context, TokenKind, string, str
 func (f *googleRecoveryFake) ConsumeToken(context.Context, TokenKind, string, time.Time) (string, bool, error) {
 	return "google", true, nil
 }
-func (f *googleRecoveryFake) SetPassword(context.Context, string, []byte) error {
+func (f *googleRecoveryFake) SetPassword(context.Context, string, []byte, int64) error {
 	f.changed++
 	return nil
 }

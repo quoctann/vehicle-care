@@ -9,8 +9,8 @@ help:
 		'make dev            Run frontend and backend together' \
 		'make dev-fe         Run Vite on http://localhost:5173 (talks to the real backend)' \
 		'make dev-be         Run the Go API on http://localhost:8080' \
-		'make dev-infra      Start Postgres + Redis (required by the API)' \
-		'make dev-infra-down Stop Postgres + Redis' \
+		'make dev-infra      Start Postgres + Redis + Mailpit (local inbox :8025)' \
+		'make dev-infra-down Stop Postgres + Redis + Mailpit' \
 		'make migrate-up     Apply database migrations (needs DB_HOST/DB_USER/DB_PASSWORD/DB_NAME)' \
 		'make migrate-create name=<name>  Scaffold a new timestamp-prefixed migration pair' \
 		'make test           Run all tests' \

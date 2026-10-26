@@ -42,6 +42,12 @@ type SessionStore = {
   updateTimezone: (timezone: string) => Promise<void>;
   /** Gọi 1 lần lúc app khởi động (và sau signup/login) để đồng bộ với cookie session hiện có. */
   hydrate: () => Promise<void>;
+  invalidatePendingHydration: (generation: number) => void;
+  refreshCurrentAccount: (
+    accountId: string | null,
+    generation: number,
+    clearExpired: boolean,
+  ) => Promise<void>;
   setAuthenticated: (account: SessionAccount) => void;
   clear: () => void;
 };
@@ -127,6 +133,47 @@ export const useSessionStore = create<SessionStore>((set, get) => {
         saveInFlight = false;
         saveGeneration = null;
         if (get().sessionGeneration === generation) set({ timezoneSaving: false });
+      }
+    },
+    invalidatePendingHydration: (generation) => {
+      if (get().sessionGeneration !== generation) return;
+      hydrationRevision += 1;
+      // Reset may revoke the session being hydrated. Do not allow that older
+      // response to open a workspace afterward; do not touch another login.
+    },
+    refreshCurrentAccount: async (accountId, generation, clearExpired) => {
+      const isCurrent = () =>
+        get().status === (accountId === null ? 'loading' : 'authenticated') &&
+        (get().account?.id ?? null) === accountId &&
+        get().sessionGeneration === generation;
+      if (!isCurrent()) return;
+      const revision = ++hydrationRevision;
+      const assertCurrent = () => {
+        if (!isCurrent() || revision !== hydrationRevision) throw new Error('Session changed.');
+      };
+      try {
+        const { account: dto } = await api.getSession();
+        assertCurrent();
+        if (accountId !== null && dto.id !== accountId) return;
+        const account = mapAccountDto(dto);
+        // Initial hydration was suspended for reset. Reconcile from the live
+        // cookie, never from the token or an offline account snapshot.
+        if (accountId === null) {
+          set({ status: 'authenticated', account, sessionGeneration: generation + 1 });
+          return;
+        }
+        set({ account });
+        await cacheSavedAccount(account, assertCurrent);
+      } catch (error) {
+        // Never clear offline entities/outbox, adopt another cookie account, or
+        // let an old response log out a newer login (even for the same account).
+        if (
+          isCurrent() &&
+          revision === hydrationRevision &&
+          clearExpired &&
+          (accountId === null || (error instanceof ApiError && error.status === 401))
+        )
+          get().clear();
       }
     },
     hydrate: async () => {

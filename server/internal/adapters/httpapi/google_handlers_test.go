@@ -22,7 +22,7 @@ import (
 
 type googleHTTPDependencies struct {
 	accountDependencies
-	user.GooglePorts
+	user.IGooglePorts
 	states   map[string]user.GoogleState
 	hash     []byte
 	linked   bool
@@ -34,10 +34,10 @@ type googleHTTPDependencies struct {
 }
 
 func (d *googleHTTPDependencies) AccountByID(_ context.Context, id string) (*domain.Account, error) {
-	return &domain.Account{ID: id, PasswordHash: d.hash}, nil
+	return &domain.Account{ID: id, PasswordHash: d.hash, AuthVersion: 1}, nil
 }
 func (d *googleHTTPDependencies) Session(_ context.Context, id string, _ time.Time) (*domain.Session, bool, error) {
-	return &domain.Session{AccountID: "owner"}, id == "session", nil
+	return &domain.Session{AccountID: "owner", AuthVersion: 1}, id == "session", nil
 }
 func (d *googleHTTPDependencies) SaveGoogleState(_ context.Context, key string, st user.GoogleState, _ time.Duration) error {
 	d.states[key] = st
@@ -52,9 +52,9 @@ func (d *googleHTTPDependencies) GoogleLinked(context.Context, string) (bool, er
 	return d.linked, nil
 }
 func (d *googleHTTPDependencies) GoogleAccount(context.Context, string, string, string, bool) (*domain.Account, error) {
-	return &domain.Account{ID: "owner"}, nil
+	return &domain.Account{ID: "owner", AuthVersion: 1}, nil
 }
-func (d *googleHTTPDependencies) LinkGoogle(context.Context, string, string) error {
+func (d *googleHTTPDependencies) LinkGoogle(context.Context, string, string, int64) error {
 	d.linked = true
 	return nil
 }

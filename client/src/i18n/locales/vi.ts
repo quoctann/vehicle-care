@@ -44,12 +44,23 @@ export const vi = {
       backToSignIn: 'Quay lại đăng nhập',
       checkEmail: 'Kiểm tra email',
       verificationSent:
-        'Đã gửi email xác thực tới <1>{{email}}</1>. Mở email và bấm vào liên kết để xác thực tài khoản.',
+        'Yêu cầu đã được tiếp nhận. Nếu <1>{{email}}</1> đủ điều kiện xác thực, bạn sẽ nhận được liên kết. Kiểm tra cả thư rác; email có thể đến chậm.',
       resetSent:
-        'Nếu <1>{{email}}</1> có tồn tại trong hệ thống, chúng tôi đã gửi liên kết đặt lại mật khẩu. Liên kết có hiệu lực trong thời gian giới hạn.',
+        'Yêu cầu đã được tiếp nhận. Nếu <1>{{email}}</1> đủ điều kiện đặt lại mật khẩu, bạn sẽ nhận được liên kết. Kiểm tra cả thư rác; email có thể đến chậm.',
       resendEmail: 'Gửi lại email',
       resendCountdown: 'Gửi lại sau {{count}} giây',
-      resent: 'Đã gửi lại email xác thực.',
+      resent:
+        'Yêu cầu đã được tiếp nhận. Nếu email đủ điều kiện, bạn sẽ nhận được liên kết xác thực.',
+      verifyEmail: 'Xác thực email',
+      verifyPrompt:
+        'Bấm xác nhận để xác thực địa chỉ email trong liên kết. Mở trang này chưa xác thực email.',
+      verifyConfirm: 'Xác nhận xác thực email',
+      verifySuccess:
+        'Email đã được xác thực. Bạn có thể đăng nhập hoặc tiếp tục sử dụng tài khoản.',
+      invalidVerificationLink:
+        'Liên kết xác thực không hợp lệ, đã hết hạn hoặc đã được sử dụng. Yêu cầu liên kết mới bên dưới.',
+      passwordBytes:
+        'Mật khẩu phải có từ 8 đến 72 byte UTF-8 (ký tự có dấu hoặc emoji có thể chiếm nhiều byte).',
       or: 'hoặc',
       continueGoogle: 'Tiếp tục với Google',
       signUpGoogle: 'Đăng ký bằng Google',
@@ -57,7 +68,8 @@ export const vi = {
       hidePassword: 'Ẩn mật khẩu',
       passwordMin: 'Mật khẩu phải có ít nhất {{count}} ký tự.',
       passwordMismatch: 'Mật khẩu xác nhận không khớp.',
-      invalidResetLink: 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.',
+      invalidResetLink:
+        'Liên kết đặt lại mật khẩu không hợp lệ, đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới.',
       resetSuccess: 'Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.',
       googleSignInFailed: 'Đăng nhập Google thất bại. Vui lòng thử lại.',
       googleSignUpFailed: 'Đăng ký qua Google thất bại. Vui lòng thử lại.',

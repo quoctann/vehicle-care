@@ -36,11 +36,6 @@ func (d Database) DSN() string {
 }
 
 type Config struct {
-	TrustedProxies      []string      `env:"TRUSTED_PROXIES"`
-	GoogleOAuthEnabled  bool          `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
-	GoogleClientID      string        `env:"GOOGLE_CLIENT_ID"`
-	GoogleClientSecret  string        `env:"GOOGLE_CLIENT_SECRET"`
-	GoogleRedirectURL   string        `env:"GOOGLE_REDIRECT_URL"`
 	Environment         string        `env:"APP_ENV" envDefault:"development"`
 	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
 	HTTPPort            string        `env:"HTTP_PORT" envDefault:"8080"`
@@ -71,6 +66,21 @@ type Config struct {
 	RedisPoolSize     int           `env:"REDIS_POOL_SIZE" envDefault:"20"`
 	RedisMinIdleConns int           `env:"REDIS_MIN_IDLE_CONNS" envDefault:"5"`
 	RedisMaxRetries   int           `env:"REDIS_MAX_RETRIES" envDefault:"3"`
+
+	GoogleOAuthEnabled bool     `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
+	GoogleClientID     string   `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret string   `env:"GOOGLE_CLIENT_SECRET"`
+	GoogleRedirectURL  string   `env:"GOOGLE_REDIRECT_URL"`
+	TrustedProxies     []string `env:"TRUSTED_PROXIES"`
+
+	MailFrontendURL string        `env:"MAIL_FRONTEND_URL" envDefault:"http://localhost:5173"`
+	SMTPHost        string        `env:"SMTP_HOST" envDefault:"localhost"`
+	SMTPPort        int           `env:"SMTP_PORT" envDefault:"1025"`
+	SMTPFrom        string        `env:"SMTP_FROM" envDefault:"noreply@vehicle-care.local"`
+	SMTPUsername    string        `env:"SMTP_USERNAME"`
+	SMTPPassword    string        `env:"SMTP_PASSWORD"`
+	SMTPStartTLS    bool          `env:"SMTP_STARTTLS" envDefault:"false"`
+	SMTPTimeout     time.Duration `env:"SMTP_TIMEOUT" envDefault:"5s"`
 }
 
 // Load reads an optional local .env without overriding injected environment
@@ -84,7 +94,10 @@ func Load() (Config, error) {
 	if err := cfg.ValidateTrustedProxies(); err != nil {
 		return Config{}, err
 	}
-	return cfg, cfg.ValidateGoogle()
+	if err := cfg.ValidateGoogle(); err != nil {
+		return Config{}, err
+	}
+	return cfg, cfg.ValidateMail()
 }
 
 // Only explicit IPs/CIDRs are accepted; an empty list trusts no proxy.

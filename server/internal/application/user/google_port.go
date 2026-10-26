@@ -17,12 +17,13 @@ var (
 const GoogleStateTTL = 10 * time.Minute
 
 type GoogleState struct {
-	Nonce     string
-	Verifier  string
-	Browser   string
-	Purpose   string
-	AccountID string
-	SessionID string
+	AuthVersion int64
+	Nonce       string
+	Verifier    string
+	Browser     string
+	Purpose     string
+	AccountID   string
+	SessionID   string
 }
 
 type GoogleClaims struct {
@@ -30,14 +31,14 @@ type GoogleClaims struct {
 	EmailTrusted         bool
 }
 
-type GoogleProvider interface {
+type IGoogleProvider interface {
 	AuthorizationURL(state, nonce, verifier string) string
 	Verify(context.Context, string, string, string) (GoogleClaims, error)
 }
 
-type GooglePorts interface {
+type IGooglePorts interface {
 	GoogleAccount(context.Context, string, string, string, bool) (*domain.Account, error)
-	LinkGoogle(context.Context, string, string) error
+	LinkGoogle(context.Context, string, string, int64) error
 	GoogleLinked(context.Context, string) (bool, error)
 	SaveGoogleState(context.Context, string, GoogleState, time.Duration) error
 	TakeGoogleState(context.Context, string) (GoogleState, bool, error)

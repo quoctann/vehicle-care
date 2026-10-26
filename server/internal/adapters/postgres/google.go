@@ -22,11 +22,14 @@ func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, 
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
-	if err := q.LockGoogleSubject(ctx, subject); err != nil {
+
+	qtx := sqlcgen.New(tx)
+
+	if err := qtx.LockGoogleSubject(ctx, subject); err != nil {
 		return nil, err
 	}
-	id, err := q.GoogleAccountID(ctx, subject)
+
+	id, err := qtx.GoogleAccountID(ctx, subject)
 	if err == nil {
 		if err := tx.Commit(); err != nil {
 			return nil, err
@@ -36,42 +39,75 @@ func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, 
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	a := domain.Account{ID: uuid.NewString(), Email: strings.ToLower(strings.TrimSpace(email)), Timezone: "UTC+07:00", EmailVerified: verified}
-	if name != "" {
-		a.Name = &name
+
+	acc := domain.Account{
+		ID:            uuid.NewString(),
+		Email:         strings.ToLower(strings.TrimSpace(email)),
+		Timezone:      "UTC+07:00",
+		EmailVerified: verified,
+		AuthVersion:   1,
 	}
-	if err := q.InsertAccount(ctx, sqlcgen.InsertAccountParams{ID: a.ID, Email: a.Email, Name: nullableString(a.Name), Timezone: a.Timezone, EmailVerified: verified}); err != nil {
+	if name != "" {
+		acc.Name = &name
+	}
+
+	if err := qtx.InsertAccount(ctx, sqlcgen.InsertAccountParams{
+		ID:            acc.ID,
+		Email:         acc.Email,
+		Name:          nullableString(acc.Name),
+		Timezone:      acc.Timezone,
+		EmailVerified: verified},
+	); err != nil {
 		if isUniqueViolation(err, "accounts_email_unique") {
 			return nil, user.ErrGoogleEmailExists
 		}
 		return nil, err
 	}
-	if err := q.CreateAccountSequence(ctx, a.ID); err != nil {
+
+	if err := qtx.CreateAccountSequence(ctx, acc.ID); err != nil {
 		return nil, err
 	}
-	if err := seed.SeedAccountPartTypes(ctx, q, a.ID, time.Now().UTC()); err != nil {
+
+	if err := seed.SeedAccountPartTypes(ctx, qtx, acc.ID, time.Now().UTC()); err != nil {
 		return nil, err
 	}
-	if err := q.InsertGoogleIdentity(ctx, sqlcgen.InsertGoogleIdentityParams{AccountID: a.ID, Subject: subject}); err != nil {
+
+	if err := qtx.InsertGoogleIdentity(ctx, sqlcgen.InsertGoogleIdentityParams{AccountID: acc.ID, Subject: subject}); err != nil {
 		return nil, err
 	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &a, nil
+
+	return &acc, nil
 }
 
-func (s *Store) LinkGoogle(ctx context.Context, accountID, subject string) error {
+func (s *Store) LinkGoogle(ctx context.Context, accountID, subject string, expectedAuthVersion int64) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	q := sqlcgen.New(tx)
-	if err := q.LockGoogleSubject(ctx, subject); err != nil {
+
+	qtx := sqlcgen.New(tx)
+
+	if err := qtx.LockGoogleSubject(ctx, subject); err != nil {
 		return err
 	}
-	err = q.InsertGoogleIdentity(ctx, sqlcgen.InsertGoogleIdentityParams{AccountID: accountID, Subject: subject})
+
+	version, err := qtx.LockAccountAuthVersion(ctx, accountID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return user.ErrAuthVersionChanged
+	}
+	if err != nil {
+		return err
+	}
+	if expectedAuthVersion <= 0 || version != expectedAuthVersion {
+		return user.ErrAuthVersionChanged
+	}
+
+	err = qtx.InsertGoogleIdentity(ctx, sqlcgen.InsertGoogleIdentityParams{AccountID: accountID, Subject: subject})
 	if isUniqueViolation(err, "auth_identities_provider_subject_key") {
 		return user.ErrGoogleIdentityLinked
 	}
@@ -81,6 +117,7 @@ func (s *Store) LinkGoogle(ctx context.Context, accountID, subject string) error
 	if err != nil {
 		return err
 	}
+
 	return tx.Commit()
 }
 
