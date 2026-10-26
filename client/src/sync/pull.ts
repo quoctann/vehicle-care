@@ -3,7 +3,12 @@ import type { PullResponse } from '@/api/contract.types';
 import { db } from '@/data/db';
 import { DEFAULT_SYNC_PAGE_SIZE } from '@/domain/constants';
 import { applyPulledChange } from './applyChange';
-import { assertActiveSyncAccount } from './sessionGuard';
+import {
+  captureSyncSession,
+  assertCurrentSyncSession,
+  assertSyncResponseAccount,
+  type SyncSessionContext,
+} from './sessionGuard';
 
 function validatePage(
   response: PullResponse,
@@ -46,21 +51,27 @@ function validatePage(
 }
 
 /** Pulls a bounded feed and commits each page only while the account outbox is clean. */
-export async function pullChanges(accountId: string): Promise<'complete' | 'deferred'> {
+export async function pullChanges(
+  accountId: string,
+  context: SyncSessionContext = captureSyncSession(accountId),
+): Promise<'complete' | 'deferred'> {
+  assertCurrentSyncSession(context);
   const meta = await db.syncMeta.get(accountId);
+  assertCurrentSyncSession(context);
   if (!meta) throw new Error(`Sync metadata is missing for account ${accountId}`);
 
   let afterSeq = meta.lastSeenSeq;
   let untilSeq: number | null = null;
 
   while (true) {
-    assertActiveSyncAccount(accountId);
+    assertCurrentSyncSession(context);
     const response = await api.pullChanges({
+      expectedAccountId: context.accountId,
       afterSeq,
       limit: DEFAULT_SYNC_PAGE_SIZE,
       ...(untilSeq == null ? {} : { untilSeq }),
     });
-    assertActiveSyncAccount(accountId);
+    assertSyncResponseAccount(response, context);
     validatePage(response, afterSeq, untilSeq);
     untilSeq ??= response.until_seq;
 
@@ -78,17 +89,21 @@ export async function pullChanges(accountId: string): Promise<'complete' | 'defe
       ],
       async () => {
         const dirtyOutbox = await db.outbox.where('accountId').equals(accountId).count();
+        assertCurrentSyncSession(context);
         if (dirtyOutbox > 0) return false;
         for (const change of response.changes) {
-          await applyPulledChange(change, accountId);
+          await applyPulledChange(change, accountId, () => assertCurrentSyncSession(context));
+          assertCurrentSyncSession(context);
         }
         const updated = await db.syncMeta.update(accountId, {
           lastSeenSeq: response.next_cursor,
         });
+        assertCurrentSyncSession(context);
         if (updated !== 1) throw new Error(`Sync metadata disappeared for account ${accountId}`);
         return true;
       },
     );
+    assertCurrentSyncSession(context);
 
     if (!applied) return 'deferred';
 

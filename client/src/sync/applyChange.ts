@@ -9,8 +9,13 @@ import {
   vehicleFieldsFromPayload,
 } from '@/data/mappers';
 
-async function assertReferencedVehicle(accountId: string, vehicleId: string): Promise<void> {
+async function assertReferencedVehicle(
+  accountId: string,
+  vehicleId: string,
+  assertCurrent: () => void,
+): Promise<void> {
   const vehicle = await db.vehicles.get(vehicleId);
+  assertCurrent();
   if (!vehicle || vehicle.accountId !== accountId) {
     throw new Error(`Sync payload references a vehicle outside account ${accountId}`);
   }
@@ -34,10 +39,12 @@ async function applyEntityChange(
   payload: Record<string, unknown>,
   serverSeq: number,
   serverSyncedAt: string,
+  assertCurrent: () => void,
 ): Promise<void> {
   switch (entityType) {
     case 'vehicle': {
       const existing = await db.vehicles.get(entityId);
+      assertCurrent();
       if (!existing) {
         const fields = vehicleFieldsFromPayload(payload);
         await db.vehicles.put({
@@ -62,8 +69,9 @@ async function applyEntityChange(
     }
     case 'reminder_config': {
       const existing = await db.reminderConfigs.get(entityId);
+      assertCurrent();
       const fields = reminderConfigFieldsFromPayload(payload);
-      await assertReferencedVehicle(accountId, fields.vehicleId);
+      await assertReferencedVehicle(accountId, fields.vehicleId, assertCurrent);
       if (!existing) {
         await db.reminderConfigs.put({
           id: entityId,
@@ -87,6 +95,7 @@ async function applyEntityChange(
     }
     case 'odometer_log': {
       const existing = await db.odometerLogs.get(entityId);
+      assertCurrent();
       if (existing) {
         if (existing.accountId !== accountId)
           throw new Error(`Odometer log ${entityId} belongs to another account`);
@@ -102,7 +111,7 @@ async function applyEntityChange(
         return;
       }
       const fields = odometerLogFieldsFromPayload(payload);
-      await assertReferencedVehicle(accountId, fields.vehicleId);
+      await assertReferencedVehicle(accountId, fields.vehicleId, assertCurrent);
       await db.odometerLogs.put({
         id: entityId,
         accountId,
@@ -115,8 +124,9 @@ async function applyEntityChange(
     }
     case 'fuel_log': {
       const existing = await db.fuelLogs.get(entityId);
+      assertCurrent();
       const fields = fuelLogFieldsFromPayload(payload);
-      await assertReferencedVehicle(accountId, fields.vehicleId);
+      await assertReferencedVehicle(accountId, fields.vehicleId, assertCurrent);
       if (!existing) {
         await db.fuelLogs.put({
           id: entityId,
@@ -140,8 +150,9 @@ async function applyEntityChange(
     }
     case 'service_log': {
       const existing = await db.serviceLogs.get(entityId);
+      assertCurrent();
       const fields = serviceLogFieldsFromPayload(payload);
-      await assertReferencedVehicle(accountId, fields.vehicleId);
+      await assertReferencedVehicle(accountId, fields.vehicleId, assertCurrent);
       if (!existing) {
         await db.serviceLogs.put({
           id: entityId,
@@ -165,6 +176,7 @@ async function applyEntityChange(
     }
     case 'part_type': {
       const existing = await db.partTypes.get(entityId);
+      assertCurrent();
       const fields = partTypeFieldsFromPayload(payload);
       if (!existing) {
         await db.partTypes.put({
@@ -195,11 +207,16 @@ async function applyEntityChange(
  * được gọi từ trong 1 transaction khác đang chạy, vd `sync/pull.ts` gộp nhiều change +
  * cập nhật `syncMeta` cùng lúc — xem ghi chú trong `outbox.ts`).
  */
-export async function applyPulledChange(change: PullChange, accountId: string): Promise<void> {
+export async function applyPulledChange(
+  change: PullChange,
+  accountId: string,
+  assertCurrent: () => void = () => undefined,
+): Promise<void> {
   await db.transaction(
     'rw',
     [db.vehicles, db.reminderConfigs, db.odometerLogs, db.fuelLogs, db.serviceLogs, db.partTypes],
     async () => {
+      assertCurrent();
       await applyEntityChange(
         accountId,
         change.entity_type,
@@ -207,7 +224,9 @@ export async function applyPulledChange(change: PullChange, accountId: string): 
         change.payload,
         change.server_seq,
         change.server_synced_at,
+        assertCurrent,
       );
+      assertCurrent();
     },
   );
 }

@@ -76,12 +76,14 @@ export type UpdateAccountTimezoneResponse = {
 };
 
 export type RegisterDeviceRequest = {
+  expected_account_id: string;
   device_id: string;
   platform: string;
   app_version: string;
 };
 
 export type RegisterDeviceResponse = {
+  account_id: string;
   device_id: string;
   registered_at: string;
 };
@@ -186,6 +188,7 @@ export type PushMutation = SyncEntityEnvelope & {
 };
 
 export type PushRequest = {
+  expected_account_id: string;
   device_id: string;
   mutations: PushMutation[];
 };
@@ -209,6 +212,7 @@ export type MutationResult = {
 };
 
 export type PushResponse = {
+  account_id: string;
   results: MutationResult[];
 };
 
@@ -219,6 +223,7 @@ export type PullChange = SyncEntityEnvelope & {
 };
 
 export type PullResponse = {
+  account_id: string;
   changes: PullChange[];
   next_cursor: number;
   until_seq: number;

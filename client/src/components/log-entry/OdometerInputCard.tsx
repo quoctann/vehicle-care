@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatNumber } from '@/lib/formatters';
+import { MAX_ODOMETER_KM } from '@/domain/validation';
 
 type OdometerInputCardProps = {
   value: string;
@@ -42,7 +43,8 @@ export function OdometerInputCard({
             id="log-odometer"
             type="number"
             min="0"
-            step="1"
+            max={MAX_ODOMETER_KM}
+            step="any"
             inputMode="numeric"
             placeholder={t('common.optional')}
             aria-invalid={Boolean(error)}

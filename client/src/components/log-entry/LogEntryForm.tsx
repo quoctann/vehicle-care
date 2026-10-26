@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 import { addFuelLog, updateFuelLog } from '@/data/repositories/fuelRepository';
 import { addServiceLog, updateServiceLog } from '@/data/repositories/serviceRepository';
-import { validateOdometerReading } from '@/domain/validation';
+import { isValidLiters, isValidNote, validateOdometerReading } from '@/domain/validation';
 import { isValidCost } from '@/domain/cost';
 import type { FuelLog, PartType, ServiceLog } from '@/domain/types';
 import { formatNumber } from '@/lib/formatters';
@@ -124,7 +124,7 @@ export function LogEntryForm({
     if (parsedOdometer != null) {
       const validation = validateOdometerReading(parsedOdometer, currentOdometerKm);
       if (!validation.valid) {
-        setErrors({ odometerKm: t('logEntry.negativeOdometer') });
+        setErrors({ odometerKm: t('logEntry.odometerRange') });
         return;
       }
       if (validation.warning === 'lower_than_current' && !lowerOdometerConfirmed) {
@@ -155,7 +155,7 @@ export function LogEntryForm({
         parsedOdometer != null &&
         !validateOdometerReading(parsedOdometer, currentOdometerKm).valid
       ) {
-        nextErrors.odometerKm = t('logEntry.negativeOdometer');
+        nextErrors.odometerKm = t('logEntry.odometerRange');
       }
     }
 
@@ -166,15 +166,14 @@ export function LogEntryForm({
 
     if (entryType === 'fuel') {
       const parsedLiters = optionalNumber(liters);
-      if (
-        liters !== '' &&
-        (parsedLiters == null || !Number.isFinite(parsedLiters) || parsedLiters <= 0)
-      ) {
+      if (liters !== '' && (parsedLiters == null || !isValidLiters(parsedLiters))) {
         nextErrors.liters = t('logEntry.invalidLiters');
       }
     } else if (!partTypeId) {
       nextErrors.partTypeId = t('logEntry.choosePart');
     }
+
+    if (!isValidNote(optionalText(note))) nextErrors.note = t('logEntry.noteTooLong');
 
     return nextErrors;
   }

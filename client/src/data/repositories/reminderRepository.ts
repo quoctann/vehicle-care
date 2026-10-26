@@ -1,5 +1,5 @@
 import { generateDeterministicId } from '@/lib/uuid';
-import { validateReminderInterval } from '@/domain/validation';
+import { isValidOdometerKm, validateReminderInterval } from '@/domain/validation';
 import type { ReminderConfig } from '@/domain/types';
 import { db } from '../db';
 import { reminderConfigToPayload } from '../mappers';
@@ -33,6 +33,8 @@ export async function createReminderConfig(input: {
   baselineOdometerKm: number | null;
   baselineDate: string | null;
 }): Promise<ReminderConfig> {
+  if (input.baselineOdometerKm != null && !isValidOdometerKm(input.baselineOdometerKm))
+    throw new Error('Baseline odometer must be between 0 and 99999999.99.');
   const validation = validateReminderInterval(input.intervalKm, input.intervalDays);
   if (!validation.valid) throw new Error(`Interval không hợp lệ: ${validation.error}`);
 

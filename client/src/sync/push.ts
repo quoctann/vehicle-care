@@ -8,7 +8,12 @@ import {
   markOutboxBlocked,
   markOutboxRetryable,
 } from '@/data/outbox';
-import { assertActiveSyncAccount } from './sessionGuard';
+import {
+  captureSyncSession,
+  assertCurrentSyncSession,
+  assertSyncResponseAccount,
+  type SyncSessionContext,
+} from './sessionGuard';
 import { entityTable, updateEntitySyncMeta } from '@/data/entityTable';
 
 export class SyncBlockedError extends Error {
@@ -55,6 +60,7 @@ function validateResult(item: OutboxItem, result: MutationResult | undefined): M
 async function applyMutationResult(
   item: OutboxItem,
   result: MutationResult,
+  context: SyncSessionContext,
 ): Promise<'continue' | 'stop'> {
   const table = entityTable(item.entityType);
   switch (result.status) {
@@ -62,6 +68,7 @@ async function applyMutationResult(
     case 'duplicate':
       await db.transaction('rw', [db.outbox, table], async () => {
         const current = await table.get(item.entityId);
+        assertCurrentSyncSession(context);
         const hasNewerLocalRevision = await db.outbox
           .where('[accountId+localSeq]')
           .between([item.accountId, item.localSeq + 1], [item.accountId, Number.MAX_SAFE_INTEGER])
@@ -70,7 +77,9 @@ async function applyMutationResult(
               candidate.entityType === item.entityType && candidate.entityId === item.entityId,
           )
           .count();
+        assertCurrentSyncSession(context);
         await markOutboxAcknowledged(item.mutationId);
+        assertCurrentSyncSession(context);
         if (
           hasNewerLocalRevision === 0 &&
           (current?.serverSeq == null || result.server_seq! >= current.serverSeq)
@@ -82,31 +91,43 @@ async function applyMutationResult(
             result.server_synced_at!,
           );
         }
+        assertCurrentSyncSession(context);
       });
       return 'continue';
     case 'retryable_error':
       await db.transaction('rw', db.outbox, async () => {
+        assertCurrentSyncSession(context);
         await markOutboxRetryable(
           item.mutationId,
           result.error_message ?? 'Retryable server error',
         );
+        assertCurrentSyncSession(context);
       });
       throw new SyncRetryableError(item, result.error_message ?? 'Retryable server error');
     case 'rejected':
       await db.transaction('rw', db.outbox, async () => {
+        assertCurrentSyncSession(context);
         await markOutboxBlocked(item.mutationId, result.error_message ?? 'Rejected by server');
+        assertCurrentSyncSession(context);
       });
       throw new SyncBlockedError(item, result.error_message ?? 'Rejected by server');
   }
 }
 
 /** Pushes one immutable envelope at a time, in account-local FIFO order. */
-export async function pushOutbox(deviceId: string, accountId: string): Promise<void> {
+export async function pushOutbox(
+  deviceId: string,
+  accountId: string,
+  context: SyncSessionContext = captureSyncSession(accountId),
+): Promise<void> {
+  assertCurrentSyncSession(context);
   const throughLocalSeq = await getOutboxHighWatermark(accountId);
+  assertCurrentSyncSession(context);
   if (throughLocalSeq == null) return;
   while (true) {
-    assertActiveSyncAccount(accountId);
+    assertCurrentSyncSession(context);
     const item = await getNextOutboxItem(accountId, throughLocalSeq);
+    assertCurrentSyncSession(context);
     if (!item) return;
     if (item.status === 'blocked')
       throw new SyncBlockedError(item, item.lastError ?? 'Mutation needs attention');
@@ -122,13 +143,14 @@ export async function pushOutbox(deviceId: string, accountId: string): Promise<v
       payload: item.payload,
     } as PushMutation;
     const response = await api.pushMutations({
+      expected_account_id: context.accountId,
       device_id: deviceId,
       mutations: [mutation],
     });
-    assertActiveSyncAccount(accountId);
+    assertSyncResponseAccount(response, context);
     if (response.results.length !== 1)
       throw new Error('Sync push returned an incomplete result set');
     const result = validateResult(item, response.results[0]);
-    await applyMutationResult(item, result);
+    await applyMutationResult(item, result, context);
   }
 }

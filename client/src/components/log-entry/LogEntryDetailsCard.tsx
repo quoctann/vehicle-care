@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslation } from 'react-i18next';
 import type { LogEntryType } from './EntryTypeSelector';
+import { MAX_LITERS } from '@/domain/validation';
 
 type LogEntryDetailsCardProps = {
   timezone: string;
@@ -58,7 +59,8 @@ export function LogEntryDetailsCard({
               id="log-liters"
               type="number"
               min="0"
-              step="0.01"
+              max={MAX_LITERS}
+              step="any"
               inputMode="decimal"
               placeholder={t('common.optional')}
               aria-invalid={Boolean(errors.liters)}
@@ -90,9 +92,15 @@ export function LogEntryDetailsCard({
           />
         </Field>
 
-        <Field label={t('logEntry.note')} htmlFor="log-note" className="sm:col-span-2">
+        <Field
+          label={t('logEntry.note')}
+          htmlFor="log-note"
+          error={errors.note}
+          className="sm:col-span-2"
+        >
           <Textarea
             id="log-note"
+            aria-invalid={Boolean(errors.note)}
             placeholder={t('common.optional')}
             value={note}
             onChange={(event) => onNoteChange(event.target.value)}

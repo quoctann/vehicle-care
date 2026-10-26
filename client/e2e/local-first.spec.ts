@@ -111,12 +111,16 @@ test('login, offline creation, reload, and explicit retry preserve the mutation 
     if (path === '/devices/register') {
       const body = request.postDataJSON();
       expect(body.platform).toBe('web');
+      expect(body.expected_account_id).toBe(account.id);
       expect(body.device_id).toMatch(/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i);
       registrations.push(body.device_id);
-      return route.fulfill({ json: { device_id: body.device_id, registered_at: serverTime } });
+      return route.fulfill({
+        json: { account_id: account.id, device_id: body.device_id, registered_at: serverTime },
+      });
     }
     if (path === '/sync/push') {
       const body = request.postDataJSON() as PushRequest;
+      expect(body.expected_account_id).toBe(account.id);
       pushes.push(body);
       events.push('push');
       expect(body.mutations).toHaveLength(1);
@@ -124,6 +128,7 @@ test('login, offline creation, reload, and explicit retry preserve the mutation 
       acknowledged = pushes.length > 1;
       return route.fulfill({
         json: {
+          account_id: account.id,
           results: [
             {
               mutation_id: mutation.mutation_id,
@@ -141,6 +146,7 @@ test('login, offline creation, reload, and explicit retry preserve the mutation 
       });
     }
     if (path === '/sync/pull') {
+      expect(url.searchParams.get('expected_account_id')).toBe(account.id);
       events.push('pull');
       const mutation = pushes.at(-1)?.mutations[0];
       const canonicalChange =
@@ -156,6 +162,7 @@ test('login, offline creation, reload, and explicit retry preserve the mutation 
           : null;
       const after = Number(url.searchParams.get('after_seq'));
       const response: PullResponse = {
+        account_id: account.id,
         changes: acknowledged && canonicalChange && after < 1 ? [canonicalChange] : [],
         next_cursor: acknowledged ? 1 : 0,
         until_seq: acknowledged ? 1 : 0,
@@ -227,4 +234,155 @@ test('login, offline creation, reload, and explicit retry preserve the mutation 
   });
   await expect(page.getByText('Canonical commuter', { exact: true }).first()).toBeVisible();
   expect(unexpected).toEqual([]);
+});
+
+test('a second tab login changes shared cookies but cannot sync the first tab offline mutation into that account', async ({
+  page,
+  context,
+}) => {
+  const other = {
+    ...account,
+    id: 'a2b8a673-e95d-4a30-b788-bf7ad9ed1650',
+    email: 'other@example.test',
+  };
+  const rejected: { expected: string; cookie: string }[] = [];
+  const pushes: PushRequest[] = [];
+  const feeds: string[] = [];
+  await context.route('**/api/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (!url.pathname.startsWith('/api/')) return route.continue();
+    const path = url.pathname.slice(4);
+    const cookie = request.headers().cookie ?? '';
+    const current = cookie.includes('sid=tab-b')
+      ? other
+      : cookie.includes('sid=tab-a')
+        ? account
+        : null;
+    if (path === '/auth/session')
+      return route.fulfill({
+        status: current ? 200 : 401,
+        json: current
+          ? { account: current }
+          : {
+              error: {
+                code: 'auth_invalid',
+                message: 'Sign in',
+                retryable: false,
+                request_id: 'session',
+              },
+            },
+      });
+    if (path === '/auth/login') {
+      const signingIn = request.postDataJSON().email === other.email ? other : account;
+      const suffix = signingIn.id === account.id ? 'a' : 'b';
+      await context.addCookies([
+        { name: 'sid', value: `tab-${suffix}`, url: url.origin, httpOnly: true, sameSite: 'Lax' },
+        { name: 'csrf_token', value: `csrf-${suffix}`, url: url.origin, sameSite: 'Lax' },
+      ]);
+      return route.fulfill({ json: { account: signingIn } });
+    }
+    const expected =
+      path === '/sync/pull'
+        ? url.searchParams.get('expected_account_id')
+        : request.postDataJSON().expected_account_id;
+    if (current?.id !== expected) {
+      rejected.push({ expected, cookie });
+      return route.fulfill({
+        status: 409,
+        json: {
+          error: {
+            code: 'validation_failed',
+            message: 'The session changed. Refresh and try again.',
+            retryable: false,
+            request_id: 'stale-tab',
+          },
+        },
+      });
+    }
+    if (path === '/devices/register')
+      return route.fulfill({
+        json: {
+          account_id: current.id,
+          device_id: request.postDataJSON().device_id,
+          registered_at: serverTime,
+        },
+      });
+    if (path === '/sync/push') {
+      pushes.push(request.postDataJSON());
+      throw new Error('No mutation should be pushed in this scenario');
+    }
+    if (path === '/sync/pull') {
+      feeds.push(current.id);
+      return route.fulfill({
+        json: {
+          account_id: current.id,
+          changes: [],
+          next_cursor: 0,
+          until_seq: 0,
+          has_more: false,
+          server_time: serverTime,
+        },
+      });
+    }
+    return route.abort();
+  });
+
+  // Keep tab B's anonymous login screen open before A signs in. Cookies are shared,
+  // but the two pages deliberately retain separate in-memory session generations.
+  const second = await context.newPage();
+  await second.goto('/');
+  await expect(second.getByLabel('Email', { exact: true })).toBeVisible();
+  const garage = new GaragePage(page);
+  await garage.signIn();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await context.setOffline(true);
+  await garage.addVehicle();
+  const original = (await rows<OutboxItem>(page, 'outbox'))[0]!;
+  const device = (await rows<SyncMeta>(page, 'syncMeta')).find(
+    (meta) => meta.accountId === account.id,
+  )!.deviceId;
+  await context.setOffline(false);
+  await second.getByLabel('Email', { exact: true }).fill(other.email);
+  await second.getByLabel('Mật khẩu', { exact: true }).fill('test-only-password');
+  await second.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        (await rows<SyncMeta>(second, 'syncMeta')).find((meta) => meta.accountId === other.id)
+          ?.bootstrapState,
+    )
+    .toBe('ready');
+  const feedsBefore = [...feeds];
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+    window.dispatchEvent(new Event('online'));
+  });
+  await page.getByRole('button', { name: /thay đổi đang chờ/ }).click();
+  await expect.poll(() => rejected.length).toBeGreaterThan(0);
+  expect(rejected[0]).toMatchObject({ expected: account.id });
+  expect(rejected[0]!.cookie).toContain('sid=tab-b');
+  await expect
+    .poll(
+      async () =>
+        (await rows<SyncMeta>(page, 'syncMeta')).find((meta) => meta.accountId === account.id)
+          ?.lastSyncError,
+    )
+    .toContain('Refresh');
+  expect(await rows<OutboxItem>(page, 'outbox')).toEqual([original]);
+  expect(
+    (await rows<SyncMeta>(page, 'syncMeta')).find((meta) => meta.accountId === account.id),
+  ).toMatchObject({ deviceId: device, lastSeenSeq: 0 });
+  expect((await rows<Vehicle>(page, 'vehicles'))[0]).toMatchObject({
+    accountId: account.id,
+    id: original.entityId,
+    name: 'Offline commuter',
+    serverSeq: null,
+  });
+  expect(pushes).toEqual([]);
+  expect(feeds).toEqual(feedsBefore);
+  await second.close();
 });

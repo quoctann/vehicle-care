@@ -1,4 +1,5 @@
 import { generateId } from '@/lib/uuid';
+import { isValidPartTypeName } from '@/domain/validation';
 import type { PartType } from '@/domain/types';
 import { db } from '../db';
 import { partTypeToPayload } from '../mappers';
@@ -13,8 +14,8 @@ import { enqueueMutation } from '../outbox';
  */
 export async function createPartType(accountId: string, displayName: string): Promise<PartType> {
   const name = displayName.trim();
-  if (!name || name.length > 200)
-    throw new Error('Part type name must contain 1 to 200 characters.');
+  if (!isValidPartTypeName(name))
+    throw new Error('Part type name must contain 1 to 200 characters and at most 500 UTF-8 bytes.');
 
   const id = generateId();
   const now = new Date().toISOString();
@@ -69,8 +70,8 @@ export function updatePartTypeName(
   displayName: string,
 ): Promise<void> {
   const name = displayName.trim();
-  if (!name || name.length > 200)
-    throw new Error('Part type name must contain 1 to 200 characters.');
+  if (!isValidPartTypeName(name))
+    throw new Error('Part type name must contain 1 to 200 characters and at most 500 UTF-8 bytes.');
   return writePartTypePatch(accountId, id, { displayName: name });
 }
 

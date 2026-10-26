@@ -5,6 +5,7 @@ import { serviceLogToPayload } from '../mappers';
 import { enqueueMutation } from '../outbox';
 import { assertVehicleOwned } from './ownership';
 import { isValidCost } from '@/domain/cost';
+import { isValidNote, isValidOdometerKm } from '@/domain/validation';
 
 /**
  * Mỗi lần hoàn tất bảo dưỡng tạo 1 ServiceLog mới — KHÔNG sửa trực tiếp
@@ -24,11 +25,9 @@ export async function addServiceLog(input: {
   cost?: number | null;
   note?: string | null;
 }): Promise<ServiceLog> {
-  if (
-    input.odometerKmSnapshot != null &&
-    (!Number.isFinite(input.odometerKmSnapshot) || input.odometerKmSnapshot < 0)
-  ) {
-    throw new Error('Service odometer cannot be negative.');
+  if (!isValidNote(input.note)) throw new Error('Note must not exceed 2000 UTF-8 bytes.');
+  if (input.odometerKmSnapshot != null && !isValidOdometerKm(input.odometerKmSnapshot)) {
+    throw new Error('Service odometer must be between 0 and 99999999.99.');
   }
   if (input.cost != null && !isValidCost(input.cost))
     throw new Error('Service cost must be between 0 and 99999999.99 with at most two decimals.');
@@ -104,11 +103,9 @@ export function updateServiceLog(
     Pick<ServiceLog, 'partTypeId' | 'servicedAt' | 'odometerKmSnapshot' | 'cost' | 'note'>
   >,
 ): Promise<void> {
-  if (
-    patch.odometerKmSnapshot != null &&
-    (!Number.isFinite(patch.odometerKmSnapshot) || patch.odometerKmSnapshot < 0)
-  ) {
-    throw new Error('Service odometer cannot be negative.');
+  if (!isValidNote(patch.note)) throw new Error('Note must not exceed 2000 UTF-8 bytes.');
+  if (patch.odometerKmSnapshot != null && !isValidOdometerKm(patch.odometerKmSnapshot)) {
+    throw new Error('Service odometer must be between 0 and 99999999.99.');
   }
   if (patch.cost != null && !isValidCost(patch.cost))
     throw new Error('Service cost must be between 0 and 99999999.99 with at most two decimals.');

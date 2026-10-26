@@ -1,5 +1,5 @@
 import { generateId } from '@/lib/uuid';
-import { validateOdometerReading } from '@/domain/validation';
+import { isValidLiters, isValidNote, validateOdometerReading } from '@/domain/validation';
 import type { FuelLog, OdometerLog } from '@/domain/types';
 import { db } from '../db';
 import { fuelLogToPayload, odometerLogToPayload } from '../mappers';
@@ -22,8 +22,9 @@ export async function addFuelLog(input: {
   odometerKm: number | null;
   isFullTank: boolean;
 }): Promise<{ fuelLog: FuelLog; odometerLog: OdometerLog | null }> {
-  if (input.liters != null && (!Number.isFinite(input.liters) || input.liters <= 0)) {
-    throw new Error('Fuel amount must be positive.');
+  if (!isValidNote(input.note)) throw new Error('Note must not exceed 2000 UTF-8 bytes.');
+  if (input.liters != null && !isValidLiters(input.liters)) {
+    throw new Error('Fuel amount must be greater than 0 and at most 9999.99.');
   }
   if (input.cost != null && !isValidCost(input.cost)) {
     throw new Error('Fuel cost must be between 0 and 99999999.99 with at most two decimals.');
@@ -127,8 +128,9 @@ export function updateFuelLog(
   id: string,
   patch: Partial<Pick<FuelLog, 'recordedAt' | 'liters' | 'cost' | 'note' | 'isFullTank'>>,
 ): Promise<void> {
-  if (patch.liters != null && (!Number.isFinite(patch.liters) || patch.liters <= 0))
-    throw new Error('Fuel amount must be positive.');
+  if (!isValidNote(patch.note)) throw new Error('Note must not exceed 2000 UTF-8 bytes.');
+  if (patch.liters != null && !isValidLiters(patch.liters))
+    throw new Error('Fuel amount must be greater than 0 and at most 9999.99.');
   if (patch.cost != null && !isValidCost(patch.cost))
     throw new Error('Fuel cost must be between 0 and 99999999.99 with at most two decimals.');
   if (patch.recordedAt && Number.isNaN(Date.parse(patch.recordedAt)))

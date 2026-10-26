@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { addOdometerLog } from '@/data/repositories/odometerRepository';
-import { validateOdometerReading } from '@/domain/validation';
+import { MAX_ODOMETER_KM, validateOdometerReading } from '@/domain/validation';
 import { formatNumber } from '@/lib/formatters';
 
 type UpdateOdometerSheetProps = {
@@ -49,7 +49,7 @@ export function UpdateOdometerSheet({
 
     const validation = validateOdometerReading(reading, currentOdometerKm);
     if (!validation.valid) {
-      setError(t('logEntry.negativeOdometer'));
+      setError(t('logEntry.odometerRange'));
       return;
     }
     if (validation.warning === 'lower_than_current' && !forceLower) {
@@ -106,7 +106,8 @@ export function UpdateOdometerSheet({
               onChange={(event) => updateValue(event.target.value)}
               type="number"
               min="0"
-              step="1"
+              max={MAX_ODOMETER_KM}
+              step="any"
               inputMode="numeric"
               aria-label={t('odometer.inputLabel')}
               aria-invalid={Boolean(error)}

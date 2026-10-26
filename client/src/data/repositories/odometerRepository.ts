@@ -1,5 +1,5 @@
 import { generateId } from '@/lib/uuid';
-import { validateOdometerReading } from '@/domain/validation';
+import { isValidNote, validateOdometerReading } from '@/domain/validation';
 import type { OdometerLog } from '@/domain/types';
 import { db } from '../db';
 import { odometerLogToPayload } from '../mappers';
@@ -8,7 +8,7 @@ import { assertVehicleOwned } from './ownership';
 
 /**
  * D-02: caller (UI) chịu trách nhiệm hỏi/hiển thị cảnh báo "thấp hơn hiện tại"
- * TRƯỚC khi gọi hàm này — ở đây chỉ chặn giá trị thật sự bất khả thi (âm), không
+ * TRƯỚC khi gọi hàm này — ở đây chỉ chặn giá trị ngoài contract, không
  * chặn lại lần nữa vì cảnh báo không phải lỗi.
  */
 export async function addOdometerLog(input: {
@@ -19,6 +19,7 @@ export async function addOdometerLog(input: {
   note?: string | null;
   source?: OdometerLog['source'];
 }): Promise<OdometerLog> {
+  if (!isValidNote(input.note)) throw new Error('Note must not exceed 2000 UTF-8 bytes.');
   const validation = validateOdometerReading(input.odometerKm, null);
   if (!validation.valid) throw new Error(`Odometer không hợp lệ: ${validation.error}`);
   if (input.recordedAt && Number.isNaN(Date.parse(input.recordedAt)))

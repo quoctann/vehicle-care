@@ -1,6 +1,6 @@
 # Vehicle Care — quyết định và hệ thống hiện hành
 
-**Cập nhật: 2026-10-19.** Tài liệu Markdown có thẩm quyền duy nhất trong `.docs/`;
+**Cập nhật: 2026-10-26.** Tài liệu Markdown có thẩm quyền duy nhất trong `.docs/`;
 thay thế các bản contract, tổng hợp, review và plan cũ. Đối chiếu working tree và SQL,
 không coi có code là đã nghiệm thu. Phạm vi kiểm chứng riêng tại mục 9.
 
@@ -114,6 +114,10 @@ Ràng buộc (đối chiếu `application/datasync/validation.go` và baseline S
   Fuel không có `shop`.
 - `due_soon_ratio` null dùng 0.9, nếu có thuộc `(0,1]`, SQL `numeric(4,3)`;
   `display_order` nguyên `[0,2147483647]`.
+- Repository client kiểm tra KM/baseline/service KM, interval ngày/KM, liters và
+  note/name UTF-8 byte limits trước ghi entity/outbox; form không đổi nonblank invalid
+  thành null. KM thấp hơn hiện tại vẫn chỉ cảnh báo, KM/liters thập phân vẫn được
+  server làm tròn canonical; không rewrite payload đã enqueue.
 - Reference cùng account; Fuel link Odometer cùng xe. SQL upsert hiện cho thay reference
   xe/hạng mục/link trên mutable snapshot nếu hợp lệ; không có invariant create-only
   cho các reference này như Odometer. Server kiểm tra ownership/reference trong transaction.
@@ -227,7 +231,7 @@ Account response chung:
 | `GET /auth/session` | cookie | 200 account; thiếu/hết phiên 401 session_expired |
 | `POST /auth/logout` | cookie + CSRF | 204, xóa session/cookie |
 | `POST /account/timezone` | `{timezone,expected_account_id?}` + cookie/CSRF | 200 account; timezone sai 400; stale expected account 409 trước write |
-| `POST /devices/register` | `{device_id,platform,app_version}` + cookie/CSRF | 200 `{device_id,registered_at}`, device UUID |
+| `POST /devices/register` | `{expected_account_id,device_id,platform,app_version}` + cookie/CSRF | 200 `{account_id,device_id,registered_at}`, device UUID |
 | `GET /part-types` | cookie | 200 `{part_types:[...]}` toàn catalog account kể cả inactive, chỉ đọc phụ trợ |
 
 PartType DTO: `id,code,name,display_order,active,account_id,server_seq,server_synced_at`.
@@ -258,10 +262,24 @@ vẫn giữ theo account. Chưa guest workspace trước lần login đầu.
 loại hydrate response cũ. Timezone save single-flight, kiểm tra generation/account
 trước apply và trong cache transaction; response không làm sống lại account đã logout.
 `expected_account_id` server là stale-tab precondition, không authorization source.
+Register/push/pull bắt buộc expected account UUID: thiếu/sai định dạng trả 400,
+khác account session trả 409 `validation_failed` trước application work. Success
+response chứa `account_id` từ session; client phải kiểm tra identity trước cache,
+ACK, apply feed hoặc cursor. Cookie/CSRF chung giữa các tab không thay thế precondition.
+Deploy frontend/backend contract cùng đợt; bundle cũ thiếu expected account sẽ bị từ
+chối an toàn và cần cập nhật/reload. Không chữa mismatch bằng cách bỏ/xóa outbox.
 Save server thành công/cache lỗi báo cảnh báo cache, không giả server save thất bại.
 Bootstrap dùng account metadata hiện tại, không ghi timezone/nextLocalSeq snapshot cũ
-sau network. Sync/restore guard kiểm tra vẫn authenticated và đúng account; không so
-generation nên không bảo đảm phân biệt logout/relogin cùng account như timezone save.
+sau network. Sync/restore capture account + generation trước khi đợi lock và giữ context
+xuyên operation; guard cả transaction, metadata/UI và auth cleanup. Response 401 cũ
+không được xóa cache/session của login mới, kể cả relogin cùng account. Guard trong
+tab không tự đồng bộ Zustand giữa các tab; server precondition là boundary bắt buộc.
+**Giới hạn đã chọn giữ:** authenticated middleware vẫn gia hạn `sid`/CSRF cookies
+trên mọi request để giữ sliding expiry. Response A cũ đến sau login B có thể ghi đè
+cookie B; expected-account chặn request lệch workspace/session, không giải quyết
+thứ tự `Set-Cookie`. Bỏ cookie renewal sẽ đổi browser expiry và chưa được chọn.
+Generation guard cũng không phân biệt được login mới cùng account ở tab khác;
+không coi #1/#6 là bảo đảm mọi race đăng nhập xuyên tab đã được loại bỏ.
 
 ## 6. Sync A — FIFO và full-record server-order LWW
 
@@ -277,7 +295,7 @@ Push chốt localSeq đầu lượt để hữu hạn khi user tiếp tục edit
 Client gửi **một mutation/request**; API giữ mảng, limit cấu hình mặc định 100:
 
 ```json
-{"device_id":"<UUID>","mutations":[{"mutation_id":"<UUID>","entity_type":"part_type","operation":"create","entity_id":"<UUID>","payload":{"code":"<cùng entity_id>","name":"Hạng mục mới","display_order":10,"active":true}}]}
+{"expected_account_id":"<account UUID>","device_id":"<UUID>","mutations":[{"mutation_id":"<UUID>","entity_type":"part_type","operation":"create","entity_id":"<UUID>","payload":{"code":"<cùng entity_id>","name":"Hạng mục mới","display_order":10,"active":true}}]}
 ```
 
 Không `api_version`, `base_server_seq`, `conflict_resolved` hoặc persisted watermark.
@@ -302,7 +320,7 @@ thành terminal payload rejection. Lỗi DB giữ infrastructure/retryable, khô
 missing ownership. Duplicate giữ seq/timestamp gốc (microsecond PostgreSQL).
 
 ```json
-{"results":[{"mutation_id":"<UUID>","status":"applied","server_seq":11,"server_synced_at":"2026-10-19T00:00:00Z"}]}
+{"account_id":"<account UUID>","results":[{"mutation_id":"<UUID>","status":"applied","server_seq":11,"server_synced_at":"2026-10-19T00:00:00Z"}]}
 ```
 
 | Result | Client |
@@ -318,12 +336,12 @@ operation, entity và device. Không sửa envelope để thử lại, không au
 ### Pull bounded và canonical
 
 ```text
-GET /sync/pull?after_seq=0&limit=100
-GET /sync/pull?after_seq=100&limit=100&until_seq=150
+GET /sync/pull?expected_account_id=<account UUID>&after_seq=0&limit=100
+GET /sync/pull?expected_account_id=<account UUID>&after_seq=100&limit=100&until_seq=150
 ```
 
 ```json
-{"changes":[],"next_cursor":150,"until_seq":150,"has_more":false,"server_time":"2026-10-19T00:00:00Z"}
+{"account_id":"<account UUID>","changes":[],"next_cursor":150,"until_seq":150,"has_more":false,"server_time":"2026-10-19T00:00:00Z"}
 ```
 
 Ví dụ rỗng ứng với cursor đã ở 150. Change gồm
@@ -381,6 +399,17 @@ Backend đọc `.env` server/root nếu có, không override env inject;
 tham khảo [`.env.example`](../.env.example). HTTP local: COOKIE_SECURE=false và
 FRONTEND_ORIGIN đúng origin frontend, cả port.
 
+Frontend image dùng nginx reverse proxy cùng origin; `/account/` được proxy như
+`/auth/`, `/devices/`, `/sync/` để timezone POST không rơi vào SPA fallback. Smoke
+test nginx thật: `python3 client/tests/nginx-routing/smoke.py` (Python 3 + Docker).
+Fixture upstream kiểm tra routing/headers/status, không thay real-backend auth test.
+
+PWA dùng `registerType: 'prompt'`, kiểm tra update mỗi giờ/khi foreground. Worker mới
+chờ user; reload cần xác nhận riêng của **từng tab**, kể cả khi tab khác đã activate.
+Hủy xác nhận giữ prompt/draft. Chấp nhận update cảnh báo có thể mất dữ liệu chưa lưu.
+Tab còn chạy registration auto-update cũ vẫn có thể reload trong lần chuyển đầu;
+bảo đảm mới chỉ áp dụng sau khi load code registration mới, chưa nghiệm thu iOS.
+
 `make migrate-up/down/status`, `make migrate-create name=...`; tương ứng
 `cd server && go run ./cmd/migrate up|down|status|create <name>`.
 Tên Unix timestamp + snake_case, cặp up/down. Down có thể destructive.
@@ -425,7 +454,30 @@ make build             # TS/Vite + Go
 make test-integration  # REQUIRE_POSTGRES_TESTS=1, -count=1, PG thật; thiếu Docker fail
 npm run test:coverage:contracts --prefix client
 npm run test:e2e --prefix client
+python3 client/tests/nginx-routing/smoke.py
+# PWA worker thật, production A/B builds; working directory client/
+PLAYWRIGHT_CHANNEL=chrome npx playwright test --config playwright.pwa.config.ts
 ```
+
+**Báo cáo phiên 2026-10-25–26 (client review fixes):** register/push/pull đã có required
+expected-account precondition, success response identity và client runtime check;
+sync/restore có generation/transaction guards và stale-safe 401 cleanup. HTTP tests
+kiểm tra server enforcement; two-tab browser test dùng shared cookies thật nhưng mock
+API, không được gọi là real-backend sync nghiệm thu.
+
+`make lint`, `make build`, `make test` (frontend 283 tests và toàn bộ Go `-race`) pass;
+`make test-integration` pass PostgreSQL bắt buộc với Docker. Contract gate đạt 91.70%
+statements / 86.30% branches / 100% functions / 93.82% lines trên tập file được chọn.
+Chrome E2E 7/7 pass: 2 sync và 5 native numeric-input cases cho tạo/sửa reminder,
+bao gồm `1e` có value rỗng nhưng `badInput=true`, không ghi state khi reject và save
+được sau sửa input. PWA production A/B worker 1/1 pass, cả hai tab đã nhận prompt
+trước khi chỉ một tab đồng ý, tab còn lại giữ draft/document. Nginx thật smoke pass
+method/path/query/body/headers, upstream status/JSON và SPA/assets fallback.
+
+Sliding cookie renewal và rủi ro response cookie đến sai thứ tự được **giữ theo lựa
+chọn chủ dự án**, xem mục 5; không tuyên bố đã loại mọi race auth xuyên tab. Default
+Playwright Chromium chưa có trong môi trường này, dùng Chrome hệ thống; iOS chưa test.
+Ba Fast Refresh warnings, bundle-size warning và React dev script warning còn hiện hữu.
 
 **Báo cáo phiên 2026-10-19:** frontend 154 tests pass (baseline đầu phiên 112), gồm
 negative type checks trong build và regression upgrade IndexedDB v4→v9. `make lint build`,
@@ -457,7 +509,9 @@ Artifacts ở `client/playwright-report` và `client/test-results` (gitignored).
 **Lịch sử, không bằng chứng working tree hiện tại:** review 23/09 ghi 64 rồi 80 tests,
 PG integration skip/không start Docker; báo cáo 06/10 ghi 85 frontend tests,
 Go race/lint và PG Docker integration gồm baseline up/down thành công. Chưa có
-browser multi-tab/iOS acceptance hoặc load benchmark hiện hành.
+nghiệm thu toàn diện real-backend multi-tab/auth races, iOS hoặc load benchmark.
+Phiên 25–26/10 bổ sung phạm vi Chrome multi-tab/mock sync, numeric inputs và PWA
+worker thật như trên; không thay bằng nghiệm thu toàn diện real-backend/auth/iOS.
 
 Checklist trước đóng thay đổi/phát hành:
 

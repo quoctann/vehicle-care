@@ -62,6 +62,7 @@ describe('pullChanges', () => {
     await seedSyncMeta();
     vi.mocked(api.pullChanges)
       .mockResolvedValueOnce({
+        account_id: accountId,
         changes: [vehicleChange(1, 'vehicle-1')],
         next_cursor: 1,
         until_seq: 2,
@@ -69,6 +70,7 @@ describe('pullChanges', () => {
         server_time: '2026-09-17T10:00:10.000Z',
       })
       .mockResolvedValueOnce({
+        account_id: accountId,
         changes: [vehicleChange(2, 'vehicle-2')],
         next_cursor: 2,
         until_seq: 2,
@@ -79,10 +81,12 @@ describe('pullChanges', () => {
     await pullChanges(accountId);
 
     expect(api.pullChanges).toHaveBeenNthCalledWith(1, {
+      expectedAccountId: accountId,
       afterSeq: 0,
       limit: 100,
     });
     expect(api.pullChanges).toHaveBeenNthCalledWith(2, {
+      expectedAccountId: accountId,
       afterSeq: 1,
       limit: 100,
       untilSeq: 2,
@@ -109,6 +113,7 @@ describe('pullChanges', () => {
       serverSeq: null,
     });
     const page: PullResponse = {
+      account_id: accountId,
       changes: [vehicleChange(1, 'would-be-inserted'), vehicleChange(2, 'collision')],
       next_cursor: 2,
       until_seq: 2,
@@ -141,6 +146,7 @@ describe('pullChanges', () => {
       createdAt: '2026-09-17T10:00:00.000Z',
     });
     vi.mocked(api.pullChanges).mockResolvedValueOnce({
+      account_id: accountId,
       changes: [],
       next_cursor: 1,
       until_seq: 1,
@@ -155,6 +161,7 @@ describe('pullChanges', () => {
   it('rejects an empty page that claims more changes without advancing the cursor', async () => {
     await seedSyncMeta();
     vi.mocked(api.pullChanges).mockResolvedValueOnce({
+      account_id: accountId,
       changes: [],
       next_cursor: 0,
       until_seq: 1,

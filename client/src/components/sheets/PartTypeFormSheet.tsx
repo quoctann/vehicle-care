@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isValidPartTypeName } from '@/domain/validation';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -29,7 +30,7 @@ export function PartTypeFormSheet({
 
   async function save() {
     const trimmed = name.trim();
-    if (!trimmed || trimmed.length > 200) {
+    if (!isValidPartTypeName(trimmed)) {
       setError(t('partType.invalidName'));
       return;
     }

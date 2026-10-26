@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { BellRing, CalendarDays, Gauge, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -17,12 +17,12 @@ import { Switch } from '@/components/ui/switch';
 import type { ReminderWithStatus } from '@/data/queries/reminderQueries';
 import { formatNumber } from '@/lib/formatters';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
-
-function optionalPositiveNumber(value: string): number | null {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
+import {
+  MAX_INTERVAL_DAYS,
+  MAX_ODOMETER_KM,
+  parseOptionalNumber,
+  validateReminderInterval,
+} from '@/domain/validation';
 
 export type ReminderManagementProps = {
   vehicleName: string;
@@ -54,6 +54,8 @@ export function ReminderManagement({
   const [intervalDays, setIntervalDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intervalKmInput = useRef<HTMLInputElement>(null);
+  const intervalDaysInput = useRef<HTMLInputElement>(null);
 
   function startEditing(reminder: ReminderWithStatus) {
     setEditing(reminder);
@@ -64,10 +66,23 @@ export function ReminderManagement({
 
   async function save() {
     if (!editing) return;
-    const km = optionalPositiveNumber(intervalKm);
-    const days = optionalPositiveNumber(intervalDays);
-    if (km == null && days == null) {
-      setError(t('reminder.positiveInterval'));
+    // An empty value can still contain incomplete numeric text in the browser.
+    if (intervalKmInput.current?.validity.badInput) return setError(t('reminder.intervalKmRange'));
+    if (intervalDaysInput.current?.validity.badInput)
+      return setError(t('reminder.intervalDaysRange'));
+    const km = parseOptionalNumber(intervalKm);
+    const days = parseOptionalNumber(intervalDays);
+    const validation = validateReminderInterval(km, days);
+    if (!validation.valid) {
+      setError(
+        t(
+          validation.error === 'missing_interval'
+            ? 'reminder.positiveInterval'
+            : validation.error === 'interval_km_not_positive'
+              ? 'reminder.intervalKmRange'
+              : 'reminder.intervalDaysRange',
+        ),
+      );
       return;
     }
     setBusy(true);
@@ -209,9 +224,12 @@ export function ReminderManagement({
               <Label htmlFor="reminder-km">{t('reminder.distanceInterval')}</Label>
               <Input
                 id="reminder-km"
+                ref={intervalKmInput}
                 inputMode="numeric"
                 type="number"
-                min="1"
+                min="0"
+                max={MAX_ODOMETER_KM}
+                step="any"
                 value={intervalKm}
                 onChange={(event) => setIntervalKm(event.target.value)}
                 placeholder="VD: 5000"
@@ -221,9 +239,12 @@ export function ReminderManagement({
               <Label htmlFor="reminder-days">{t('reminder.dayInterval')}</Label>
               <Input
                 id="reminder-days"
+                ref={intervalDaysInput}
                 inputMode="numeric"
                 type="number"
                 min="1"
+                max={MAX_INTERVAL_DAYS}
+                step="1"
                 value={intervalDays}
                 onChange={(event) => setIntervalDays(event.target.value)}
                 placeholder="VD: 180"

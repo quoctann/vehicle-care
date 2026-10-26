@@ -58,6 +58,7 @@ beforeEach(async () => {
     serverSeq: 10,
   });
   vi.mocked(api.registerDevice).mockResolvedValue({
+    account_id: accountId,
     device_id: 'stable-device',
     registered_at: timestamp,
   });
@@ -79,6 +80,7 @@ it('applies canonical odometer fields after the ACK set the same server version'
     recordedAt: timestamp,
   });
   vi.mocked(api.pushMutations).mockImplementation(async ({ mutations }) => ({
+    account_id: accountId,
     results: [
       {
         mutation_id: mutations[0].mutation_id,
@@ -103,6 +105,7 @@ it('applies canonical odometer fields after the ACK set the same server version'
     server_synced_at: timestamp,
   };
   vi.mocked(api.pullChanges).mockResolvedValue({
+    account_id: accountId,
     changes: [change],
     next_cursor: 11,
     until_seq: 11,
@@ -126,6 +129,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
   vi.mocked(api.pullChanges).mockImplementationOnce(async () => {
     await updateVehicle(accountId, vehicleId, { name: 'New local edit' });
     return {
+      account_id: accountId,
       changes: [
         {
           entity_type: 'vehicle',
@@ -154,6 +158,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
   });
   expect(useSyncStore.getState().status).toBe('pending');
   vi.mocked(api.pushMutations).mockImplementation(async ({ mutations }) => ({
+    account_id: accountId,
     results: [
       {
         mutation_id: mutations[0].mutation_id,
@@ -164,6 +169,7 @@ it('defers a racing pull without disabling auto-sync, then completes the next sy
     ],
   }));
   vi.mocked(api.pullChanges).mockResolvedValue({
+    account_id: accountId,
     changes: [
       {
         entity_type: 'vehicle',
@@ -192,6 +198,7 @@ it('leaves new work after the push high watermark pending without recording a fa
   vi.mocked(api.pushMutations).mockImplementationOnce(async ({ mutations }) => {
     await updateVehicle(accountId, vehicleId, { name: 'Later edit' });
     return {
+      account_id: accountId,
       results: [
         {
           mutation_id: mutations[0].mutation_id,
@@ -219,6 +226,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
   await updateVehicle(accountId, vehicleId, { name: 'Rejected edit' });
   const original = (await db.outbox.toArray())[0];
   vi.mocked(api.pushMutations).mockResolvedValueOnce({
+    account_id: accountId,
     results: [
       { mutation_id: original.mutationId, status: 'rejected', error_message: 'Invalid vehicle' },
     ],
@@ -228,6 +236,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
 
   const fixed = await repairBlockedMutation(original.mutationId, { name: 'Fixed' });
   vi.mocked(api.pushMutations).mockResolvedValueOnce({
+    account_id: accountId,
     results: [
       {
         mutation_id: fixed.mutationId,
@@ -238,6 +247,7 @@ it('repairs a rejected mutation and completes push then pull without leaving a b
     ],
   });
   vi.mocked(api.pullChanges).mockResolvedValueOnce({
+    account_id: accountId,
     changes: [
       {
         entity_type: 'vehicle',
@@ -266,10 +276,12 @@ it('restores a blocked workspace from cursor zero through the real pull pipeline
   await updateVehicle(accountId, vehicleId, { name: 'Discard me' });
   const item = (await db.outbox.toArray())[0];
   vi.mocked(api.pushMutations).mockResolvedValueOnce({
+    account_id: accountId,
     results: [{ mutation_id: item.mutationId, status: 'rejected', error_message: 'Bad data' }],
   });
   await expect(runSync()).rejects.toThrow('Bad data');
   vi.mocked(api.pullChanges).mockResolvedValueOnce({
+    account_id: accountId,
     changes: [
       {
         entity_type: 'part_type',
@@ -301,7 +313,11 @@ it('restores a blocked workspace from cursor zero through the real pull pipeline
 
   await restoreFromServer(accountId);
 
-  expect(api.pullChanges).toHaveBeenCalledWith({ afterSeq: 0, limit: 100 });
+  expect(api.pullChanges).toHaveBeenCalledWith({
+    expectedAccountId: accountId,
+    afterSeq: 0,
+    limit: 100,
+  });
   expect(await db.outbox.count()).toBe(0);
   expect((await db.vehicles.get(vehicleId))?.name).toBe('Server truth');
   expect(await db.partTypes.get('seed-part')).toBeDefined();
@@ -319,6 +335,7 @@ it('retries the same device and envelope after a lost response and changed local
   vi.mocked(api.pushMutations)
     .mockRejectedValueOnce(new TypeError('Failed to fetch'))
     .mockResolvedValueOnce({
+      account_id: accountId,
       results: [
         {
           mutation_id: item.mutationId,
@@ -331,6 +348,7 @@ it('retries the same device and envelope after a lost response and changed local
   await expect(runSync()).rejects.toThrow('Failed to fetch');
   vi.stubGlobal('localStorage', { getItem: () => 'replacement-device', setItem: vi.fn() });
   vi.mocked(api.pullChanges).mockResolvedValueOnce({
+    account_id: accountId,
     changes: [
       {
         entity_type: 'vehicle',

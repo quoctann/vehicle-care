@@ -2,7 +2,12 @@ import * as api from '@/api/client';
 import { db, type SyncMeta } from '@/data/db';
 import { getOrCreateDeviceId } from '@/lib/deviceId';
 import { useSessionStore, type SessionAccount } from '@/stores/useSessionStore';
-import { assertActiveSyncAccount } from './sessionGuard';
+import {
+  captureSyncSession,
+  assertCurrentSyncSession,
+  assertSyncResponseAccount,
+  type SyncSessionContext,
+} from './sessionGuard';
 
 export type SyncBootstrap = {
   accountId: string;
@@ -10,15 +15,12 @@ export type SyncBootstrap = {
 };
 
 /** Registers this installation and creates the account-scoped local sync bookkeeping. */
-export async function bootstrapSync(account: SessionAccount): Promise<SyncBootstrap> {
-  assertActiveSyncAccount(account.id);
-  const generation = useSessionStore.getState().sessionGeneration;
-  const assertCurrent = () => {
-    assertActiveSyncAccount(account.id);
-    if (useSessionStore.getState().sessionGeneration !== generation) {
-      throw new Error('The active session changed during sync bootstrap.');
-    }
-  };
+export async function bootstrapSync(
+  account: SessionAccount,
+  context: SyncSessionContext = captureSyncSession(account.id),
+): Promise<SyncBootstrap> {
+  const assertCurrent = () => assertCurrentSyncSession(context);
+  assertCurrent();
   const deviceId = await db.transaction('rw', db.syncMeta, async () => {
     const existing = await db.syncMeta.get(account.id);
     assertCurrent();
@@ -43,12 +45,13 @@ export async function bootstrapSync(account: SessionAccount): Promise<SyncBootst
     return deviceId;
   });
   assertCurrent();
-  await api.registerDevice({
+  const response = await api.registerDevice({
+    expected_account_id: context.accountId,
     device_id: deviceId,
     platform: 'web',
     app_version: '0.1.0',
   });
-  assertCurrent();
+  assertSyncResponseAccount(response, context);
 
   await db.transaction('rw', [db.syncMeta, db.accountCache], async () => {
     const current = await db.syncMeta.get(account.id);

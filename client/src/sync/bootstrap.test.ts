@@ -28,11 +28,30 @@ it('caches the latest session profile rather than the captured bootstrap account
   vi.mocked(api.registerDevice).mockImplementation(async () => {
     // Profile updates do not represent a new login/session generation.
     useSessionStore.setState({ account: { ...account, timezone: 'Asia/Tokyo' } });
-    return { device_id: 'device-1', registered_at: new Date().toISOString() };
+    return {
+      account_id: account.id,
+      device_id: 'device-1',
+      registered_at: new Date().toISOString(),
+    };
   });
   await bootstrapSync(account);
   expect(await db.accountCache.get('current')).toMatchObject({ timezone: 'Asia/Tokyo' });
 });
+
+it.each([undefined, 'another-account'])(
+  'rejects registration identity %s before caching',
+  async (identity) => {
+    useSessionStore.getState().setAuthenticated(account);
+    vi.stubGlobal('localStorage', { getItem: () => 'device-1', setItem: vi.fn() });
+    vi.mocked(api.registerDevice).mockResolvedValue({
+      account_id: identity,
+      device_id: 'device-1',
+      registered_at: new Date().toISOString(),
+    } as Awaited<ReturnType<typeof api.registerDevice>>);
+    await expect(bootstrapSync(account)).rejects.toThrow(/account/i);
+    expect(await db.accountCache.get('current')).toBeUndefined();
+  },
+);
 
 it.each(['switch', 'relogin'])('does not cache a bootstrap result after %s', async (change) => {
   useSessionStore.getState().setAuthenticated(account);
@@ -42,7 +61,11 @@ it.each(['switch', 'relogin'])('does not cache a bootstrap result after %s', asy
     useSessionStore
       .getState()
       .setAuthenticated({ ...account, id: change === 'switch' ? 'account-2' : account.id });
-    return { device_id: 'device-1', registered_at: new Date().toISOString() };
+    return {
+      account_id: account.id,
+      device_id: 'device-1',
+      registered_at: new Date().toISOString(),
+    };
   });
   await expect(bootstrapSync(account)).rejects.toThrow(/changed/i);
   expect(await db.accountCache.get('current')).toBeUndefined();
@@ -52,6 +75,7 @@ it('aborts cache writes if the session changes inside the bootstrap transaction'
   useSessionStore.getState().setAuthenticated(account);
   vi.stubGlobal('localStorage', { getItem: () => 'device-1', setItem: vi.fn() });
   vi.mocked(api.registerDevice).mockResolvedValue({
+    account_id: account.id,
     device_id: 'device-1',
     registered_at: new Date().toISOString(),
   });
@@ -88,7 +112,11 @@ it('does not move nextLocalSeq backwards when a local write happens during devic
     () =>
       new Promise((resolve) => {
         finishRegistration = () =>
-          resolve({ device_id: 'device-1', registered_at: new Date().toISOString() });
+          resolve({
+            account_id: account.id,
+            device_id: 'device-1',
+            registered_at: new Date().toISOString(),
+          });
       }),
   );
 
@@ -116,6 +144,7 @@ it('preserves the IndexedDB device identity when localStorage has been cleared o
     bootstrapState: 'ready',
   });
   vi.mocked(api.registerDevice).mockResolvedValue({
+    account_id: account.id,
     device_id: 'original-device',
     registered_at: new Date().toISOString(),
   });

@@ -120,11 +120,13 @@ export function pushMutations(req: PushRequest): Promise<PushResponse> {
 }
 
 export function pullChanges(params: {
+  expectedAccountId: string;
   afterSeq: number;
   limit: number;
   untilSeq?: number;
 }): Promise<PullResponse> {
   const query = new URLSearchParams({
+    expected_account_id: params.expectedAccountId,
     after_seq: String(params.afterSeq),
     limit: String(params.limit),
   });

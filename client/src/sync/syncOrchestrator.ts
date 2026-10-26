@@ -6,66 +6,81 @@ import { useSyncStore } from '@/stores/useSyncStore';
 import { bootstrapSync } from './bootstrap';
 import { pullChanges } from './pull';
 import { pushOutbox, SyncBlockedError, SyncRetryableError } from './push';
-import { assertActiveSyncAccount } from './sessionGuard';
+import {
+  captureSyncSession,
+  assertCurrentSyncSession,
+  isCurrentSyncSession,
+  updateSyncMetadata,
+  expireSyncSession,
+  type SyncSessionContext,
+} from './sessionGuard';
 import { withAccountSyncLock } from './accountLock';
 
-let inFlight: { accountId: string; promise: Promise<void> } | null = null;
+const inFlight = new Map<string, Promise<void>>();
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Sync failed';
 }
 
-async function deferSync(accountId: string): Promise<void> {
-  await db.syncMeta.update(accountId, { lastSyncError: null, lastSyncFailureKind: null });
-  if (useSessionStore.getState().account?.id === accountId) useSyncStore.getState().setPending();
+async function deferSync(context: SyncSessionContext): Promise<void> {
+  await updateSyncMetadata(context, { lastSyncError: null, lastSyncFailureKind: null });
+  if (isCurrentSyncSession(context)) useSyncStore.getState().setPending();
 }
 
 async function performSync(
   account: NonNullable<ReturnType<typeof useSessionStore.getState>['account']>,
+  context: SyncSessionContext,
 ): Promise<void> {
+  assertCurrentSyncSession(context);
   useSyncStore.getState().setSyncing();
-  await db.syncMeta
-    .update(account.id, { lastSyncError: null, lastSyncFailureKind: null })
-    .catch(() => undefined);
+  await updateSyncMetadata(context, { lastSyncError: null, lastSyncFailureKind: null }).catch(
+    () => undefined,
+  );
 
   try {
-    const { accountId, deviceId } = await bootstrapSync(account);
-    assertActiveSyncAccount(accountId);
-    await pushOutbox(deviceId, accountId);
-    assertActiveSyncAccount(accountId);
+    assertCurrentSyncSession(context);
+    const { accountId, deviceId } = await bootstrapSync(account, context);
+    assertCurrentSyncSession(context);
+    await pushOutbox(deviceId, accountId, context);
+    assertCurrentSyncSession(context);
 
     const unresolvedBeforePull = await countUnresolvedOutboxForAccount(accountId);
+    assertCurrentSyncSession(context);
     if (unresolvedBeforePull > 0) {
       const next = await getNextOutboxItem(accountId);
+      assertCurrentSyncSession(context);
       if (next?.status === 'blocked')
         throw new SyncBlockedError(next, next.lastError ?? 'Mutation needs attention');
-      await deferSync(accountId);
+      await deferSync(context);
       return;
     }
 
-    const pullResult = await pullChanges(accountId);
-    assertActiveSyncAccount(accountId);
+    const pullResult = await pullChanges(accountId, context);
+    assertCurrentSyncSession(context);
     if (pullResult === 'deferred') {
-      await deferSync(accountId);
+      await deferSync(context);
       return;
     }
 
     const syncedAt = new Date().toISOString();
     const clean = await db.transaction('rw', db.outbox, db.syncMeta, async () => {
       const clean = (await countUnresolvedOutboxForAccount(accountId)) === 0;
+      assertCurrentSyncSession(context);
       await db.syncMeta.update(accountId, {
         ...(clean ? { lastSyncedAt: syncedAt } : {}),
         lastSyncError: null,
         lastSyncFailureKind: null,
         bootstrapState: 'ready',
       });
+      assertCurrentSyncSession(context);
       return clean;
     });
-    if (useSessionStore.getState().account?.id === accountId) {
+    if (isCurrentSyncSession(context)) {
       if (clean) useSyncStore.getState().setSynced(syncedAt);
       else useSyncStore.getState().setPending();
     }
   } catch (error) {
+    if (!isCurrentSyncSession(context)) throw error;
     const message = errorMessage(error);
     const failureKind =
       error instanceof SyncBlockedError
@@ -73,17 +88,12 @@ async function performSync(
         : error instanceof ApiError && !error.retryable
           ? 'terminal'
           : 'retryable';
-    await db.syncMeta
-      .update(account.id, { lastSyncError: message, lastSyncFailureKind: failureKind })
-      .catch(() => undefined);
-    if (
-      error instanceof ApiError &&
-      (error.status === 401 || error.code === 'session_expired' || error.code === 'auth_invalid')
-    ) {
-      await db.accountCache.delete('current').catch(() => undefined);
-      useSessionStore.getState().clear();
-    }
-    if (useSessionStore.getState().account?.id === account.id) {
+    await updateSyncMetadata(context, {
+      lastSyncError: message,
+      lastSyncFailureKind: failureKind,
+    }).catch(() => undefined);
+    await expireSyncSession(error, context);
+    if (isCurrentSyncSession(context)) {
       if (error instanceof SyncBlockedError) useSyncStore.getState().setBlocked(message);
       else if (
         error instanceof SyncRetryableError ||
@@ -101,15 +111,15 @@ async function performSync(
 export function runSync(): Promise<void> {
   const { status, account } = useSessionStore.getState();
   if (status !== 'authenticated' || !account) return Promise.resolve();
-
-  if (inFlight) {
-    if (inFlight.accountId === account.id) return inFlight.promise;
-    return inFlight.promise.catch(() => undefined).then(runSync);
-  }
-
-  const promise = withAccountSyncLock(account.id, () => performSync(account)).finally(() => {
-    if (inFlight?.promise === promise) inFlight = null;
-  });
-  inFlight = { accountId: account.id, promise };
+  const context = captureSyncSession(account.id);
+  const key = JSON.stringify([context.accountId, context.sessionGeneration]);
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+  const promise = withAccountSyncLock(account.id, () => performSync(account, context)).finally(
+    () => {
+      if (inFlight.get(key) === promise) inFlight.delete(key);
+    },
+  );
+  inFlight.set(key, promise);
   return promise;
 }

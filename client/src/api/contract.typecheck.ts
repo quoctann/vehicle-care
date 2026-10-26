@@ -1,8 +1,41 @@
 // Compiled by tsconfig.app.json (and `npm run build`), never executed.
-import type { PullChange, PushMutation, SyncPayloadMap } from './contract.types';
+import type {
+  PullChange,
+  PushMutation,
+  SyncPayloadMap,
+  PushRequest,
+  RegisterDeviceRequest,
+  PullResponse,
+  PushResponse,
+  RegisterDeviceResponse,
+} from './contract.types';
 import { enqueueMutation } from '@/data/outbox';
 import { vehicleToPayload } from '@/data/mappers';
 import type { Vehicle } from '@/domain/types';
+
+export function accountBindingTypeChecks() {
+  // @ts-expect-error old unbound clients must not compile
+  const push: PushRequest = { device_id: 'device', mutations: [] };
+  // @ts-expect-error registration requires the captured account
+  const registration: RegisterDeviceRequest = {
+    device_id: 'device',
+    platform: 'web',
+    app_version: 'test',
+  };
+  // @ts-expect-error successful responses require runtime-verifiable identity
+  const pushResponse: PushResponse = { results: [] };
+  // @ts-expect-error successful registration requires identity
+  const registrationResponse: RegisterDeviceResponse = { device_id: 'device', registered_at: '' };
+  // @ts-expect-error successful pull requires identity
+  const pullResponse: PullResponse = {
+    changes: [],
+    next_cursor: 0,
+    until_seq: 0,
+    has_more: false,
+    server_time: '',
+  };
+  return [push, registration, pushResponse, registrationResponse, pullResponse];
+}
 
 export function contractTypeChecks(vehicle: Vehicle, payloads: SyncPayloadMap) {
   const base = { mutation_id: 'm', entity_id: 'e', operation: 'create' as const };

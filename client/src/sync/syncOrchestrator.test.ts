@@ -28,6 +28,47 @@ afterEach(async () => {
 });
 
 describe('runSync', () => {
+  it.each(['switch', 'relogin'])('ignores an old 401 after %s', async (change) => {
+    const account = {
+      id: 'account-1',
+      email: 'a@example.com',
+      name: null,
+      timezone: 'UTC',
+      emailVerified: true,
+    };
+    useSessionStore.getState().setAuthenticated(account);
+    let rejectRequest!: (error: unknown) => void;
+    vi.mocked(bootstrapSync).mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectRequest = reject;
+        }),
+    );
+    const old = runSync();
+    const rejected = expect(old).rejects.toThrow('Expired');
+    await vi.waitFor(() => expect(rejectRequest).toBeTypeOf('function'));
+    useSessionStore.getState().clear();
+    useSessionStore
+      .getState()
+      .setAuthenticated({ ...account, id: change === 'switch' ? 'account-2' : account.id });
+    const generation = useSessionStore.getState().sessionGeneration;
+    useSyncStore.getState().setSynced('new-session');
+    rejectRequest(
+      new ApiError(
+        {
+          error: { code: 'session_expired', message: 'Expired', retryable: false, request_id: 'r' },
+        },
+        401,
+      ),
+    );
+    await rejected;
+    expect(useSessionStore.getState()).toMatchObject({
+      status: 'authenticated',
+      sessionGeneration: generation,
+    });
+    expect(useSyncStore.getState().status).toBe('synced');
+  });
+
   it('deduplicates concurrent runs and pushes before pulling', async () => {
     const calls: string[] = [];
     useSessionStore.setState({

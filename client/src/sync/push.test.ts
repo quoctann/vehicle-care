@@ -83,7 +83,10 @@ describe('pushOutbox', () => {
       const original = outboxItem({ payload: { name: 'Legacy', unknown_field: ['🔧'] } });
       await db.outbox.add(original);
       // Deliberately malformed HTTP JSON: static declarations do not validate it.
-      vi.mocked(api.pushMutations).mockResolvedValue(response as unknown as PushResponse);
+      vi.mocked(api.pushMutations).mockResolvedValue({
+        account_id: accountId,
+        ...response,
+      } as unknown as PushResponse);
       await expect(pushOutbox('device', accountId)).rejects.toThrow();
       expect(await db.outbox.get(original.mutationId)).toEqual(original);
       expect(vi.mocked(api.pushMutations).mock.calls[0][0].mutations[0].payload).toEqual(
@@ -103,6 +106,7 @@ describe('pushOutbox', () => {
     await db.vehicles.put(vehicle('vehicle-1', 'Local'));
     await db.outbox.add(outboxItem({}));
     vi.mocked(api.pushMutations).mockResolvedValue({
+      account_id: accountId,
       results: [
         {
           mutation_id: 'mutation-1',
@@ -116,6 +120,7 @@ describe('pushOutbox', () => {
     await pushOutbox(deviceId, accountId);
 
     expect(api.pushMutations).toHaveBeenCalledWith({
+      expected_account_id: accountId,
       device_id: deviceId,
       mutations: [
         {
@@ -136,6 +141,7 @@ describe('pushOutbox', () => {
       outboxItem({ mutationId: 'mutation-2', localSeq: 2, payload: { name: 'Latest' } }),
     ]);
     vi.mocked(api.pushMutations).mockImplementation(async ({ mutations }) => ({
+      account_id: accountId,
       results: [
         {
           mutation_id: mutations[0].mutation_id,
@@ -162,6 +168,7 @@ describe('pushOutbox', () => {
       outboxItem({ mutationId: 'mutation-2', localSeq: 2 }),
     ]);
     vi.mocked(api.pushMutations).mockResolvedValue({
+      account_id: accountId,
       results: [
         { mutation_id: 'mutation-1', status: 'retryable_error', error_message: 'Try later' },
       ],
@@ -182,6 +189,7 @@ describe('pushOutbox', () => {
     await db.vehicles.put(vehicle('vehicle-1', 'Local'));
     await db.outbox.add(outboxItem({ mutationId: 'mutation-blocked' }));
     vi.mocked(api.pushMutations).mockResolvedValue({
+      account_id: accountId,
       results: [
         { mutation_id: 'mutation-blocked', status: 'rejected', error_message: 'Invalid vehicle' },
       ],
@@ -233,6 +241,7 @@ describe('pushOutbox', () => {
     ]);
     vi.mocked(api.pushMutations)
       .mockResolvedValueOnce({
+        account_id: accountId,
         results: [
           {
             mutation_id: 'mutation-old',
@@ -243,6 +252,7 @@ describe('pushOutbox', () => {
         ],
       })
       .mockResolvedValueOnce({
+        account_id: accountId,
         results: [
           {
             mutation_id: 'mutation-new',
@@ -268,6 +278,7 @@ describe('pushOutbox', () => {
     vi.mocked(api.pushMutations).mockImplementationOnce(async () => {
       await db.outbox.add(outboxItem({ mutationId: 'mutation-later', localSeq: 2 }));
       return {
+        account_id: accountId,
         results: [
           {
             mutation_id: 'mutation-1',
