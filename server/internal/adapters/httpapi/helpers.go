@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
-	"go.uber.org/zap"
+	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
 )
 
 func (s *Server) bind(c *gin.Context, destination any) bool {
@@ -27,7 +27,7 @@ func (s *Server) bind(c *gin.Context, destination any) bool {
 func (s *Server) writeError(c *gin.Context, err error) {
 	appErr, ok := app.AsError(err)
 	if !ok {
-		s.logger.Error("request failed", zap.Error(err), zap.String("request_id", c.GetString(requestIDKey)))
+		s.logger.Error("request failed", logging.ContextFields(c.Request.Context())...)
 		s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
 		return
 	}
@@ -55,7 +55,7 @@ func (s *Server) writeError(c *gin.Context, err error) {
 		status = http.StatusInternalServerError
 
 	default:
-		s.logger.Error("request failed with unknown error code", zap.String("code", appErr.Code), zap.String("request_id", c.GetString(requestIDKey)))
+		s.logger.Error("request failed with unknown error code", logging.ContextFields(c.Request.Context())...)
 		status = http.StatusInternalServerError
 		code = app.ECInternalError
 		message = "Internal server error."

@@ -26,6 +26,7 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 	"github.com/quoctann/vehicle-care/server/internal/platform/config"
 	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
+	"github.com/quoctann/vehicle-care/server/internal/platform/observability"
 	"go.uber.org/zap"
 )
 
@@ -44,27 +45,46 @@ var _ datasync.IPorts = (*Datasource)(nil)
 var _ httpapi.IOAuthStateStore = (*redisadapter.Store)(nil)
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "API stopped due to a startup or server error")
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	logger, err := logging.New(cfg.Environment)
+	logger, err := logging.NewWithFile(cfg.Environment, cfg.LogFile)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer func() { _ = logger.Sync() }()
+	shutdownTelemetry, err := observability.Init(context.Background(), cfg.Observability)
+	if err != nil {
+		return fmt.Errorf("initialize observability")
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(ctx); err != nil {
+			// Export errors may contain collector endpoint/credential details.
+			logger.Warn("telemetry shutdown incomplete")
+		}
+	}()
 
 	if cfg.AutoMigrate {
 		if err := runAutoMigrate(cfg); err != nil {
-			logger.Fatal("auto migrate", zap.Error(err))
+			return fmt.Errorf("auto migrate")
 		}
 		logger.Info("auto migrate: schema up to date")
 	}
 
 	source, pingers, close, err := buildDatasource(context.Background(), cfg)
 	if err != nil {
-		logger.Fatal("init datasource", zap.Error(err))
+		return fmt.Errorf("initialize datasource")
 	}
 	defer close()
 
@@ -74,7 +94,7 @@ func main() {
 		googleProvider, err = googleadapter.New(ctx, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
 		cancel()
 		if err != nil {
-			logger.Fatal("initialize Google OIDC")
+			return fmt.Errorf("initialize Google OIDC")
 		}
 	}
 
@@ -96,6 +116,7 @@ func main() {
 		User:        userService,
 		Google:      user.NewGoogleService(userService, source, googleProvider),
 		AuthLimiter: source,
+		APILimiter:  source,
 		DataSync:    datasync.NewService(source, cfg.SyncMaxBatchSize, cfg.SyncMaxPageSize),
 	}
 	api := httpapi.New(svc, cfg, logger, pingers...)
@@ -109,21 +130,32 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 
-	go func() {
-		logger.Info("server listening", zap.String("address", cfg.Address()), zap.String("frontend_origin", cfg.FrontendOrigin))
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("serve HTTP", zap.Error(err))
-		}
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	return serve(ctx, server, logger)
+}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
+// serve returns errors rather than calling Fatal, allowing adapter/telemetry
+// cleanup to run on listener failure as well as normal process cancellation.
+func serve(ctx context.Context, server *http.Server, logger *zap.Logger) error {
+	errorsCh := make(chan error, 1)
+	go func() { errorsCh <- server.ListenAndServe() }()
+	logger.Info("server listening", zap.String("address", server.Addr))
+	select {
+	case err := <-errorsCh:
+		if !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("serve HTTP")
+		}
+		return nil
+	case <-ctx.Done():
+	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful shutdown", zap.Error(err))
+		_ = server.Close()
+		return fmt.Errorf("graceful shutdown")
 	}
+	return nil
 }
 
 func runAutoMigrate(cfg config.Config) error {

@@ -1,4 +1,28 @@
 services:
+  lgtm:
+    image: grafana/otel-lgtm:0.29.0
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - vehicle_lgtm_data:/data
+      - ./observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/vehicle-care.yaml:ro
+      - ./observability/dashboard.json:/otel-lgtm/grafana/conf/provisioning/dashboards/vehicle-care/api.json:ro
+
+  alloy:
+    image: grafana/alloy:v1.14.0
+    profiles: [observability]
+    environment:
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-vehicle-care-api}
+      APP_ENV: ${APP_ENV:-development}
+    command: ["run", "--storage.path=/var/lib/alloy/data", "/etc/alloy/config.alloy"]
+    volumes:
+      - ./observability/config.alloy:/etc/alloy/config.alloy:ro
+      - ./.logs:/logs:ro
+      - vehicle_alloy_data:/var/lib/alloy/data
+    depends_on: [lgtm]
+
   mailpit:
     image: axllent/mailpit:v1.27
     restart: unless-stopped
@@ -39,4 +63,6 @@ services:
       retries: 10
 
 volumes:
+  vehicle_lgtm_data:
+  vehicle_alloy_data:
   vehicle_postgres_data:

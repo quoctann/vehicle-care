@@ -2,8 +2,6 @@ package redis
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
@@ -43,11 +41,4 @@ func (s *Store) TakeGoogleState(ctx context.Context, key string) (user.GoogleSta
 		return state, false, err
 	}
 	return state, true, nil
-}
-
-// Both increment and expiry are atomic; Redis failure always denies authentication.
-func (s *Store) AllowAuth(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
-	sum := sha256.Sum256([]byte(key))
-	n, err := s.client.Eval(ctx, `local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('PEXPIRE',KEYS[1],ARGV[1]) end; return n`, []string{"auth:limit:" + hex.EncodeToString(sum[:])}, window.Milliseconds()).Int64()
-	return err == nil && n <= int64(limit), err
 }

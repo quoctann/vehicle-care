@@ -214,8 +214,8 @@ Không bearer/JWT. Protected POST so cookie và `X-CSRF-Token` với CSRF token 
 public auth POST không qua middleware CSRF này. CORS origin chính xác/credentials,
 body tối đa 1 MiB. Authorization lấy account từ session, device đăng ký cùng account;
 không lộ entity account khác. Không log password/token/payload nhạy cảm; trace bằng
-request ID, không trả lỗi SQL. Auth có rate limiting qua Redis, lỗi limiter fail closed;
-không coi đây là rate limiting toàn bộ API sync/account.
+request ID, không trả lỗi SQL. Rate limiting dùng token bucket atomic trong Redis,
+fail closed; có quota API chung và quota auth riêng (chi tiết §8 bên dưới).
 Các auth POST công khai, Google start và link chung quota 30 request/IP/phút;
 link thêm quota 5 request/account/15 phút. Vượt quota trả 429 `rate_limited`, Redis
 limiter lỗi trả 503 `internal_error`; Google start redirect `unavailable` trong cả
@@ -260,7 +260,7 @@ cùng mục đích/account. Token lưu dạng hash trong Redis, không trả tok
 | `validation_failed` | 400; CSRF 403; body quá lớn 413; duplicate email/stale account 409 / false |
 | `ownership_invalid` | 403 / false; có thể là per-mutation error trong push HTTP 200 |
 | `internal_error` | 500; unknown error/panic trả true, nhưng application error qua writeError hiện trả false |
-| `rate_limited` | 429 cho auth JSON endpoints; OAuth redirect dùng mã lỗi frontend allowlist |
+| `rate_limited` | 429 / true cho API/auth JSON endpoints; có `Retry-After`; OAuth redirect dùng mã lỗi frontend allowlist |
 
 Health có body riêng: `/health/live` 200 `{status:"ok"}`;
 `/health/ready` ping PG+Redis, 200 ready hoặc 503 unavailable.
@@ -528,6 +528,73 @@ Redis Compose tắt persistence, chỉ dành dev; production cần quyết đị
 phù hợp (ví dụ AOF) vì mất Redis làm mất session/token, không mất dữ liệu xe PostgreSQL.
 SQL/codegen: [server/db/README.md](../server/db/README.md).
 
+### Token bucket và Grafana LGTM
+
+Tham khảo [`quoctann/content-hub` tại `71fc185`](https://github.com/quoctann/content-hub/tree/71fc1855a09b6cf4fbfc87e4e98296c3fe2ce97a) (token bucket, trace correlation và nguyên tắc
+redact SQL); ở đây bucket lưu Redis thay vì memory để chia quota giữa replica.
+Mỗi phép refill/consume chạy một Lua script atomic với đồng hồ Redis; subject hash
+trong namespace mới, key tự hết hạn khi bucket có thể đầy trở lại. Không reset
+session, không migrate SQL và không xóa key limiter cũ khi deploy.
+
+- Quota API theo IP: `API_RATE_LIMIT_PER_MINUTE=600`, `API_RATE_LIMIT_BURST=120`.
+  Auth giữ bucket riêng 30 token, refill 30/phút; link 5 token, refill 5/15 phút;
+  email recipient 3 token, refill 3/giờ. **Đây là refill liên tục, không phải hard
+  cap rolling-window**: cho phép burst ban đầu rồi phục hồi dần.
+- Health, OPTIONS và Google callback không dùng quota API. Callback vẫn bắt buộc
+  state/browser binding hợp lệ. Chỉ tin forwarding headers từ `TRUSTED_PROXIES`.
+- Throttle trả 429 `rate_limited`, retryable, `Retry-After` (giây làm tròn lên);
+  Redis lỗi trả 503, không fallback cho qua. Google start vẫn redirect `unavailable`.
+  Nhiều user chung NAT/proxy chia bucket IP; đặt trusted proxies đúng, điều chỉnh
+  quota theo tải thật. Sync lớn có thể bị throttle; outbox giữ nguyên và retry thủ
+  công cùng mutation identity, không tự bỏ hay reorder work.
+
+Telemetry mặc định tắt (`OTEL_ENABLED=false`), không phải dependency của readiness.
+Khi bật, traces và metrics đi **OTLP HTTP/protobuf** tới collector theo biến
+`OTEL_EXPORTER_OTLP_ENDPOINT` (host local `http://localhost:4318`, container dùng
+DNS collector, không dùng localhost của container). TLS/headers cấu hình theo
+OTEL exporter chuẩn; credentials phải inject từ secret manager. Resource service
+name mặc định `vehicle-care-api`. Không expose OTLP/Grafana công khai không auth.
+
+Local (không thay `.env` đang có):
+
+```bash
+make dev-infra
+make dev-observability
+make dev-be-observed
+# frontend chạy riêng: make dev-fe
+```
+
+Grafana `http://localhost:3000` (development-only admin/admin), dashboard **Vehicle
+Care API** được provision sẵn. Explore → Tempo
+để tìm service; Prometheus để xem HTTP request count/duration; Loki query
+`{service_name="vehicle-care-api"} | json`. JSON logs có `request_id`, `trace_id`,
+`span_id`; trace ID là metadata, không indexed stream label. Alloy chỉ đọc
+`server/.logs/api.json`, không mount Docker socket hoặc toàn bộ host logs. Nếu đổi
+`OTEL_SERVICE_NAME`/`APP_ENV`, export cùng giá trị cho cả Make/Compose và API;
+dashboard mặc định lọc log `vehicle-care-api` cần đổi theo tên service mới.
+`make dev-observability-down` dừng collector/backend, không xóa volume.
+
+Production dùng LGTM/Alloy được vận hành riêng, không dùng all-in-one dev image.
+Collect JSON stdout bằng agent hiện có; `LOG_FILE` chỉ tiện local và không có
+rotation nội bộ, cần retention/logrotate hoặc tắt file output khi chạy lâu.
+Metrics dùng route template/unmatched và label hữu hạn; không account/IP/request ID.
+Traces/log HTTP không thu query OAuth, raw URL/body/cookie, Redis keys/arguments,
+SQL/parameters hoặc raw dependency error. Chỉ request ID/path template/status và
+trace context phục vụ correlation. Health không tạo telemetry HTTP.
+Sampling `OTEL_TRACE_SAMPLE_RATIO=0.1` mặc định; remote parent từ client vẫn theo
+ratio local, không được ép bật/tắt sampling bằng `traceparent`. Child span trong
+process theo parent. Local smoke đặt 1 để lấy mọi trace. Log có trace ID không bảo
+đảm trace được sampled/lưu Tempo.
+SDK shutdown flush có deadline sau khi drain HTTP; collector outage không chặn API.
+Không có profiling trong scope này; LGTM gồm Loki/Grafana/Tempo và metrics backend
+Prometheus local hoặc Mimir/Prometheus production.
+
+Smoke toàn đường truyền thật, Docker bắt buộc:
+`python3 server/tests/observability/smoke.py`. Dùng PostgreSQL/Redis/LGTM/Alloy
+disposable và port loopback động; kiểm tra 429/Retry-After, health miễn quota,
+metrics ở Prometheus, trace ở Tempo, log correlation ở Loki và redaction secrets.
+Không dùng DB hay file env local, không xem test mock là bằng chứng LGTM thực tế.
+
 ### Cấu hình Google Auth Platform
 
 1. Tạo/chọn Google Cloud project, khuyến nghị tách development và production.
@@ -624,6 +691,25 @@ python3 server/tests/mail-flow/smoke.py
 # PWA worker thật, production A/B builds; working directory client/
 PLAYWRIGHT_CHANNEL=chrome npx playwright test --config playwright.pwa.config.ts
 ```
+
+**Báo cáo token bucket/LGTM 26/10/2026:** Redis token bucket dùng chung replica,
+quota API/auth riêng, Retry-After và fail-closed đã triển khai. OTLP HTTP traces/
+metrics, PostgreSQL/Redis child spans, JSON trace-correlated logs qua Alloy→Loki,
+dev LGTM profile và dashboard đã có. Smoke `server/tests/observability/smoke.py`
+pass với backend/PG/Redis/LGTM/Alloy thật: 429, health miễn quota, tên metrics đúng
+dashboard, Tempo/Loki correlation và redaction canary. Exporter diagnostics được
+sanitize; caller không thể override sampling bằng sampled flag của remote parent.
+
+`make lint-be build-be` pass; race tests phần thay đổi pass, kể cả shutdown đợi
+request đang chạy. `make test-be` **chưa xanh toàn bộ**: test có sẵn
+`TestGoogleSignupRollsBackFailedSeedAndInvalidIdentity` fail `empty subject accepted`.
+Đã reproduce cùng lỗi tại clean worktree của HEAD gốc `1b17aa5`; không sửa Google
+identity/schema ngoài scope. Toàn bộ Go suite còn lại pass khi dùng
+`go test -race -coverprofile=... -skip '^TestGoogleSignupRollsBackFailedSeedAndInvalidIdentity$' ./...`.
+Coverage statements tập logic mới (HTTP/Redis limiter, HTTP/dependency telemetry,
+config mới, logging và observability init): **188/192 = 97,92%**; không phải coverage
+toàn backend. Không thay frontend, sync/outbox payload, migration hay prototype HTML.
+Production collector/TLS/auth/retention và load tuning vẫn cần nghiệm thu riêng.
 
 **Báo cáo email verification/reset 26/10/2026:** SMTP plain-text + HTML, Mailpit local,
 route public verify/reset, recovery generic có response budget và auth-version

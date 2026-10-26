@@ -36,16 +36,18 @@ func (d Database) DSN() string {
 }
 
 type Config struct {
-	Environment         string        `env:"APP_ENV" envDefault:"development"`
-	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
-	HTTPPort            string        `env:"HTTP_PORT" envDefault:"8080"`
-	FrontendOrigin      string        `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
-	FrontendRedirectURL string        `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
-	CookieSecure        bool          `env:"COOKIE_SECURE" envDefault:"false"`
-	CookieDomain        string        `env:"COOKIE_DOMAIN"`
-	SessionTTL          time.Duration `env:"SESSION_TTL" envDefault:"720h"`
-	SyncMaxBatchSize    int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
-	SyncMaxPageSize     int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+	Environment           string        `env:"APP_ENV" envDefault:"development"`
+	HTTPHost              string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
+	HTTPPort              string        `env:"HTTP_PORT" envDefault:"8080"`
+	FrontendOrigin        string        `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
+	FrontendRedirectURL   string        `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
+	CookieSecure          bool          `env:"COOKIE_SECURE" envDefault:"false"`
+	CookieDomain          string        `env:"COOKIE_DOMAIN"`
+	SessionTTL            time.Duration `env:"SESSION_TTL" envDefault:"720h"`
+	SyncMaxBatchSize      int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
+	SyncMaxPageSize       int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+	APIRateLimitPerMinute int           `env:"API_RATE_LIMIT_PER_MINUTE" envDefault:"600"`
+	APIRateLimitBurst     int           `env:"API_RATE_LIMIT_BURST" envDefault:"120"`
 	// AutoMigrate applies pending schema migrations before the API starts
 	// listening. Local dev convenience only — defaults off so production/k8s
 	// keeps migrations as a separate, explicit deploy step (see
@@ -54,7 +56,9 @@ type Config struct {
 	// run.
 	AutoMigrate bool `env:"AUTO_MIGRATE" envDefault:"false"`
 
-	Database Database
+	Database      Database
+	Observability Observability
+	LogFile       string `env:"LOG_FILE"`
 
 	RedisAddr         string        `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 	RedisPassword     string        `env:"REDIS_PASSWORD"`
@@ -95,6 +99,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if err := cfg.ValidateGoogle(); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.ValidateRateLimit(); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.Observability.Validate(); err != nil {
 		return Config{}, err
 	}
 	return cfg, cfg.ValidateMail()

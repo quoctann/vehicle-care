@@ -37,6 +37,7 @@ type Server struct {
 	datasyncService *datasync.Service
 	googleService   *user.GoogleService
 	authLimiter     AuthLimiter
+	apiLimiter      RateLimiter
 }
 
 type Service struct {
@@ -44,6 +45,7 @@ type Service struct {
 	DataSync    *datasync.Service
 	Google      *user.GoogleService
 	AuthLimiter AuthLimiter
+	APILimiter  RateLimiter
 }
 
 func New(svc *Service, cfg config.Config, logger *zap.Logger, pingers ...IPinger) *Server {
@@ -59,6 +61,10 @@ func New(svc *Service, cfg config.Config, logger *zap.Logger, pingers ...IPinger
 		datasyncService: svc.DataSync,
 		googleService:   svc.Google,
 		authLimiter:     svc.AuthLimiter,
+		apiLimiter:      svc.APILimiter,
+	}
+	if s.apiLimiter == nil {
+		s.apiLimiter, _ = svc.AuthLimiter.(RateLimiter)
 	}
 
 	router := gin.New()
@@ -71,10 +77,11 @@ func New(svc *Service, cfg config.Config, logger *zap.Logger, pingers ...IPinger
 	}
 	router.Use(
 		s.requestID(),
+		s.telemetry(),
+		s.accessLog(),
+		s.recovery(),
 		s.cors(),
 		s.limitBody(),
-		s.recovery(),
-		s.accessLog(),
 	)
 	s.router = router
 	s.routes()
@@ -87,6 +94,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
+	s.router.Use(s.rateAPI())
 	s.router.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	s.router.GET("/health/ready", s.ready)
 

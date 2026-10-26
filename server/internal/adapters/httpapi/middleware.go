@@ -98,7 +98,7 @@ func (s *Server) recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				s.logger.Error("request panic", zap.Any("panic", recovered), zap.String("request_id", c.GetString(requestIDKey)))
+				s.logger.Error("request panic", logging.ContextFields(c.Request.Context())...)
 				s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
 				c.Abort()
 			}
@@ -111,12 +111,12 @@ func (s *Server) accessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		started := time.Now()
 		c.Next()
-		s.logger.Info("http request",
-			zap.String("request_id", c.GetString(requestIDKey)),
-			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
+		fields := append(logging.ContextFields(c.Request.Context()),
+			zap.String("method", boundedMethod(c.Request.Method)),
+			zap.String("route", telemetryRoute(c)),
 			zap.Int("status", c.Writer.Status()),
 			zap.Duration("latency", time.Since(started)),
 		)
+		s.logger.Info("http request", fields...)
 	}
 }

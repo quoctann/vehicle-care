@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -14,38 +13,6 @@ import (
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 )
-
-type AuthLimiter interface {
-	AllowAuth(context.Context, string, int, time.Duration) (bool, error)
-}
-
-func (s *Server) rateAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if s.authLimiter == nil {
-			c.Next()
-			return
-		}
-		ok, err := s.authLimiter.AllowAuth(c.Request.Context(), "ip:"+c.ClientIP(), 30, time.Minute)
-		if err != nil || !ok {
-			if c.Request.URL.Path == "/auth/google/start" {
-				s.googleRedirect(c, "login", "unavailable")
-			} else {
-				s.writeAuthLimitError(c, err)
-			}
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
-func (s *Server) writeAuthLimitError(c *gin.Context, err error) {
-	status, code := http.StatusTooManyRequests, app.ECRateLimited
-	if err != nil {
-		status, code = http.StatusServiceUnavailable, app.ECInternalError
-	}
-	s.writeAPIError(c, status, code, "Authentication temporarily unavailable.", true)
-}
 
 func googleHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
@@ -123,12 +90,10 @@ func (s *Server) googleLink(c *gin.Context) {
 		s.writeAPIError(c, http.StatusServiceUnavailable, app.ECInternalError, "Google linking is unavailable.", true)
 		return
 	}
-	if s.authLimiter != nil {
-		ok, err := s.authLimiter.AllowAuth(c.Request.Context(), "link:"+mustAccount(c).ID, 5, 15*time.Minute)
-		if err != nil || !ok {
-			s.writeAuthLimitError(c, err)
-			return
-		}
+	ok, retry, limitErr := s.allowAuth(c.Request.Context(), "link:"+mustAccount(c).ID, 5, 15*time.Minute)
+	if limitErr != nil || !ok {
+		s.rejectRate(c, limitErr, retry)
+		return
 	}
 	var req struct {
 		Password string `json:"password" binding:"required"`
