@@ -52,9 +52,11 @@ func (s *Service) allowMail(ctx context.Context, email string) bool {
 	if s.mail == nil {
 		return true
 	} // Existing non-delivery application consumers.
+
 	if s.mail.limiter == nil {
 		return false
 	} // Fail closed in configured delivery mode.
+
 	digest := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email))))
 	ok, err := s.mail.limiter.AllowAuth(ctx, "mail:recipient:"+hex.EncodeToString(digest[:]), 3, time.Hour)
 	return err == nil && ok
@@ -66,16 +68,19 @@ func (s *Service) sendTokenMail(ctx context.Context, email string, kind TokenKin
 	if s.mail == nil || s.mail.sender == nil {
 		return
 	}
+
 	path, subject, ttl := "/verify-email", "Verify your Vehicle Care email", "24 hours"
 	if kind == TokenKindReset {
 		path, subject, ttl = "/reset-password", "Reset your Vehicle Care password", "30 minutes"
 	}
+
 	link := s.mail.frontendURL + path + "#" + url.Values{"token": []string{token}}.Encode()
 	text := subject + "\n\nOpen this link to continue:\n" + link + "\n\nThis link expires in " + ttl + ". If you did not request this email, you can ignore it.\n"
 	html, err := renderTokenHTML(subject, link, ttl)
 	if err != nil {
 		return
 	}
+
 	sendCtx, cancel := context.WithTimeout(ctx, s.mail.timeout)
 	defer cancel()
 	_ = s.mail.sender.Send(sendCtx, MailMessage{To: email, Subject: subject, Text: text, HTML: html, Purpose: string(kind)})

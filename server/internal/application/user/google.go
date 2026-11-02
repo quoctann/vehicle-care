@@ -66,14 +66,14 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 			return "", googleError("unavailable")
 		}
 		if !ok || session == nil || expected == "" || expected != session.AccountID {
-			return "", &app.Error{Code: app.ECConflict, Message: "Account changed. Sign in again."}
+			return "", &app.Error{Code: app.ErrConflict, Message: "Account changed. Sign in again."}
 		}
 		a, err := s.user.ports.AccountByID(ctx, session.AccountID)
 		if err != nil {
 			return "", googleError("unavailable")
 		}
 		if a == nil || session.AuthVersion <= 0 || session.AuthVersion != a.AuthVersion || len(password) > 72 || bcrypt.CompareHashAndPassword(a.PasswordHash, []byte(password)) != nil {
-			return "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid credentials."}
+			return "", &app.Error{Code: app.ErrAuthInvalid, Message: "Invalid credentials."}
 		}
 		linked, err := s.ports.GoogleLinked(ctx, a.ID)
 		if err != nil {

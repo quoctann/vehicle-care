@@ -35,7 +35,7 @@ func (s *Service) Push(ctx context.Context, accountID string, deviceID string, m
 		return nil, err
 	}
 	if !registered {
-		return nil, &app.Error{Code: app.ECOwnershipInvalid, Message: "Device is not registered to this account."}
+		return nil, &app.Error{Code: app.ErrOwnershipInvalid, Message: "Device is not registered to this account."}
 	}
 
 	results := make([]domain.MutationResult, 0, len(mutations))
@@ -77,7 +77,7 @@ func (s *Service) Pull(ctx context.Context, accountID string, afterSeq int64, li
 		return domain.PullPage{}, err
 	}
 	if page == nil {
-		return domain.PullPage{}, &app.Error{Code: app.ECInternalError, Message: "Pull store returned no page."}
+		return domain.PullPage{}, &app.Error{Code: app.ErrInternalError, Message: "Pull store returned no page."}
 	}
 
 	return *page, nil
@@ -91,7 +91,7 @@ func (s *Service) ListPartTypes(ctx context.Context, accountID string) ([]domain
 	values := make([]domain.PartType, 0, len(partTypes))
 	for _, partType := range partTypes {
 		if partType == nil {
-			return nil, &app.Error{Code: app.ECInternalError, Message: "Part type store returned an invalid entry."}
+			return nil, &app.Error{Code: app.ErrInternalError, Message: "Part type store returned an invalid entry."}
 		}
 		values = append(values, *partType)
 	}
@@ -104,5 +104,5 @@ func rejected(mutationID string, code domain.MutationErrorCode, message string) 
 }
 
 func validation(message string) error {
-	return &app.Error{Code: app.ECValidationFailed, Message: message}
+	return &app.Error{Code: app.ErrValidationFailed, Message: message}
 }

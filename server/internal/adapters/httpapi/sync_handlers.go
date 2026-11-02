@@ -48,7 +48,7 @@ func (s *Server) push(c *gin.Context) {
 		return
 	}
 	if len(request.Mutations) == 0 {
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "mutations must not be empty.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "mutations must not be empty.", false)
 		return
 	}
 
@@ -81,13 +81,13 @@ func (s *Server) pull(c *gin.Context) {
 
 	afterSeq, err := strconv.ParseInt(c.DefaultQuery("after_seq", "0"), 10, 64)
 	if err != nil {
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "after_seq is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "after_seq is invalid.", false)
 		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	if err != nil {
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "limit is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "limit is invalid.", false)
 		return
 	}
 
@@ -95,7 +95,7 @@ func (s *Server) pull(c *gin.Context) {
 	if rawUntilSeq, ok := c.GetQuery("until_seq"); ok {
 		parsedUntilSeq, parseErr := strconv.ParseInt(rawUntilSeq, 10, 64)
 		if parseErr != nil {
-			s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "until_seq is invalid.", false)
+			s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "until_seq is invalid.", false)
 			return
 		}
 		untilSeq = &parsedUntilSeq
@@ -120,11 +120,11 @@ func (s *Server) pull(c *gin.Context) {
 func (s *Server) requireSyncAccount(c *gin.Context, expectedAccountID string) bool {
 	expected, err := uuid.Parse(expectedAccountID)
 	if err != nil {
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "expected_account_id must be a UUID.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "expected_account_id must be a UUID.", false)
 		return false
 	}
 	if expected.String() != mustAccount(c).ID {
-		s.writeAPIError(c, http.StatusConflict, app.ECValidationFailed, "The session changed. Refresh and try again.", false)
+		s.writeAPIError(c, http.StatusConflict, app.ErrValidationFailed, "The session changed. Refresh and try again.", false)
 		return false
 	}
 	return true

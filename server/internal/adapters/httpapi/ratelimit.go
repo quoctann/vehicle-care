@@ -100,9 +100,9 @@ func (s *Server) rejectRate(c *gin.Context, err error, retry time.Duration) {
 }
 
 func (s *Server) writeAuthLimitError(c *gin.Context, err error) {
-	status, code := http.StatusTooManyRequests, app.ECRateLimited
+	status, code := http.StatusTooManyRequests, app.ErrRateLimited
 	if err != nil {
-		status, code = http.StatusServiceUnavailable, app.ECInternalError
+		status, code = http.StatusServiceUnavailable, app.ErrInternalError
 	}
 	s.writeAPIError(c, status, code, "Requests temporarily unavailable.", true)
 }

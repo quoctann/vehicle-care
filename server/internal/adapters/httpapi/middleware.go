@@ -16,7 +16,7 @@ func (s *Server) requireSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionID, err := c.Cookie("sid")
 		if err != nil {
-			s.writeAPIError(c, http.StatusUnauthorized, app.ECSessionExpired, "Session expired or missing.", false)
+			s.writeAPIError(c, http.StatusUnauthorized, app.ErrSessionExpired, "Session expired or missing.", false)
 			c.Abort()
 			return
 		}
@@ -44,7 +44,7 @@ func (s *Server) requireCSRF() gin.HandlerFunc {
 		headerToken := c.GetHeader("X-CSRF-Token")
 
 		if err != nil || cookieToken == "" || headerToken == "" || cookieToken != session.CSRFToken || headerToken != session.CSRFToken {
-			s.writeAPIError(c, http.StatusForbidden, app.ECValidationFailed, "Invalid CSRF token.", false)
+			s.writeAPIError(c, http.StatusForbidden, app.ErrValidationFailed, "Invalid CSRF token.", false)
 			c.Abort()
 			return
 		}
@@ -99,7 +99,7 @@ func (s *Server) recovery() gin.HandlerFunc {
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				s.logger.Error("request panic", logging.ContextFields(c.Request.Context())...)
-				s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
+				s.writeAPIError(c, http.StatusInternalServerError, app.ErrInternalError, "Internal server error.", true)
 				c.Abort()
 			}
 		}()

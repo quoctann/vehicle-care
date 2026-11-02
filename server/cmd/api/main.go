@@ -62,6 +62,7 @@ func run() error {
 		return err
 	}
 	defer func() { _ = logger.Sync() }()
+
 	shutdownTelemetry, err := observability.Init(context.Background(), cfg.Observability)
 	if err != nil {
 		return fmt.Errorf("initialize observability")
@@ -135,12 +136,11 @@ func run() error {
 	return serve(ctx, server, logger)
 }
 
-// serve returns errors rather than calling Fatal, allowing adapter/telemetry
-// cleanup to run on listener failure as well as normal process cancellation.
 func serve(ctx context.Context, server *http.Server, logger *zap.Logger) error {
 	errorsCh := make(chan error, 1)
 	go func() { errorsCh <- server.ListenAndServe() }()
 	logger.Info("server listening", zap.String("address", server.Addr))
+
 	select {
 	case err := <-errorsCh:
 		if !errors.Is(err, http.ErrServerClosed) {
@@ -149,12 +149,15 @@ func serve(ctx context.Context, server *http.Server, logger *zap.Logger) error {
 		return nil
 	case <-ctx.Done():
 	}
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		_ = server.Close()
 		return fmt.Errorf("graceful shutdown")
 	}
+
 	return nil
 }
 

@@ -42,7 +42,7 @@ func TestUpdateTimezoneValidationAndPersistence(t *testing.T) {
 			deps := &timezoneDependencies{}
 			_, err := NewService(deps, time.Hour).UpdateTimezone(context.Background(), "account", zone)
 			var appErr *app.Error
-			if !errors.As(err, &appErr) || appErr.Code != app.ECValidationFailed || deps.calls != 0 {
+			if !errors.As(err, &appErr) || appErr.Code != app.ErrValidationFailed || deps.calls != 0 {
 				t.Fatalf("expected validation without persistence, got %v, calls=%d", err, deps.calls)
 			}
 		})
@@ -79,8 +79,8 @@ func TestUpdateTimezoneStoreErrors(t *testing.T) {
 		err  error
 		code string
 	}{
-		{ErrAccountNotFound, app.ECSessionExpired},
-		{errors.New("private database details"), app.ECInternalError},
+		{ErrAccountNotFound, app.ErrSessionExpired},
+		{errors.New("private database details"), app.ErrInternalError},
 	} {
 		_, err := NewService(&timezoneDependencies{err: test.err}, time.Hour).UpdateTimezone(context.Background(), "account", "UTC+00:00")
 		var appErr *app.Error

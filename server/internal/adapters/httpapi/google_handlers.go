@@ -18,23 +18,27 @@ func googleHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Referrer-Policy", "no-referrer")
 }
+
 func (s *Server) googleRedirect(c *gin.Context, purpose, code string) {
 	googleHeaders(c)
 	path := "/sign-in?google_error="
 	if purpose == "link" {
 		path = "/settings?google_error="
 	}
+
 	switch code {
 	case "cancelled", "expired", "email_exists", "identity_linked", "already_linked", "unavailable", "failed":
 	default:
 		code = "failed"
 	}
+
 	c.Redirect(http.StatusFound, strings.TrimRight(s.cfg.FrontendRedirectURL, "/")+path+code)
 }
 func (s *Server) googleCookie(c *gin.Context, state, value string, age int) {
 	if state == "" || len(state) > 256 {
 		return
 	}
+
 	c.SetSameSite(http.SameSiteLaxMode)
 	// __Host prevents sibling-subdomain cookie tossing over HTTPS.
 	path := "/auth/google"
@@ -53,24 +57,29 @@ func (s *Server) googleCookieName(state string) string {
 	}
 	return "google_browser_" + suffix
 }
+
 func (s *Server) setGoogleTransactionCookie(c *gin.Context, authorizationURL, browser string) bool {
 	u, err := url.Parse(authorizationURL)
 	if err != nil {
 		return false
 	}
+
 	state := u.Query().Get("state")
 	if state == "" || len(state) > 256 {
 		return false
 	}
+
 	s.googleCookie(c, state, browser, int(user.GoogleStateTTL.Seconds()))
 	return true
 }
+
 func (s *Server) googleStart(c *gin.Context) {
 	googleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
 		s.googleRedirect(c, "login", "unavailable")
 		return
 	}
+
 	browser := user.NewGoogleBrowserBinding()
 	sid, _ := c.Cookie("sid")
 	url, err := s.googleService.Begin(c.Request.Context(), browser, "login", sid, "", "")
@@ -78,23 +87,28 @@ func (s *Server) googleStart(c *gin.Context) {
 		s.googleRedirect(c, "login", user.GoogleErrorCode(err))
 		return
 	}
+
 	if !s.setGoogleTransactionCookie(c, url, browser) {
 		s.googleRedirect(c, "login", "failed")
 		return
 	}
+
 	c.Redirect(http.StatusFound, url)
 }
+
 func (s *Server) googleLink(c *gin.Context) {
 	googleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
-		s.writeAPIError(c, http.StatusServiceUnavailable, app.ECInternalError, "Google linking is unavailable.", true)
+		s.writeAPIError(c, http.StatusServiceUnavailable, app.ErrInternalError, "Google linking is unavailable.", true)
 		return
 	}
+
 	ok, retry, limitErr := s.allowAuth(c.Request.Context(), "link:"+mustAccount(c).ID, 5, 15*time.Minute)
 	if limitErr != nil || !ok {
 		s.rejectRate(c, limitErr, retry)
 		return
 	}
+
 	var req struct {
 		Password string `json:"password" binding:"required"`
 		Expected string `json:"expected_account_id" binding:"required"`
@@ -102,6 +116,7 @@ func (s *Server) googleLink(c *gin.Context) {
 	if !s.bind(c, &req) {
 		return
 	}
+
 	browser := user.NewGoogleBrowserBinding()
 	url, err := s.googleService.Begin(c.Request.Context(), browser, "link", c.GetString(sessionIDKey), req.Expected, req.Password)
 	if err != nil {
@@ -115,15 +130,18 @@ func (s *Server) googleLink(c *gin.Context) {
 		if code == "unavailable" {
 			status = 503
 		}
-		s.writeAPIError(c, status, app.ECValidationFailed, code, false)
+		s.writeAPIError(c, status, app.ErrValidationFailed, code, false)
 		return
 	}
+
 	if !s.setGoogleTransactionCookie(c, url, browser) {
-		s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Google linking is unavailable.", true)
+		s.writeAPIError(c, http.StatusInternalServerError, app.ErrInternalError, "Google linking is unavailable.", true)
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"authorization_url": url})
 }
+
 func (s *Server) googleCallback(c *gin.Context) {
 	googleHeaders(c)
 	state := c.Query("state")
@@ -138,6 +156,7 @@ func (s *Server) googleCallback(c *gin.Context) {
 		s.googleRedirect(c, purpose, "unavailable")
 		return
 	}
+
 	// Consume the transaction even on provider cancellation/error.
 	code := c.Query("code")
 	if c.Query("error") != "" {
@@ -148,35 +167,39 @@ func (s *Server) googleCallback(c *gin.Context) {
 		s.googleRedirect(c, result.Purpose, user.GoogleErrorCode(err))
 		return
 	}
+
 	path := "/"
 	if result.Purpose == "link" {
 		path = "/settings?google=linked"
 	} else {
 		s.setAuthCookies(c, result.SessionID, result.CSRFToken)
 	}
+
 	c.Redirect(http.StatusFound, strings.TrimRight(s.cfg.FrontendRedirectURL, "/")+path)
 }
 func (s *Server) googleStatus(c *gin.Context) {
 	googleHeaders(c)
-	a := mustAccount(c)
+	acc := mustAccount(c)
 	expected := c.Query("expected_account_id")
 	if expected == "" {
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "expected_account_id is required.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "expected_account_id is required.", false)
 		return
 	}
-	if expected != a.ID {
-		s.writeAPIError(c, http.StatusConflict, app.ECValidationFailed, "The session changed. Refresh and try again.", false)
+	if expected != acc.ID {
+		s.writeAPIError(c, http.StatusConflict, app.ErrValidationFailed, "The session changed. Refresh and try again.", false)
 		return
 	}
+
 	linked := false
-	hasPassword := len(a.PasswordHash) > 0
+	hasPassword := len(acc.PasswordHash) > 0
 	if s.googleService != nil {
 		var err error
-		linked, hasPassword, err = s.googleService.Status(c.Request.Context(), a.ID)
+		linked, hasPassword, err = s.googleService.Status(c.Request.Context(), acc.ID)
 		if err != nil {
-			s.writeAPIError(c, 503, app.ECInternalError, "Authentication temporarily unavailable.", true)
+			s.writeAPIError(c, 503, app.ErrInternalError, "Authentication temporarily unavailable.", true)
 			return
 		}
 	}
+
 	c.JSON(http.StatusOK, gin.H{"enabled": s.cfg.GoogleOAuthEnabled, "linked": linked, "has_password": hasPassword})
 }

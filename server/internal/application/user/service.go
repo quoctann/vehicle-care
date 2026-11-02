@@ -34,13 +34,13 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Acc
 	account, err := s.ports.AccountByEmail(ctx, strings.TrimSpace(email))
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
-			return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
+			return domain.Account{}, "", "", &app.Error{Code: app.ErrAuthInvalid, Message: "Invalid email or password."}
 		}
-		return domain.Account{}, "", "", &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return domain.Account{}, "", "", &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 
 	if account == nil || bcrypt.CompareHashAndPassword(account.PasswordHash, []byte(password)) != nil {
-		return domain.Account{}, "", "", &app.Error{Code: app.ECAuthInvalid, Message: "Invalid email or password."}
+		return domain.Account{}, "", "", &app.Error{Code: app.ErrAuthInvalid, Message: "Invalid email or password."}
 	}
 
 	sessionID, csrfToken, err := s.createSession(ctx, *account)
@@ -51,7 +51,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Acc
 func (s *Service) VerifyEmail(ctx context.Context, token string) error {
 	accountID, ok, err := s.ports.ConsumeToken(ctx, "verification", token, s.now())
 	if err != nil {
-		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
+		return &app.Error{Code: app.ErrInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
 		return validation("Verification token is invalid or expired.")
@@ -68,10 +68,10 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 
 	existing, err := s.ports.AccountByEmail(ctx, email)
 	if err == nil && existing != nil {
-		return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
+		return domain.Account{}, "", "", "", &app.Error{Code: app.ErrConflict, Message: "Email is already registered."}
 	}
 	if err != nil && !errors.Is(err, ErrAccountNotFound) {
-		return domain.Account{}, "", "", "", &app.Error{Code: app.ECInternalError, Message: "Store is unavailable."}
+		return domain.Account{}, "", "", "", &app.Error{Code: app.ErrInternalError, Message: "Store is unavailable."}
 	}
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -89,7 +89,7 @@ func (s *Service) Signup(ctx context.Context, email, password string, name *stri
 	}
 	if err := s.ports.CreateAccount(ctx, account); err != nil {
 		if errors.Is(err, ErrAccountExists) {
-			return domain.Account{}, "", "", "", &app.Error{Code: app.ECConflict, Message: "Email is already registered."}
+			return domain.Account{}, "", "", "", &app.Error{Code: app.ErrConflict, Message: "Email is already registered."}
 		}
 		return domain.Account{}, "", "", "", err
 	}
@@ -119,7 +119,7 @@ func (s *Service) CreateVerificationToken(ctx context.Context, email string) (st
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
 		}
-		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return "", false, &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 
 	if account == nil || account.EmailVerified {
@@ -146,7 +146,7 @@ func (s *Service) CreateResetToken(ctx context.Context, email string) (string, b
 		if errors.Is(err, ErrAccountNotFound) {
 			return "", false, nil
 		}
-		return "", false, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return "", false, &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 
 	// Google-only accounts remain passwordless; forgot-password is still generic.
@@ -176,7 +176,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 
 	subject, ok, err := s.ports.ConsumeToken(ctx, TokenKindReset, token, s.now())
 	if err != nil {
-		return &app.Error{Code: app.ECInternalError, Message: "Token store is unavailable."}
+		return &app.Error{Code: app.ErrInternalError, Message: "Token store is unavailable."}
 	}
 	if !ok {
 		return validation("Password reset token is invalid or expired.")
@@ -188,7 +188,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 	}
 	account, err := s.ports.AccountByID(ctx, accountID)
 	if err != nil {
-		return &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 	if account == nil || len(account.PasswordHash) == 0 || account.AuthVersion != version {
 		return validation("Password reset token is invalid or expired.")
@@ -211,20 +211,20 @@ func (s *Service) ResetPassword(ctx context.Context, token, password string) err
 func (s *Service) ResolveSession(ctx context.Context, sessionID string) (domain.Session, domain.Account, error) {
 	session, found, err := s.ports.GetAndRefreshSession(ctx, sessionID, s.now(), s.now().Add(s.sessionTTL))
 	if err != nil {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Session store is unavailable."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ErrInternalError, Message: "Session store is unavailable."}
 	}
 	if !found || session == nil {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ErrSessionExpired, Message: "Session expired or missing."}
 	}
 	account, err := s.ports.AccountByID(ctx, session.AccountID)
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
-			return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
+			return domain.Session{}, domain.Account{}, &app.Error{Code: app.ErrSessionExpired, Message: "Session expired or missing."}
 		}
-		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 	if account == nil || session.AuthVersion <= 0 || session.AuthVersion != account.AuthVersion {
-		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
+		return domain.Session{}, domain.Account{}, &app.Error{Code: app.ErrSessionExpired, Message: "Session expired or missing."}
 	}
 
 	return *session, *account, nil
@@ -267,5 +267,5 @@ func validPassword(value string) bool {
 }
 
 func validation(message string) error {
-	return &app.Error{Code: app.ECValidationFailed, Message: message}
+	return &app.Error{Code: app.ErrValidationFailed, Message: message}
 }
