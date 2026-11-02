@@ -14,13 +14,13 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
 )
 
-func googleHeaders(c *gin.Context) {
+func addGoogleHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Referrer-Policy", "no-referrer")
 }
 
 func (s *Server) googleRedirect(c *gin.Context, purpose, code string) {
-	googleHeaders(c)
+	addGoogleHeaders(c)
 	path := "/sign-in?google_error="
 	if purpose == "link" {
 		path = "/settings?google_error="
@@ -34,6 +34,7 @@ func (s *Server) googleRedirect(c *gin.Context, purpose, code string) {
 
 	c.Redirect(http.StatusFound, strings.TrimRight(s.cfg.FrontendRedirectURL, "/")+path+code)
 }
+
 func (s *Server) googleCookie(c *gin.Context, state, value string, age int) {
 	if state == "" || len(state) > 256 {
 		return
@@ -47,6 +48,7 @@ func (s *Server) googleCookie(c *gin.Context, state, value string, age int) {
 	}
 	c.SetCookie(s.googleCookieName(state), value, age, path, "", s.cfg.CookieSecure, true)
 }
+
 func (s *Server) googleCookieName(state string) string {
 	// Each transaction owns a distinct cookie, so an older callback cannot
 	// overwrite or clear another pending browser binding. Names reveal no state.
@@ -74,7 +76,7 @@ func (s *Server) setGoogleTransactionCookie(c *gin.Context, authorizationURL, br
 }
 
 func (s *Server) googleStart(c *gin.Context) {
-	googleHeaders(c)
+	addGoogleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
 		s.googleRedirect(c, "login", "unavailable")
 		return
@@ -97,7 +99,7 @@ func (s *Server) googleStart(c *gin.Context) {
 }
 
 func (s *Server) googleLink(c *gin.Context) {
-	googleHeaders(c)
+	addGoogleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
 		s.writeAPIError(c, http.StatusServiceUnavailable, app.ErrInternalError, "Google linking is unavailable.", true)
 		return
@@ -143,7 +145,7 @@ func (s *Server) googleLink(c *gin.Context) {
 }
 
 func (s *Server) googleCallback(c *gin.Context) {
-	googleHeaders(c)
+	addGoogleHeaders(c)
 	state := c.Query("state")
 	browser, _ := c.Cookie(s.googleCookieName(state))
 	sid, _ := c.Cookie("sid")
@@ -177,8 +179,9 @@ func (s *Server) googleCallback(c *gin.Context) {
 
 	c.Redirect(http.StatusFound, strings.TrimRight(s.cfg.FrontendRedirectURL, "/")+path)
 }
+
 func (s *Server) googleStatus(c *gin.Context) {
-	googleHeaders(c)
+	addGoogleHeaders(c)
 	acc := mustAccount(c)
 	expected := c.Query("expected_account_id")
 	if expected == "" {

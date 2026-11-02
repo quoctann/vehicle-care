@@ -37,11 +37,13 @@ func GoogleErrorCode(err error) string {
 	if errors.As(err, &e) {
 		return string(e)
 	}
+
 	for _, v := range []error{ErrGoogleEmailExists, ErrGoogleIdentityLinked, ErrGoogleAlreadyLinked} {
 		if errors.Is(err, v) {
 			return v.Error()
 		}
 	}
+
 	return "failed"
 }
 
@@ -50,6 +52,7 @@ func randomOAuth() string {
 	if _, err := rand.Read(b); err != nil {
 		panic("secure randomness unavailable")
 	}
+
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -59,7 +62,15 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 	if s == nil || s.provider == nil {
 		return "", googleError("unavailable")
 	}
-	st := GoogleState{Browser: browser, Purpose: purpose, SessionID: sid, Nonce: randomOAuth(), Verifier: randomOAuth()}
+
+	gs := GoogleState{
+		Browser:   browser,
+		Purpose:   purpose,
+		SessionID: sid,
+		Nonce:     randomOAuth(),
+		Verifier:  randomOAuth(),
+	}
+
 	if purpose == "link" {
 		session, ok, err := s.user.ports.Session(ctx, sid, time.Now())
 		if err != nil {
@@ -68,106 +79,119 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 		if !ok || session == nil || expected == "" || expected != session.AccountID {
 			return "", &app.Error{Code: app.ErrConflict, Message: "Account changed. Sign in again."}
 		}
-		a, err := s.user.ports.AccountByID(ctx, session.AccountID)
+
+		acc, err := s.user.ports.AccountByID(ctx, session.AccountID)
 		if err != nil {
 			return "", googleError("unavailable")
 		}
-		if a == nil || session.AuthVersion <= 0 || session.AuthVersion != a.AuthVersion || len(password) > 72 || bcrypt.CompareHashAndPassword(a.PasswordHash, []byte(password)) != nil {
+		if acc == nil || session.AuthVersion <= 0 ||
+			session.AuthVersion != acc.AuthVersion || len(password) > 72 ||
+			bcrypt.CompareHashAndPassword(acc.PasswordHash, []byte(password)) != nil {
 			return "", &app.Error{Code: app.ErrAuthInvalid, Message: "Invalid credentials."}
 		}
-		linked, err := s.ports.GoogleLinked(ctx, a.ID)
+
+		linked, err := s.ports.GoogleLinked(ctx, acc.ID)
 		if err != nil {
 			return "", googleError("unavailable")
 		}
 		if linked {
 			return "", ErrGoogleAlreadyLinked
 		}
-		st.AccountID = a.ID
-		st.AuthVersion = a.AuthVersion
+		gs.AccountID = acc.ID
+		gs.AuthVersion = acc.AuthVersion
 	} else if purpose != "login" {
 		return "", googleError("failed")
 	}
+
 	// Purpose is only a redirect hint when the Redis record has expired.
 	// Authentication always uses the bound, single-use stored transaction.
 	state := purpose + "." + randomOAuth()
-	if err := s.ports.SaveGoogleState(ctx, state, st, GoogleStateTTL); err != nil {
+	if err := s.ports.SaveGoogleState(ctx, state, gs, GoogleStateTTL); err != nil {
 		return "", googleError("unavailable")
 	}
-	return s.provider.AuthorizationURL(state, st.Nonce, st.Verifier), nil
+
+	return s.provider.AuthorizationURL(state, gs.Nonce, gs.Verifier), nil
 }
 
 func (s *GoogleService) Complete(ctx context.Context, key, browser, code string, cancelled bool, sid string) (GoogleResult, error) {
-	r := GoogleResult{Purpose: "login"}
+	rs := GoogleResult{Purpose: "login"}
 	if strings.HasPrefix(key, "link.") {
-		r.Purpose = "link"
+		rs.Purpose = "link"
 	}
 	if s == nil || s.provider == nil {
-		return r, googleError("unavailable")
+		return rs, googleError("unavailable")
 	}
 	if key == "" || len(key) > 256 {
-		return r, googleError("expired")
+		return rs, googleError("expired")
 	}
-	st, ok, err := s.ports.TakeGoogleState(ctx, key)
+
+	gs, ok, err := s.ports.TakeGoogleState(ctx, key)
 	if err != nil {
-		return r, googleError("unavailable")
+		return rs, googleError("unavailable")
 	}
 	if !ok {
-		return r, googleError("expired")
+		return rs, googleError("expired")
 	}
-	if st.Purpose == "link" {
-		r.Purpose = "link"
+	if gs.Purpose == "link" {
+		rs.Purpose = "link"
 	}
-	if browser == "" || subtle.ConstantTimeCompare([]byte(st.Browser), []byte(browser)) != 1 || st.SessionID != sid {
-		return r, googleError("expired")
+	if browser == "" || subtle.ConstantTimeCompare([]byte(gs.Browser), []byte(browser)) != 1 || gs.SessionID != sid {
+		return rs, googleError("expired")
 	}
 	if cancelled {
-		return r, googleError("cancelled")
+		return rs, googleError("cancelled")
 	}
 	if code == "" || len(code) > 8192 {
-		return r, googleError("failed")
+		return rs, googleError("failed")
 	}
-	if st.Purpose == "link" {
-		if err := s.checkLinkSession(ctx, st, sid); err != nil {
-			return r, err
+	if gs.Purpose == "link" {
+		if err := s.checkLinkSession(ctx, gs, sid); err != nil {
+			return rs, err
 		}
 	}
-	claims, err := s.provider.Verify(ctx, code, st.Nonce, st.Verifier)
+
+	claims, err := s.provider.Verify(ctx, code, gs.Nonce, gs.Verifier)
 	if err != nil {
-		return r, googleError("failed")
+		return rs, googleError("failed")
 	}
 	if claims.Subject == "" || len(claims.Subject) > 255 || !validEmail(claims.Email) {
-		return r, googleError("failed")
+		return rs, googleError("failed")
 	}
-	if st.Purpose == "link" {
-		if err := s.checkLinkSession(ctx, st, sid); err != nil {
-			return r, err
+
+	if gs.Purpose == "link" {
+		if err := s.checkLinkSession(ctx, gs, sid); err != nil {
+			return rs, err
 		}
-		err := s.ports.LinkGoogle(ctx, st.AccountID, claims.Subject, st.AuthVersion)
+		err := s.ports.LinkGoogle(ctx, gs.AccountID, claims.Subject, gs.AuthVersion)
 		if errors.Is(err, ErrAuthVersionChanged) {
-			return r, googleError("expired")
+			return rs, googleError("expired")
 		}
-		return r, err
+		return rs, err
 	}
+
 	return s.completeGoogleLogin(ctx, claims, sid)
 }
 
 func (s *GoogleService) completeGoogleLogin(ctx context.Context, claims GoogleClaims, sid string) (GoogleResult, error) {
-	r := GoogleResult{Purpose: "login"}
-	a, err := s.ports.GoogleAccount(ctx, claims.Subject, claims.Email, claims.Name, claims.EmailTrusted)
+	rs := GoogleResult{Purpose: "login"}
+	acc, err := s.ports.GoogleAccount(ctx, claims.Subject, claims.Email, claims.Name, claims.EmailTrusted)
 	if err != nil {
-		return r, err
+		return rs, err
 	}
-	r.SessionID, r.CSRFToken, err = s.user.createSession(ctx, *a)
+
+	rs.SessionID, rs.CSRFToken, err = s.user.createSession(ctx, *acc)
 	if err != nil {
-		return GoogleResult{Purpose: r.Purpose}, googleError("unavailable")
+		return GoogleResult{Purpose: rs.Purpose}, googleError("unavailable")
 	}
+
 	if sid != "" {
 		if err := s.user.ports.DeleteSession(ctx, sid); err != nil {
-			_ = s.user.ports.DeleteSession(ctx, r.SessionID)
-			return GoogleResult{Purpose: r.Purpose}, googleError("unavailable")
+			_ = s.user.ports.DeleteSession(ctx, rs.SessionID)
+			return GoogleResult{Purpose: rs.Purpose}, googleError("unavailable")
 		}
 	}
-	return r, nil
+
+	return rs, nil
 }
 
 func (s *GoogleService) checkLinkSession(ctx context.Context, st GoogleState, sid string) error {
@@ -178,13 +202,15 @@ func (s *GoogleService) checkLinkSession(ctx context.Context, st GoogleState, si
 	if !ok || session == nil || session.AccountID != st.AccountID {
 		return googleError("expired")
 	}
-	a, err := s.user.ports.AccountByID(ctx, session.AccountID)
+
+	acc, err := s.user.ports.AccountByID(ctx, session.AccountID)
 	if err != nil {
 		return googleError("unavailable")
 	}
-	if a == nil || st.AuthVersion <= 0 || session.AuthVersion != st.AuthVersion || session.AuthVersion != a.AuthVersion {
+	if acc == nil || st.AuthVersion <= 0 || session.AuthVersion != st.AuthVersion || session.AuthVersion != acc.AuthVersion {
 		return googleError("expired")
 	}
+
 	return nil
 }
 

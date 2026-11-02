@@ -27,8 +27,10 @@ type GoogleState struct {
 }
 
 type GoogleClaims struct {
-	Subject, Email, Name string
-	EmailTrusted         bool
+	Subject      string
+	Email        string
+	Name         string
+	EmailTrusted bool
 }
 
 type IGoogleProvider interface {
