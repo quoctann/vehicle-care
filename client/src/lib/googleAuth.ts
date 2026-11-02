@@ -32,6 +32,7 @@ export function googleCallback(search: string) {
   return { error, linked, cleanSearch: clean ? `?${clean}` : '' };
 }
 
+/** Allow navigation only to the HTTPS accounts.google.com origin. */
 export function trustedGoogleAuthorizationUrl(value: unknown): string {
   if (typeof value !== 'string') throw new Error('Invalid Google authorization URL.');
   const url = new URL(value);

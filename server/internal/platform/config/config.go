@@ -124,6 +124,9 @@ func (c Config) ValidateTrustedProxies() error {
 	return nil
 }
 
+// ValidateGoogle checks the two distinct redirect destinations: Google returns
+// to the exact backend callback, then the backend redirects to the frontend
+// origin. Production requires HTTPS redirects and Secure transaction cookies.
 func (c Config) ValidateGoogle() error {
 	if !c.GoogleOAuthEnabled {
 		return nil

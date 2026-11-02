@@ -14,8 +14,11 @@ import (
 	"github.com/quoctann/vehicle-care/server/internal/domain"
 )
 
+// GoogleAccount resolves an existing identity by subject or atomically creates
+// a passwordless account, its sequence/default catalog/changefeed, and identity.
 // The subject advisory lock serializes signup retries before account creation.
-// Email uniqueness never authorizes linking an existing account.
+// Existing profile fields are not overwritten, and email uniqueness never
+// authorizes linking an existing account.
 func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, verified bool) (*domain.Account, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -83,6 +86,9 @@ func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, 
 	return &acc, nil
 }
 
+// LinkGoogle attaches a subject only if the account is still at the auth
+// version that was reauthenticated before redirecting to Google. Row locks and
+// unique constraints preserve that precondition under concurrent callbacks.
 func (s *Store) LinkGoogle(ctx context.Context, accountID, subject string, expectedAuthVersion int64) error {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {

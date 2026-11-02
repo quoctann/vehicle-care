@@ -19,6 +19,8 @@ func addGoogleHeaders(c *gin.Context) {
 	c.Header("Referrer-Policy", "no-referrer")
 }
 
+// googleRedirect uses purpose only to choose a fixed frontend destination.
+// Public error codes are allowlisted so internal/provider details never leak.
 func (s *Server) googleRedirect(c *gin.Context, purpose, code string) {
 	addGoogleHeaders(c)
 	path := "/sign-in?google_error="
@@ -75,6 +77,9 @@ func (s *Server) setGoogleTransactionCookie(c *gin.Context, authorizationURL, br
 	return true
 }
 
+// googleStart begins the shared login/signup flow. It snapshots any existing
+// sid so a change to the browser's sid cookie invalidates this callback, then
+// uses a full-page 302 rather than exposing the transaction to fetch.
 func (s *Server) googleStart(c *gin.Context) {
 	addGoogleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
@@ -98,6 +103,9 @@ func (s *Server) googleStart(c *gin.Context) {
 	c.Redirect(http.StatusFound, url)
 }
 
+// googleLink is a JSON API only for the authenticated Settings flow. Session
+// and CSRF middleware run first; this handler adds an account rate limit, then
+// Begin performs password/account/auth-version checks before returning a URL.
 func (s *Server) googleLink(c *gin.Context) {
 	addGoogleHeaders(c)
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
@@ -144,6 +152,10 @@ func (s *Server) googleLink(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"authorization_url": url})
 }
 
+// googleCallback is Google's registered backend redirect URI, not a frontend
+// route. It has no session/CSRF middleware: Complete instead requires the
+// single-use state plus matching browser/session bindings. Login sets new app
+// cookies; linking keeps the original session and only records the identity.
 func (s *Server) googleCallback(c *gin.Context) {
 	addGoogleHeaders(c)
 	state := c.Query("state")
@@ -180,6 +192,8 @@ func (s *Server) googleCallback(c *gin.Context) {
 	c.Redirect(http.StatusFound, strings.TrimRight(s.cfg.FrontendRedirectURL, "/")+path)
 }
 
+// googleStatus powers the Settings card. expected_account_id detects stale
+// tabs/sessions; authorization still comes exclusively from requireSession.
 func (s *Server) googleStatus(c *gin.Context) {
 	addGoogleHeaders(c)
 	acc := mustAccount(c)

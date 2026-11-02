@@ -57,6 +57,8 @@ export function GoogleAccountCard({ accountId }: { accountId: string }) {
     };
   }, [context, online, attempt, t]);
 
+  // Reauthenticate against the session captured by this form. Password state is
+  // cleared before awaiting, and stale responses cannot navigate a newer session.
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (

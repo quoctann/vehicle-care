@@ -20,6 +20,8 @@ type Provider struct {
 	client   *http.Client
 }
 
+// New performs OIDC discovery at startup and builds the OAuth configuration
+// and ID-token verifier from Google's discovered endpoints and JWKS URI.
 func New(ctx context.Context, id, secret, redirect string) (*Provider, error) {
 	issuer := "https://accounts.google.com"
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -43,12 +45,18 @@ func New(ctx context.Context, id, secret, redirect string) (*Provider, error) {
 	}, nil
 }
 
+// AuthorizationURL sends state, an ID-token nonce, and only the S256 PKCE
+// challenge to Google. The verifier remains in the server-side transaction.
 func (p *Provider) AuthorizationURL(state, nonce, verifier string) string {
 	return p.oauth.AuthCodeURL(state, oidc.Nonce(nonce),
 		oauth2.S256ChallengeOption(verifier),
 		oauth2.SetAuthURLParam("prompt", "select_account"))
 }
 
+// Verify exchanges the code with the backend-held PKCE verifier. go-oidc checks
+// signature/JWKS, issuer, audience, and expiry; the explicit checks below bind
+// nonce/azp and require a verified email. EmailTrusted is narrower than Google's
+// email_verified claim and controls local recovery-email trust for new accounts.
 func (p *Provider) Verify(ctx context.Context, code, nonce, verifier string) (user.GoogleClaims, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

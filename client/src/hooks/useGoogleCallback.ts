@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { googleCallback } from '@/lib/googleAuth';
 
+/**
+ * Handles the backend's redirect back to React, not Google's code callback.
+ * It exposes allowlisted feedback and removes OAuth parameters from history;
+ * authentication is established separately by session hydration.
+ */
 export function useGoogleCallback() {
   const location = useLocation();
   const navigate = useNavigate();

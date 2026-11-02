@@ -32,6 +32,9 @@ type googleError string
 
 func (e googleError) Error() string { return string(e) }
 
+// GoogleErrorCode converts internal failures to the stable public codes used
+// by JSON responses and frontend redirects. Unknown errors deliberately collapse
+// to "failed" so provider and infrastructure details are not exposed.
 func GoogleErrorCode(err error) string {
 	var e googleError
 	if errors.As(err, &e) {
@@ -56,8 +59,14 @@ func randomOAuth() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
+// NewGoogleBrowserBinding returns an opaque value stored in both Redis and an
+// HttpOnly transaction cookie; it is separate from the OAuth state and session.
 func NewGoogleBrowserBinding() string { return randomOAuth() }
 
+// Begin creates the server-side transaction for either login or account link.
+// State identifies the transaction, nonce binds the resulting ID token, and the
+// verifier stays here while only its PKCE challenge goes to Google. Linking also
+// reauthenticates the password and snapshots the exact account/session version.
 func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expected, password string) (string, error) {
 	if s == nil || s.provider == nil {
 		return "", googleError("unavailable")
@@ -113,6 +122,11 @@ func (s *GoogleService) Begin(ctx context.Context, browser, purpose, sid, expect
 	return s.provider.AuthorizationURL(state, gs.Nonce, gs.Verifier), nil
 }
 
+// Complete consumes state before any provider work, then validates the browser
+// and matching starting sid cookie. The state's purpose prefix is only a
+// destination hint when no record remains; the stored record authorizes the
+// operation. Link sessions are checked on both sides of the provider exchange
+// to close races with logout, replacement, and auth-version changes.
 func (s *GoogleService) Complete(ctx context.Context, key, browser, code string, cancelled bool, sid string) (GoogleResult, error) {
 	rs := GoogleResult{Purpose: "login"}
 	if strings.HasPrefix(key, "link.") {
@@ -172,6 +186,10 @@ func (s *GoogleService) Complete(ctx context.Context, key, browser, code string,
 	return s.completeGoogleLogin(ctx, claims, sid)
 }
 
+// completeGoogleLogin resolves the local account before creating the ordinary
+// opaque application session. It then rotates any starting session; if old
+// session deletion fails, it attempts to delete the new session before returning
+// unavailable. PostgreSQL account creation and Redis session writes are not atomic.
 func (s *GoogleService) completeGoogleLogin(ctx context.Context, claims GoogleClaims, sid string) (GoogleResult, error) {
 	rs := GoogleResult{Purpose: "login"}
 	acc, err := s.ports.GoogleAccount(ctx, claims.Subject, claims.Email, claims.Name, claims.EmailTrusted)
@@ -194,6 +212,9 @@ func (s *GoogleService) completeGoogleLogin(ctx context.Context, claims GoogleCl
 	return rs, nil
 }
 
+// checkLinkSession proves that the exact session reauthenticated in Begin is
+// still active for the same account and auth version. AuthVersion binds the
+// link to that credential generation, not merely to a still-valid account ID.
 func (s *GoogleService) checkLinkSession(ctx context.Context, st GoogleState, sid string) error {
 	session, ok, err := s.user.ports.Session(ctx, sid, time.Now())
 	if err != nil {
@@ -214,6 +235,8 @@ func (s *GoogleService) checkLinkSession(ctx context.Context, st GoogleState, si
 	return nil
 }
 
+// Status reports identity linkage and whether password reauthentication is
+// possible. The HTTP layer separately adds whether Google OAuth is enabled.
 func (s *GoogleService) Status(ctx context.Context, accountID string) (bool, bool, error) {
 	a, err := s.user.ports.AccountByID(ctx, accountID)
 	if err != nil || a == nil {
