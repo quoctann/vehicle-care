@@ -507,8 +507,17 @@ tham khảo [`.env.example`](../.env.example). HTTP local: COOKIE_SECURE=false v
 FRONTEND_ORIGIN đúng origin frontend, cả port.
 
 Frontend image dùng nginx reverse proxy cùng origin; `/account/` được proxy như
-`/auth/`, `/devices/`, `/sync/` để timezone POST không rơi vào SPA fallback. Smoke
-test nginx thật: `python3 client/tests/nginx-routing/smoke.py` (Python 3 + Docker).
+`/auth/`, `/devices/`, `/sync/`, `/part-types` để timezone POST không rơi vào SPA fallback.
+VITE_API_BASE_URL để trống trong production để fetch cùng origin; đặt sang hostname
+API riêng sẽ phá vỡ cookie SameSite=Lax và CSRF double-submit.
+
+Topology khuyến nghị: chỉ frontend Service được expose qua Ingress công khai,
+backend Service giữ `ClusterIP`. Callback Google là redirect trình duyệt nên
+phải ở cùng public application origin, ví dụ
+`https://app.example.com/auth/google/callback`, proxy qua nginx tới backend.
+Không cần Ingress/backend hostname công khai riêng.
+
+Smoke test nginx thật: `python3 client/tests/nginx-routing/smoke.py` (Python 3 + Docker).
 Fixture upstream kiểm tra routing/headers/status, không thay real-backend auth test.
 
 PWA dùng `registerType: 'prompt'`, kiểm tra update mỗi giờ/khi foreground. Worker mới
@@ -607,8 +616,8 @@ Không dùng DB hay file env local, không xem test mock là bằng chứng LGTM
    theo yêu cầu thực tế của Console, không suy luận basic scopes miễn mọi xác minh.
 5. Clients → Create client → **Web application**. Authorized redirect URIs:
    - Local: `http://localhost:8080/auth/google/callback`.
-   - Production: `https://<public-api-origin>/auth/google/callback`; với nginx cùng
-     origin dùng domain frontend công khai, không dùng hostname backend nội bộ.
+   - Production: `https://<public-app-origin>/auth/google/callback`; với nginx cùng
+     origin đây chính là domain frontend công khai, không dùng hostname backend nội bộ.
    URI phải khớp chính xác scheme, host, port, path và trailing slash. Không wildcard;
    `localhost` khác `127.0.0.1`. Authorized JavaScript origins không cần cho redirect
    backend này; không đặt callback là frontend `/sign-in`.
@@ -616,7 +625,8 @@ Không dùng DB hay file env local, không xem test mock là bằng chứng LGTM
    `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL` đúng URI đã đăng ký.
    `FRONTEND_REDIRECT_URL` là origin frontend (local `http://localhost:5173`),
    `FRONTEND_ORIGIN` khớp origin đó. Production HTTPS và `COOKIE_SECURE=true`;
-   local HTTP dùng `false`. Tham khảo `.env.example`, không ghi đè `.env` đang có.
+   local HTTP dùng `false`. `COOKIE_DOMAIN` để trống để cookie host-only trừ khi
+   cố tình dùng subdomain. Tham khảo `.env.example`, không ghi đè `.env` đang có.
    Không đưa secret vào `VITE_*`, Git, log hoặc chat; lưu bằng secret manager/inject env.
    Lưu Client Secret ngay khi tạo: Google chỉ hiển thị/cho tải secret tại thời điểm
    tạo, không thể xem hoặc tải lại sau đó; mất secret thì tạo/rotate secret mới.

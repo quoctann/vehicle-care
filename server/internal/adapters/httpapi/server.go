@@ -93,6 +93,11 @@ func (s *Server) Handler() http.Handler {
 	return s.router
 }
 
+// routes wires the HTTP handlers. With the recommended same-origin proxy
+// topology, normal API calls and the Google OAuth callback share the public
+// application origin, so session/CSRF cookies remain on one host and CORS is
+// unnecessary. /health/* are intended for Kubernetes probes and are not
+// exposed through the frontend nginx proxy.
 func (s *Server) routes() {
 	s.router.Use(s.rateAPI())
 	s.router.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })

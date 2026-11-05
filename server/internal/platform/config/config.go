@@ -36,13 +36,31 @@ func (d Database) DSN() string {
 }
 
 type Config struct {
-	Environment           string        `env:"APP_ENV" envDefault:"development"`
-	HTTPHost              string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
-	HTTPPort              string        `env:"HTTP_PORT" envDefault:"8080"`
-	FrontendOrigin        string        `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
-	FrontendRedirectURL   string        `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
-	CookieSecure          bool          `env:"COOKIE_SECURE" envDefault:"false"`
-	CookieDomain          string        `env:"COOKIE_DOMAIN"`
+	Environment string `env:"APP_ENV" envDefault:"development"`
+	HTTPHost    string `env:"HTTP_HOST" envDefault:"0.0.0.0"`
+	HTTPPort    string `env:"HTTP_PORT" envDefault:"8080"`
+
+	// FrontendOrigin is the public origin serving the SPA. It drives CORS and
+	// origin checks. With the recommended same-origin proxy topology this is
+	// the public application origin, e.g. https://app.example.com, not a
+	// separate backend hostname.
+	FrontendOrigin string `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
+
+	// FrontendRedirectURL is where the browser is sent after a successful
+	// Google OAuth callback. It must be an origin (no path). In production it
+	// should match FRONTEND_ORIGIN.
+	FrontendRedirectURL string `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
+
+	// CookieSecure sets the Secure flag on session and CSRF cookies. Must be
+	// true in production over HTTPS; required when GOOGLE_OAUTH_ENABLED=true
+	// in production.
+	CookieSecure bool `env:"COOKIE_SECURE" envDefault:"false"`
+
+	// CookieDomain scopes cookies. Leave empty for host-only cookies tied to
+	// the exact public application host. Only set a parent domain (e.g.
+	// .example.com) if the SPA is intentionally served across subdomains.
+	CookieDomain string `env:"COOKIE_DOMAIN"`
+
 	SessionTTL            time.Duration `env:"SESSION_TTL" envDefault:"720h"`
 	SyncMaxBatchSize      int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
 	SyncMaxPageSize       int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
@@ -71,11 +89,26 @@ type Config struct {
 	RedisMinIdleConns int           `env:"REDIS_MIN_IDLE_CONNS" envDefault:"5"`
 	RedisMaxRetries   int           `env:"REDIS_MAX_RETRIES" envDefault:"3"`
 
-	GoogleOAuthEnabled bool     `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
-	GoogleClientID     string   `env:"GOOGLE_CLIENT_ID"`
-	GoogleClientSecret string   `env:"GOOGLE_CLIENT_SECRET"`
-	GoogleRedirectURL  string   `env:"GOOGLE_REDIRECT_URL"`
-	TrustedProxies     []string `env:"TRUSTED_PROXIES"`
+	// GoogleOAuthEnabled toggles Google OIDC routes. When true,
+	// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URL must all
+	// be configured and consistent with the Google Cloud client.
+	GoogleOAuthEnabled bool   `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
+	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
+
+	// GoogleRedirectURL is the exact URI registered in Google Cloud. With the
+	// same-origin frontend proxy topology this is the public application
+	// origin plus /auth/google/callback, e.g.
+	// https://app.example.com/auth/google/callback. The path must be exactly
+	// /auth/google/callback.
+	GoogleRedirectURL string `env:"GOOGLE_REDIRECT_URL"`
+
+	// TrustedProxies lists the IPs/CIDRs of the real reverse-proxy chain
+	// (frontend nginx, Ingress, load balancer). Gin uses these to decide
+	// whether X-Forwarded-For/Proto headers can be trusted for client IP and
+	// rate limiting. Leave empty to ignore all forwarding headers. Never set
+	// to 0.0.0.0/0 or ::/0.
+	TrustedProxies []string `env:"TRUSTED_PROXIES"`
 
 	MailFrontendURL string        `env:"MAIL_FRONTEND_URL" envDefault:"http://localhost:5173"`
 	SMTPHost        string        `env:"SMTP_HOST" envDefault:"localhost"`

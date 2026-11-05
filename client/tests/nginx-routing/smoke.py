@@ -119,6 +119,8 @@ def check_routes(base_url):
     check_proxy(base_url, "/devices/register", "POST", b'{"device_id":"smoke-device"}')
     check_proxy(base_url, "/sync/push", "POST", b'{"mutations":[]}')
     check_proxy(base_url, "/sync/pull?after_seq=0&limit=100")
+    # Exact match: /part-types has no trailing slash in the backend router.
+    check_proxy(base_url, "/part-types")
 
     for path in ("/", "/settings", "/settings?tab=account"):
         status, headers, body = request(base_url, path)
