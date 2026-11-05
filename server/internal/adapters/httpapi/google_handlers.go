@@ -23,6 +23,7 @@ func addGoogleHeaders(c *gin.Context) {
 // Public error codes are allowlisted so internal/provider details never leak.
 func (s *Server) googleRedirect(c *gin.Context, purpose, code string) {
 	addGoogleHeaders(c)
+
 	path := "/sign-in?google_error="
 	if purpose == "link" {
 		path = "/settings?google_error="
@@ -82,6 +83,7 @@ func (s *Server) setGoogleTransactionCookie(c *gin.Context, authorizationURL, br
 // uses a full-page 302 rather than exposing the transaction to fetch.
 func (s *Server) googleStart(c *gin.Context) {
 	addGoogleHeaders(c)
+
 	if !s.cfg.GoogleOAuthEnabled || s.googleService == nil {
 		s.googleRedirect(c, "login", "unavailable")
 		return

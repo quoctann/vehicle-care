@@ -49,6 +49,11 @@ const lockGoogleSubject = `-- name: LockGoogleSubject :exec
 SELECT pg_advisory_xact_lock(hashtextextended('google:' || $1::text, 0))
 `
 
+// This advisory lock is used to prevent concurrent inserts of the same google
+// subject. Subject is hashed to a 64-bit integer using hashtextextended, which
+// is then used to acquire an exclusive lock for the duration of the
+// transaction. This ensures that only one transaction can insert a given google
+// subject at a time, preventing duplicate entries in table.
 func (q *Queries) LockGoogleSubject(ctx context.Context, subject string) error {
 	_, err := q.db.ExecContext(ctx, lockGoogleSubject, subject)
 	return err

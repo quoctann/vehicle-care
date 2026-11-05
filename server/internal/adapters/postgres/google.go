@@ -28,6 +28,8 @@ func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, 
 
 	qtx := sqlcgen.New(tx)
 
+	// lock by application subject instead of row locking, since the account may
+	// not exist yet
 	if err := qtx.LockGoogleSubject(ctx, subject); err != nil {
 		return nil, err
 	}
