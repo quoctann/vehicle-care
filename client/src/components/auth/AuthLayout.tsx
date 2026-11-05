@@ -25,7 +25,7 @@ export function AuthLayout({
         </div>
 
         <div className="rounded-2xl border border-border-subtle bg-card p-6 shadow-[0_1px_1px_rgba(44,54,53,.025)]">
-          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-center">{title}</h1>
           {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
           <div className="mt-5">{children}</div>
         </div>
