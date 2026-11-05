@@ -46,7 +46,7 @@ var _ httpapi.IOAuthStateStore = (*redisadapter.Store)(nil)
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "API stopped due to a startup or server error")
+		fmt.Fprintf(os.Stderr, "%s: %s\n", "API stopped due to a startup or server error", err.Error())
 		os.Exit(1)
 	}
 }
