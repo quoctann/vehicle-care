@@ -311,11 +311,7 @@ export const vi = {
       quietHoursAria: 'Sử dụng giờ yên tĩnh',
       app: 'Ứng dụng',
       timezone: 'Múi giờ',
-      timezoneDescription:
-        'Dùng cho ngày nhắc bảo dưỡng, lịch sử, chi phí theo tháng và nhập ngày giờ. Đổi múi giờ không thay đổi thời điểm đã lưu.',
       timezoneCurrent: 'Đang dùng: {{timezone}}',
-      timezoneOffsetHelp:
-        'Các lựa chọn UTC có độ lệch cố định, không đổi theo mùa. Tên thành phố chỉ giúp nhận biết, không tự điều chỉnh theo giờ mùa hè.',
       timezoneChoose: 'Chọn múi giờ',
       timezoneDeviceUnsupported:
         'Không tìm thấy độ lệch thiết bị trong danh sách. Vui lòng chọn múi giờ UTC thủ công.',
@@ -326,8 +322,6 @@ export const vi = {
       timezoneSaveFailed: 'Không thể lưu múi giờ. Kiểm tra kết nối và thử lại.',
       timezoneCacheFailed:
         'Đã lưu trên máy chủ nhưng chưa lưu được ngoại tuyến. Vui lòng tải lại khi có kết nối.',
-      timezoneOnlineHelp:
-        'Cần kết nối để lưu. Múi giờ đã lưu dùng được ngoại tuyến. Nút thiết bị lấy độ lệch UTC hiện tại khi bấm; độ lệch không tự đổi theo mùa hoặc khi di chuyển.',
       units: 'Đơn vị',
       kilometres: 'Ki-lô-mét',
       miles: 'Dặm',
