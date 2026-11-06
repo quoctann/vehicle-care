@@ -20,6 +20,10 @@ import (
 // Existing profile fields are not overwritten, and email uniqueness never
 // authorizes linking an existing account.
 func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, verified bool) (*domain.Account, error) {
+	if strings.TrimSpace(subject) == "" {
+		return nil, user.ErrGoogleInvalidIdentity
+	}
+
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -92,6 +96,10 @@ func (s *Store) GoogleAccount(ctx context.Context, subject, email, name string, 
 // version that was reauthenticated before redirecting to Google. Row locks and
 // unique constraints preserve that precondition under concurrent callbacks.
 func (s *Store) LinkGoogle(ctx context.Context, accountID, subject string, expectedAuthVersion int64) error {
+	if strings.TrimSpace(subject) == "" {
+		return user.ErrGoogleInvalidIdentity
+	}
+
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err

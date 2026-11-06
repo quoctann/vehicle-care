@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	ErrGoogleEmailExists    = errors.New("email_exists")
-	ErrGoogleIdentityLinked = errors.New("identity_linked")
-	ErrGoogleAlreadyLinked  = errors.New("already_linked")
+	ErrGoogleEmailExists     = errors.New("email_exists")
+	ErrGoogleIdentityLinked  = errors.New("identity_linked")
+	ErrGoogleAlreadyLinked   = errors.New("already_linked")
+	ErrGoogleInvalidIdentity = errors.New("invalid_identity")
 )
 
 const GoogleStateTTL = 10 * time.Minute

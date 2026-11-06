@@ -42,7 +42,7 @@ func TestOIDCVerification(t *testing.T) {
 	}))
 	defer srv.Close()
 	issuer = srv.URL
-	p, err := New(context.Background(), "client", "secret", issuer+"/callback")
+	p, err := newProvider(context.Background(), issuer, "client", "secret", issuer+"/callback")
 	if err != nil {
 		t.Fatal(err)
 	}

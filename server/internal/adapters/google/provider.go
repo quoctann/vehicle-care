@@ -20,10 +20,17 @@ type Provider struct {
 	client   *http.Client
 }
 
+const googleIssuer = "https://accounts.google.com"
+
 // New performs OIDC discovery at startup and builds the OAuth configuration
 // and ID-token verifier from Google's discovered endpoints and JWKS URI.
 func New(ctx context.Context, id, secret, redirect string) (*Provider, error) {
-	issuer := "https://accounts.google.com"
+	return newProvider(ctx, googleIssuer, id, secret, redirect)
+}
+
+// newProvider builds a Provider against an arbitrary OIDC issuer. New pins it
+// to Google; tests use it to exercise discovery and token exchange locally.
+func newProvider(ctx context.Context, issuer, id, secret, redirect string) (*Provider, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	ctx = oidc.ClientContext(ctx, client)
 
