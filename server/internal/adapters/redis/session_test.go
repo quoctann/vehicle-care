@@ -13,7 +13,7 @@ func TestCreateSessionAndGetAndRefreshSession(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	session := domain.Session{AccountID: "account-1", CSRFToken: "csrf-1", ExpiresAt: now.Add(time.Hour)}
+	session := domain.Session{AccountID: "account-1", CSRFToken: "csrf-1", ExpiresAt: now.Add(time.Hour), AuthVersion: 3}
 	if err := store.CreateSession(ctx, "session-1", session); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestCreateSessionAndGetAndRefreshSession(t *testing.T) {
 	if err != nil || !ok || got == nil {
 		t.Fatalf("get and refresh session: ok=%v err=%v", ok, err)
 	}
-	if got.AccountID != "account-1" || got.CSRFToken != "csrf-1" {
+	if got.AccountID != "account-1" || got.CSRFToken != "csrf-1" || got.AuthVersion != 3 {
 		t.Fatalf("unexpected session payload: %#v", got)
 	}
 	if !got.ExpiresAt.Equal(newExpiresAt) {
@@ -67,7 +67,7 @@ func TestDeleteSessionRemovesIt(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	session := domain.Session{AccountID: "account-1", CSRFToken: "csrf-1", ExpiresAt: now.Add(time.Hour)}
+	session := domain.Session{AccountID: "account-1", CSRFToken: "csrf-1", ExpiresAt: now.Add(time.Hour), AuthVersion: 1}
 	if err := store.CreateSession(ctx, "session-1", session); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestDeleteAccountSessionsRemovesOnlyThatAccount(t *testing.T) {
 		"session-b1": "account-2",
 	}
 	for sessionID, accountID := range sessions {
-		session := domain.Session{AccountID: accountID, CSRFToken: "csrf", ExpiresAt: now.Add(time.Hour)}
+		session := domain.Session{AccountID: accountID, CSRFToken: "csrf", ExpiresAt: now.Add(time.Hour), AuthVersion: 1}
 		if err := store.CreateSession(ctx, sessionID, session); err != nil {
 			t.Fatalf("create session %s: %v", sessionID, err)
 		}

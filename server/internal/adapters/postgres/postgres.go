@@ -7,11 +7,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/quoctann/vehicle-care/server/internal/adapters/postgres/sqlcgen"
@@ -44,10 +44,12 @@ var (
 // New opens a PostgreSQL connection pool for dsn and verifies connectivity
 // with a ping before returning.
 func New(ctx context.Context, dsn string) (*Store, error) {
-	sqlDB, err := sql.Open("pgx", dsn)
+	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open: %w", err)
 	}
+	config.Tracer = queryTracer{}
+	sqlDB := stdlib.OpenDB(*config)
 
 	sqlDB.SetMaxOpenConns(defaultMaxOpenConns)
 	sqlDB.SetMaxIdleConns(defaultMaxIdleConns)

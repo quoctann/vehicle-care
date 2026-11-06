@@ -33,12 +33,12 @@ func TestResolveSessionPointerResults(t *testing.T) {
 		deps     sessionDependencies
 		wantCode string
 	}{
-		{name: "missing", deps: sessionDependencies{}, wantCode: app.ECSessionExpired},
-		{name: "nil found session", deps: sessionDependencies{found: true}, wantCode: app.ECSessionExpired},
-		{name: "session store error", deps: sessionDependencies{sessionErr: errors.New("redis down")}, wantCode: app.ECInternalError},
-		{name: "missing account", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}, accountErr: ErrAccountNotFound}, wantCode: app.ECSessionExpired},
-		{name: "nil account", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}}, wantCode: app.ECSessionExpired},
-		{name: "account store error", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}, accountErr: errors.New("postgres down")}, wantCode: app.ECInternalError},
+		{name: "missing", deps: sessionDependencies{}, wantCode: app.ErrSessionExpired},
+		{name: "nil found session", deps: sessionDependencies{found: true}, wantCode: app.ErrSessionExpired},
+		{name: "session store error", deps: sessionDependencies{sessionErr: errors.New("redis down")}, wantCode: app.ErrInternalError},
+		{name: "missing account", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}, accountErr: ErrAccountNotFound}, wantCode: app.ErrSessionExpired},
+		{name: "nil account", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}}, wantCode: app.ErrSessionExpired},
+		{name: "account store error", deps: sessionDependencies{found: true, session: &domain.Session{AccountID: "account"}, accountErr: errors.New("postgres down")}, wantCode: app.ErrInternalError},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, _, err := NewService(&test.deps, time.Hour).ResolveSession(context.Background(), "session")
@@ -49,7 +49,7 @@ func TestResolveSessionPointerResults(t *testing.T) {
 		})
 	}
 
-	deps := &sessionDependencies{found: true, session: &domain.Session{AccountID: "account", CSRFToken: "token"}, account: &domain.Account{ID: "account"}}
+	deps := &sessionDependencies{found: true, session: &domain.Session{AccountID: "account", CSRFToken: "token", AuthVersion: 1}, account: &domain.Account{ID: "account", AuthVersion: 1}}
 	session, account, err := NewService(deps, time.Hour).ResolveSession(context.Background(), "session")
 	if err != nil || session.CSRFToken != "token" || account.ID != "account" {
 		t.Fatalf("expected resolved session and account, session=%#v account=%#v err=%v", session, account, err)

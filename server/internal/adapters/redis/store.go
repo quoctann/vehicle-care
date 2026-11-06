@@ -19,6 +19,7 @@ type Store struct {
 
 // NewStore wraps an already-connected Redis client.
 func NewStore(client *goredis.Client) *Store {
+	client.AddHook(tracingHook{})
 	return &Store{client: client}
 }
 

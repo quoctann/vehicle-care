@@ -9,8 +9,11 @@ help:
 		'make dev            Run frontend and backend together' \
 		'make dev-fe         Run Vite on http://localhost:5173 (talks to the real backend)' \
 		'make dev-be         Run the Go API on http://localhost:8080' \
-		'make dev-infra      Start Postgres + Redis (required by the API)' \
-		'make dev-infra-down Stop Postgres + Redis' \
+		'make dev-infra      Start Postgres + Redis + Mailpit (local inbox :8025)' \
+		'make dev-infra-down Stop Postgres + Redis + Mailpit' \
+		'make dev-observability Start optional local Grafana LGTM + Alloy' \
+		'make dev-be-observed Run API with telemetry and local JSON log collection' \
+		'make dev-observability-down Stop local LGTM + Alloy without deleting data' \
 		'make migrate-up     Apply database migrations (needs DB_HOST/DB_USER/DB_PASSWORD/DB_NAME)' \
 		'make migrate-create name=<name>  Scaffold a new timestamp-prefixed migration pair' \
 		'make test           Run all tests' \
@@ -43,6 +46,18 @@ dev-infra-down:
 
 dev-infra-logs:
 	docker compose -f server/docker-compose.yml logs -f
+
+.PHONY: dev-observability dev-observability-down dev-be-observed
+dev-observability:
+	mkdir -p -m 700 server/.logs
+	docker compose -f server/docker-compose.yml --profile observability up -d lgtm alloy
+
+dev-observability-down:
+	docker compose -f server/docker-compose.yml --profile observability stop alloy lgtm
+
+dev-be-observed:
+	mkdir -p -m 700 server/.logs
+	cd server && OTEL_ENABLED=true LOG_FILE=.logs/api.json go run ./cmd/api
 
 migrate-up:
 	cd server && go run ./cmd/migrate up

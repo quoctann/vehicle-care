@@ -20,7 +20,7 @@ func (s *Server) updateTimezone(c *gin.Context) {
 	session := c.MustGet(sessionKey).(domain.Session)
 	// This is only a stale-UI precondition; authorization always uses the session.
 	if request.ExpectedAccountID != nil && *request.ExpectedAccountID != session.AccountID {
-		s.writeAPIError(c, http.StatusConflict, app.ECValidationFailed, "The session changed. Refresh and try again.", false)
+		s.writeAPIError(c, http.StatusConflict, app.ErrValidationFailed, "The session changed. Refresh and try again.", false)
 		return
 	}
 

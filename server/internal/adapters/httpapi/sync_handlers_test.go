@@ -36,11 +36,11 @@ func (d *syncUserDependencies) GetAndRefreshSession(_ context.Context, id string
 	} else if id != "session-a" {
 		return nil, false, nil
 	}
-	return &domain.Session{AccountID: accountID, CSRFToken: "csrf"}, true, nil
+	return &domain.Session{AccountID: accountID, CSRFToken: "csrf", AuthVersion: 1}, true, nil
 }
 
 func (d *syncUserDependencies) AccountByID(_ context.Context, id string) (*domain.Account, error) {
-	return &domain.Account{ID: id, Email: "sync@example.test", Timezone: "UTC+07:00"}, nil
+	return &domain.Account{ID: id, Email: "sync@example.test", Timezone: "UTC+07:00", AuthVersion: 1}, nil
 }
 
 func (d *syncUserDependencies) RegisterDevice(_ context.Context, accountID, _ string) (time.Time, error) {

@@ -7,17 +7,17 @@ import (
 	"github.com/gin-gonic/gin"
 	app "github.com/quoctann/vehicle-care/server/internal/application"
 	"github.com/quoctann/vehicle-care/server/internal/domain"
-	"go.uber.org/zap"
+	"github.com/quoctann/vehicle-care/server/internal/platform/logging"
 )
 
 func (s *Server) bind(c *gin.Context, destination any) bool {
 	if err := c.ShouldBindJSON(destination); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
-			s.writeAPIError(c, http.StatusRequestEntityTooLarge, app.ECValidationFailed, "Request body exceeds limit", false)
+			s.writeAPIError(c, http.StatusRequestEntityTooLarge, app.ErrValidationFailed, "Request body exceeds limit", false)
 			return false
 		}
-		s.writeAPIError(c, http.StatusBadRequest, app.ECValidationFailed, "Request body is invalid.", false)
+		s.writeAPIError(c, http.StatusBadRequest, app.ErrValidationFailed, "Request body is invalid.", false)
 		return false
 	}
 
@@ -27,8 +27,8 @@ func (s *Server) bind(c *gin.Context, destination any) bool {
 func (s *Server) writeError(c *gin.Context, err error) {
 	appErr, ok := app.AsError(err)
 	if !ok {
-		s.logger.Error("request failed", zap.Error(err), zap.String("request_id", c.GetString(requestIDKey)))
-		s.writeAPIError(c, http.StatusInternalServerError, app.ECInternalError, "Internal server error.", true)
+		s.logger.Error("request failed", logging.ContextFields(c.Request.Context())...)
+		s.writeAPIError(c, http.StatusInternalServerError, app.ErrInternalError, "Internal server error.", true)
 		return
 	}
 
@@ -38,26 +38,26 @@ func (s *Server) writeError(c *gin.Context, err error) {
 
 	switch appErr.Code {
 
-	case app.ECAuthInvalid, app.ECSessionExpired:
+	case app.ErrAuthInvalid, app.ErrSessionExpired:
 		status = http.StatusUnauthorized
 
-	case app.ECOwnershipInvalid:
+	case app.ErrOwnershipInvalid:
 		status = http.StatusForbidden
 
-	case app.ECConflict:
+	case app.ErrConflict:
 		status = http.StatusConflict
-		code = app.ECValidationFailed
+		code = app.ErrValidationFailed
 
-	case app.ECValidationFailed:
+	case app.ErrValidationFailed:
 		status = http.StatusBadRequest
 
-	case app.ECInternalError:
+	case app.ErrInternalError:
 		status = http.StatusInternalServerError
 
 	default:
-		s.logger.Error("request failed with unknown error code", zap.String("code", appErr.Code), zap.String("request_id", c.GetString(requestIDKey)))
+		s.logger.Error("request failed with unknown error code", logging.ContextFields(c.Request.Context())...)
 		status = http.StatusInternalServerError
-		code = app.ECInternalError
+		code = app.ErrInternalError
 		message = "Internal server error."
 	}
 

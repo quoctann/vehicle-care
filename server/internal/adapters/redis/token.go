@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/quoctann/vehicle-care/server/internal/application/user"
@@ -34,7 +35,13 @@ func (s *Store) CreateToken(ctx context.Context, kind user.TokenKind, token, acc
 		ttlSeconds = 1
 	}
 
-	indexKey := tokenIndexKey(string(kind), accountID)
+	// Reset payloads include the issuance auth version, but replacement must
+	// remain account-scoped across generations (never index by the payload).
+	indexAccountID := accountID
+	if kind == user.TokenKindReset {
+		indexAccountID, _, _ = strings.Cut(accountID, ":")
+	}
+	indexKey := tokenIndexKey(string(kind), indexAccountID)
 	if err := createTokenScript.Run(ctx, s.client, []string{indexKey}, string(kind), accountID, tokenHash(token), ttlSeconds).Err(); err != nil {
 		return wrapErr("create token", err)
 	}

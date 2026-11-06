@@ -18,11 +18,19 @@ type Account struct {
 	PasswordHash  []byte         `json:"password_hash"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
+	AuthVersion   int64          `json:"auth_version"`
 }
 
 type AccountSequence struct {
 	AccountID  string `json:"account_id"`
 	CurrentSeq int64  `json:"current_seq"`
+}
+
+type AuthIdentity struct {
+	AccountID string    `json:"account_id"`
+	Provider  string    `json:"provider"`
+	Subject   string    `json:"subject"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type ChangeFeed struct {

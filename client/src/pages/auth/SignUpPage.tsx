@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { getUserError } from '@/lib/userError';
+import { useGoogleCallback } from '@/hooks/useGoogleCallback';
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export function SignUpPage() {
   const { t } = useTranslation();
+  const google = useGoogleCallback();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -68,6 +70,11 @@ export function SignUpPage() {
         </>
       }
     >
+      {google.error ? (
+        <p role="alert" className="mb-4 text-sm text-destructive">
+          {t(`google.errors.${google.error}`)}
+        </p>
+      ) : null}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="name">{t('auth.name')}</Label>
@@ -126,7 +133,9 @@ export function SignUpPage() {
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <GoogleButton onClick={handleGoogle} loading={submitting} label={t('auth.signUpGoogle')} />
+      {google.error !== 'unavailable' ? (
+        <GoogleButton onClick={handleGoogle} loading={submitting} label={t('auth.signUpGoogle')} />
+      ) : null}
     </AuthLayout>
   );
 }

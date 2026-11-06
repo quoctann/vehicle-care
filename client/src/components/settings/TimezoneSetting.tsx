@@ -67,9 +67,6 @@ function TimezoneForm({ timezone }: { timezone: string }) {
         </span>
         <div className="min-w-0">
           <p className="text-sm font-medium">{t('settings.timezone')}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {t('settings.timezoneDescription')}
-          </p>
           <p className="mt-1 break-all text-xs text-muted-foreground">
             {t('settings.timezoneCurrent', {
               timezone:
@@ -139,8 +136,6 @@ function TimezoneForm({ timezone }: { timezone: string }) {
             {t(saving ? 'settings.timezoneSaving' : 'settings.timezoneSave')}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">{t('settings.timezoneOnlineHelp')}</p>
-        <p className="text-xs text-muted-foreground">{t('settings.timezoneOffsetHelp')}</p>
         {error && (
           <p role="alert" className="text-xs text-destructive">
             {error}

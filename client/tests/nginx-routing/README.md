@@ -20,10 +20,9 @@ overrides it).
 
 Checks run against real nginx: `nginx -t`, account timezone POST method/path/body,
 query preservation, cookies/CSRF, forwarded headers, upstream status/JSON/response
-cookie, existing auth/devices/sync routes, SPA `/settings` fallback, static asset
-cache headers, missing asset 404, and `/healthz`. This tests routing, **not** backend
-authentication, timezone validation, or real database writes. `/part-types` routing
-is outside this change's scope.
+cookie, existing auth/devices/sync routes, `GET /part-types`, SPA `/settings` fallback,
+static asset cache headers, missing asset 404, and `/healthz`. This tests routing,
+**not** backend authentication, timezone validation, or real database writes.
 
 For regression experiments without editing the production file:
 

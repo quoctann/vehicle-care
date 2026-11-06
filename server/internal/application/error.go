@@ -4,12 +4,13 @@ import "errors"
 
 // Application Error Codes
 const (
-	ECAuthInvalid      = "auth_invalid"
-	ECSessionExpired   = "session_expired"
-	ECOwnershipInvalid = "ownership_invalid"
-	ECConflict         = "conflict"
-	ECInternalError    = "internal_error"
-	ECValidationFailed = "validation_failed"
+	ErrAuthInvalid      = "auth_invalid"
+	ErrSessionExpired   = "session_expired"
+	ErrOwnershipInvalid = "ownership_invalid"
+	ErrConflict         = "conflict"
+	ErrInternalError    = "internal_error"
+	ErrValidationFailed = "validation_failed"
+	ErrRateLimited      = "rate_limited"
 )
 
 // Error identifies an application failure that the HTTP adapter can map safely.

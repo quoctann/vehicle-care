@@ -4,6 +4,34 @@ import * as api from './client';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('gets Google status with account precondition and links using CSRF and password reauthentication', async () => {
+  vi.stubGlobal('document', { cookie: 'csrf_token=google-csrf' });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ enabled: true, linked: false, has_password: true }),
+    });
+  vi.stubGlobal('fetch', fetcher);
+  expect(await api.getGoogleStatus('account-a')).toEqual({
+    enabled: true,
+    linked: false,
+    has_password: true,
+  });
+  await api.linkGoogle({ password: 'reauth-password', expected_account_id: 'account-a' });
+  expect(fetcher.mock.calls[0][0]).toMatch(
+    /\/auth\/google\/status\?expected_account_id=account-a$/,
+  );
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'include' });
+  expect(fetcher.mock.calls[1][1]).toMatchObject({
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-CSRF-Token': 'google-csrf' },
+    body: JSON.stringify({ password: 'reauth-password', expected_account_id: 'account-a' }),
+  });
+});
+
 it('transmits the required expected account in register/push JSON and pull query', async () => {
   const fetcher = vi.fn().mockResolvedValue({
     ok: true,

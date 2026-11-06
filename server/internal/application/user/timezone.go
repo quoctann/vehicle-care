@@ -25,10 +25,10 @@ func (s *Service) UpdateTimezone(ctx context.Context, accountID, timezone string
 	}
 	account, err := s.ports.UpdateAccountTimezone(ctx, accountID, formatOffset(minutes))
 	if errors.Is(err, ErrAccountNotFound) {
-		return nil, &app.Error{Code: app.ECSessionExpired, Message: "Session expired or missing."}
+		return nil, &app.Error{Code: app.ErrSessionExpired, Message: "Session expired or missing."}
 	}
 	if err != nil || account == nil {
-		return nil, &app.Error{Code: app.ECInternalError, Message: "Account store is unavailable."}
+		return nil, &app.Error{Code: app.ErrInternalError, Message: "Account store is unavailable."}
 	}
 	return account, nil
 }

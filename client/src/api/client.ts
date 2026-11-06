@@ -1,6 +1,9 @@
 import { CSRF_HEADER_NAME, readCsrfToken } from '@/lib/csrf';
 import { API_BASE_URL } from './config';
 import type {
+  GoogleLinkRequest,
+  GoogleLinkResponse,
+  GoogleStatusResponse,
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
@@ -107,6 +110,17 @@ export function logout(): Promise<void> {
  */
 export function googleStartUrl(): string {
   return `${API_BASE_URL}/auth/google/start`;
+}
+
+export type { GoogleStatusResponse } from './contract.types';
+
+export function getGoogleStatus(expectedAccountId: string): Promise<GoogleStatusResponse> {
+  const query = new URLSearchParams({ expected_account_id: expectedAccountId });
+  return request('GET', `/auth/google/status?${query}`);
+}
+
+export function linkGoogle(req: GoogleLinkRequest): Promise<GoogleLinkResponse> {
+  return request('POST', '/auth/google/link', req);
 }
 
 export function registerDevice(req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {

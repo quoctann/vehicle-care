@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getUserError } from '@/lib/userError';
+import { useGoogleCallback } from '@/hooks/useGoogleCallback';
 import { mapAccountDto, useSessionStore } from '@/stores/useSessionStore';
 import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 export function SignInPage() {
   const { t } = useTranslation();
+  const google = useGoogleCallback();
   const navigate = useNavigate();
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
   const [email, setEmail] = useState('');
@@ -52,6 +54,11 @@ export function SignInPage() {
         </>
       }
     >
+      {google.error ? (
+        <p role="alert" className="mb-4 text-sm text-destructive">
+          {t(`google.errors.${google.error}`)}
+        </p>
+      ) : null}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">{t('common.email')}</Label>
@@ -96,7 +103,9 @@ export function SignInPage() {
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <GoogleButton onClick={handleGoogle} loading={submitting} />
+      {google.error !== 'unavailable' ? (
+        <GoogleButton onClick={handleGoogle} loading={submitting} />
+      ) : null}
     </AuthLayout>
   );
 }

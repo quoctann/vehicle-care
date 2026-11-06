@@ -3,7 +3,9 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -34,16 +36,36 @@ func (d Database) DSN() string {
 }
 
 type Config struct {
-	Environment         string        `env:"APP_ENV" envDefault:"development"`
-	HTTPHost            string        `env:"HTTP_HOST" envDefault:"0.0.0.0"`
-	HTTPPort            string        `env:"HTTP_PORT" envDefault:"8080"`
-	FrontendOrigin      string        `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
-	FrontendRedirectURL string        `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
-	CookieSecure        bool          `env:"COOKIE_SECURE" envDefault:"false"`
-	CookieDomain        string        `env:"COOKIE_DOMAIN"`
-	SessionTTL          time.Duration `env:"SESSION_TTL" envDefault:"720h"`
-	SyncMaxBatchSize    int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
-	SyncMaxPageSize     int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+	Environment string `env:"APP_ENV" envDefault:"development"`
+	HTTPHost    string `env:"HTTP_HOST" envDefault:"0.0.0.0"`
+	HTTPPort    string `env:"HTTP_PORT" envDefault:"8080"`
+
+	// FrontendOrigin is the public origin serving the SPA. It drives CORS and
+	// origin checks. With the recommended same-origin proxy topology this is
+	// the public application origin, e.g. https://app.example.com, not a
+	// separate backend hostname.
+	FrontendOrigin string `env:"FRONTEND_ORIGIN" envDefault:"http://localhost:5173"`
+
+	// FrontendRedirectURL is where the browser is sent after a successful
+	// Google OAuth callback. It must be an origin (no path). In production it
+	// should match FRONTEND_ORIGIN.
+	FrontendRedirectURL string `env:"FRONTEND_REDIRECT_URL" envDefault:"http://localhost:5173"`
+
+	// CookieSecure sets the Secure flag on session and CSRF cookies. Must be
+	// true in production over HTTPS; required when GOOGLE_OAUTH_ENABLED=true
+	// in production.
+	CookieSecure bool `env:"COOKIE_SECURE" envDefault:"false"`
+
+	// CookieDomain scopes cookies. Leave empty for host-only cookies tied to
+	// the exact public application host. Only set a parent domain (e.g.
+	// .example.com) if the SPA is intentionally served across subdomains.
+	CookieDomain string `env:"COOKIE_DOMAIN"`
+
+	SessionTTL            time.Duration `env:"SESSION_TTL" envDefault:"720h"`
+	SyncMaxBatchSize      int           `env:"SYNC_MAX_BATCH_SIZE" envDefault:"100"`
+	SyncMaxPageSize       int           `env:"SYNC_MAX_PAGE_SIZE" envDefault:"100"`
+	APIRateLimitPerMinute int           `env:"API_RATE_LIMIT_PER_MINUTE" envDefault:"600"`
+	APIRateLimitBurst     int           `env:"API_RATE_LIMIT_BURST" envDefault:"120"`
 	// AutoMigrate applies pending schema migrations before the API starts
 	// listening. Local dev convenience only — defaults off so production/k8s
 	// keeps migrations as a separate, explicit deploy step (see
@@ -52,7 +74,9 @@ type Config struct {
 	// run.
 	AutoMigrate bool `env:"AUTO_MIGRATE" envDefault:"false"`
 
-	Database Database
+	Database      Database
+	Observability Observability
+	LogFile       string `env:"LOG_FILE"`
 
 	RedisAddr         string        `env:"REDIS_ADDR" envDefault:"localhost:6379"`
 	RedisPassword     string        `env:"REDIS_PASSWORD"`
@@ -64,6 +88,36 @@ type Config struct {
 	RedisPoolSize     int           `env:"REDIS_POOL_SIZE" envDefault:"20"`
 	RedisMinIdleConns int           `env:"REDIS_MIN_IDLE_CONNS" envDefault:"5"`
 	RedisMaxRetries   int           `env:"REDIS_MAX_RETRIES" envDefault:"3"`
+
+	// GoogleOAuthEnabled toggles Google OIDC routes. When true,
+	// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URL must all
+	// be configured and consistent with the Google Cloud client.
+	GoogleOAuthEnabled bool   `env:"GOOGLE_OAUTH_ENABLED" envDefault:"false"`
+	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
+
+	// GoogleRedirectURL is the exact URI registered in Google Cloud. With the
+	// same-origin frontend proxy topology this is the public application
+	// origin plus /auth/google/callback, e.g.
+	// https://app.example.com/auth/google/callback. The path must be exactly
+	// /auth/google/callback.
+	GoogleRedirectURL string `env:"GOOGLE_REDIRECT_URL"`
+
+	// TrustedProxies lists the IPs/CIDRs of the real reverse-proxy chain
+	// (frontend nginx, Ingress, load balancer). Gin uses these to decide
+	// whether X-Forwarded-For/Proto headers can be trusted for client IP and
+	// rate limiting. Leave empty to ignore all forwarding headers. Never set
+	// to 0.0.0.0/0 or ::/0.
+	TrustedProxies []string `env:"TRUSTED_PROXIES"`
+
+	MailFrontendURL string        `env:"MAIL_FRONTEND_URL" envDefault:"http://localhost:5173"`
+	SMTPHost        string        `env:"SMTP_HOST" envDefault:"localhost"`
+	SMTPPort        int           `env:"SMTP_PORT" envDefault:"1025"`
+	SMTPFrom        string        `env:"SMTP_FROM" envDefault:"noreply@vehicle-care.local"`
+	SMTPUsername    string        `env:"SMTP_USERNAME"`
+	SMTPPassword    string        `env:"SMTP_PASSWORD"`
+	SMTPStartTLS    bool          `env:"SMTP_STARTTLS" envDefault:"false"`
+	SMTPTimeout     time.Duration `env:"SMTP_TIMEOUT" envDefault:"5s"`
 }
 
 // Load reads an optional local .env without overriding injected environment
@@ -74,7 +128,66 @@ func Load() (Config, error) {
 	if err := env.Parse(&cfg); err != nil {
 		return Config{}, err
 	}
-	return cfg, nil
+	if err := cfg.ValidateTrustedProxies(); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.ValidateGoogle(); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.ValidateRateLimit(); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.Observability.Validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, cfg.ValidateMail()
+}
+
+// Only explicit IPs/CIDRs are accepted; an empty list trusts no proxy.
+func (c Config) ValidateTrustedProxies() error {
+	for _, raw := range c.TrustedProxies {
+		if _, err := netip.ParseAddr(raw); err == nil {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil || prefix.Bits() == 0 {
+			return fmt.Errorf("TRUSTED_PROXIES requires explicit IPs or non-global CIDRs")
+		}
+	}
+	return nil
+}
+
+// ValidateGoogle checks the two distinct redirect destinations: Google returns
+// to the exact backend callback, then the backend redirects to the frontend
+// origin. Production requires HTTPS redirects and Secure transaction cookies.
+func (c Config) ValidateGoogle() error {
+	if !c.GoogleOAuthEnabled {
+		return nil
+	}
+	if c.Environment == "production" && !c.CookieSecure {
+		return fmt.Errorf("Google OAuth requires COOKIE_SECURE=true in production")
+	}
+	if strings.TrimSpace(c.GoogleClientID) == "" || strings.TrimSpace(c.GoogleClientSecret) == "" {
+		return fmt.Errorf("Google OAuth requires client ID and secret")
+	}
+	for _, raw := range []string{c.GoogleRedirectURL, c.FrontendRedirectURL} {
+		u, err := url.Parse(raw)
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"))) {
+			return fmt.Errorf("invalid Google OAuth redirect configuration")
+		}
+		if c.Environment == "production" && u.Scheme != "https" {
+			return fmt.Errorf("Google OAuth requires HTTPS redirects in production")
+		}
+	}
+	u, _ := url.Parse(c.GoogleRedirectURL)
+	if u.Path != "/auth/google/callback" {
+		return fmt.Errorf("Google redirect must use /auth/google/callback")
+	}
+	frontend, _ := url.Parse(c.FrontendRedirectURL)
+	if frontend.Path != "" && frontend.Path != "/" {
+		return fmt.Errorf("FRONTEND_REDIRECT_URL must be an origin")
+	}
+	return nil
 }
 
 // Address returns the configured listen address.

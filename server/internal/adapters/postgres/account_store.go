@@ -70,6 +70,7 @@ func (s *Store) AccountByEmail(ctx context.Context, email string) (*domain.Accou
 		Timezone:      row.Timezone,
 		EmailVerified: row.EmailVerified,
 		PasswordHash:  row.PasswordHash,
+		AuthVersion:   row.AuthVersion,
 	}
 	if row.Name.Valid {
 		value := row.Name.String
@@ -94,6 +95,7 @@ func (s *Store) AccountByID(ctx context.Context, id string) (*domain.Account, er
 		Timezone:      row.Timezone,
 		EmailVerified: row.EmailVerified,
 		PasswordHash:  row.PasswordHash,
+		AuthVersion:   row.AuthVersion,
 	}
 	if row.Name.Valid {
 		value := row.Name.String
@@ -125,6 +127,7 @@ func (s *Store) UpdateAccountTimezone(ctx context.Context, accountID, timezone s
 		Timezone:      row.Timezone,
 		EmailVerified: row.EmailVerified,
 		PasswordHash:  row.PasswordHash,
+		AuthVersion:   row.AuthVersion,
 	}
 	if row.Name.Valid {
 		value := row.Name.String
@@ -134,9 +137,15 @@ func (s *Store) UpdateAccountTimezone(ctx context.Context, accountID, timezone s
 	return &account, nil
 }
 
-func (s *Store) SetPassword(ctx context.Context, accountID string, passwordHash []byte) error {
-	if err := s.queries.SetPassword(ctx, sqlcgen.SetPasswordParams{ID: accountID, PasswordHash: passwordHash}); err != nil {
+// SetPassword atomically changes credentials and revokes sessions. The version
+// predicate serializes concurrent resets without allowing a stale token to win.
+func (s *Store) SetPassword(ctx context.Context, accountID string, passwordHash []byte, expectedAuthVersion int64) error {
+	rows, err := s.queries.SetPassword(ctx, sqlcgen.SetPasswordParams{ID: accountID, PasswordHash: passwordHash, AuthVersion: expectedAuthVersion})
+	if err != nil {
 		return fmt.Errorf("postgres: set password: %w", err)
+	}
+	if rows != 1 {
+		return app_user.ErrAuthVersionChanged
 	}
 	return nil
 }

@@ -3,12 +3,12 @@
 Ứng dụng quản lý KM, bảo dưỡng và chi phí xe máy, local-first: React/TypeScript +
 IndexedDB, Go/Gin API, PostgreSQL (account/sync) và Redis (session/token).
 
-**Tài liệu cập nhật 2026-10-19:** [Quyết định, kiến trúc, dữ liệu và API](.docs/decision.md).
+**Tài liệu cập nhật 2026-10-26:** [Quyết định, kiến trúc, dữ liệu và API](.docs/decision.md).
 Đây là tài liệu Markdown có thẩm quyền duy nhất trong `.docs/`; hai HTML chỉ là prototype.
 
 ## Chạy nhanh
 
-Yêu cầu Go 1.24+, Node.js 22+, npm, GNU Make/Bash và Docker Compose.
+Yêu cầu Go 1.25.11, Node.js 22+, npm, GNU Make/Bash và Docker Compose.
 
 ```bash
 make install
@@ -22,10 +22,24 @@ Tham khảo [`.env.example`](.env.example) cho DB/Redis/cookie/origin. Backend �
 API http://localhost:8080, health `/health/live` và `/health/ready` (ping PG + Redis).
 Ctrl+C dừng hai process; hạ tầng dừng riêng bằng `make dev-infra-down`.
 
+Email xác thực/reset dùng SMTP, không gắn với nhà cung cấp cụ thể. Local có Mailpit
+trong `make dev-infra`: mở inbox **http://localhost:8025**; SMTP ở `127.0.0.1:1025`,
+không cần credentials và không gửi mail ra Internet. Cấu hình theo `.env.example`,
+không ghi đè `.env` hiện có. Link mail trỏ về `MAIL_FRONTEND_URL`.
+Production cấu hình SMTP có TLS và domain gửi hợp lệ; xem
+[runbook email](.docs/decision.md#52-email-verification-và-password-reset).
+
 `make dev-be`/`make dev-fe` chạy riêng; Vite trực tiếp `npm run dev --prefix client`
 vẫn cần backend thật, không MSW. `make dev` cấu hình FE gọi localhost:8080.
 Không có demo account: signup mới sẽ seed 10 hạng mục riêng account, sửa/tắt/thêm được.
 Đăng nhập cùng account ở profile thứ hai để kiểm tra sync đa thiết bị.
+
+Google login là tùy chọn, mặc định tắt. Tạo Google OAuth **Web application** client,
+đăng ký callback local `http://localhost:8080/auth/google/callback`, rồi cấu hình
+`GOOGLE_OAUTH_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL`
+ở backend. Xem [hướng dẫn cấu hình và rollout](.docs/decision.md#cấu-hình-google-auth-platform).
+Tài khoản email/password liên kết Google trong Settings sau khi nhập lại password;
+không tự liên kết theo email. Không đưa Client Secret vào frontend hay Git.
 
 Nếu không giữ session, kiểm tra FRONTEND_ORIGIN khớp origin/port frontend và
 COOKIE_SECURE=false khi dùng HTTP local. Production inject env trực tiếp, không mount
@@ -40,6 +54,7 @@ make build
 make test-integration
 npm run test:coverage:contracts --prefix client
 npm run test:e2e --prefix client
+python3 server/tests/mail-flow/smoke.py
 ```
 
 Go tests dùng race detector. Test PG tùy chọn trong `make test` có thể skip nếu Docker
@@ -50,18 +65,22 @@ cho video nếu chưa có). Nếu dùng Google Chrome hệ thống, chạy
 `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e --prefix client` từ repository root.
 E2E dùng API mock, không kiểm thử backend/PWA offline navigation thật. Coverage gate
 chỉ áp dụng contract/persistence; không phải coverage toàn source hoặc gate timezone riêng.
+Smoke mail dùng API, PostgreSQL, Redis và SMTP/Mailpit thật trong container disposable;
+không chạy đồng thời Playwright với Docker smoke/testcontainers nếu môi trường gặp
+`ERR_NETWORK_CHANGED` khi Docker tạo network.
 Xem [phạm vi và tình trạng kiểm chứng](.docs/decision.md#9-kiểm-chứng-và-nghiệm-thu).
 
 ## Contract và giới hạn
 
-- Email/password, cookie sid HttpOnly; protected POST cần cookie + X-CSRF-Token.
+- Email/password hoặc Google OIDC, cookie sid HttpOnly; protected POST cần cookie + X-CSRF-Token.
 - Account timezone là fixed UTC offset, không IANA/DST; save online có stale-account guard.
 - Entity + immutable outbox atomic local; push FIFO từng mutation, idempotent retry,
   mutable full-record server-order LWW. Pull phân trang cùng until_seq, canonical equal-seq.
 - Odometer chỉ thêm; Fuel/Service sửa/xóa mềm không cascade sửa/xóa KM.
 - Có repair blocked và restore local từ server cần xác nhận; không tự reset dữ liệu.
-- Chưa email delivery/notification worker, Google OAuth (start trả 400), rate limiting,
-  export/import, guest, OCR, Plus hoặc fuel efficiency. reminder_notification mới có schema.
+- Chưa email nhắc lịch/notification worker, export/import, guest, OCR, Plus hoặc fuel
+  efficiency. reminder_notification mới có schema. Google thật cần cấu hình credentials
+  và nghiệm thu trên staging; browser mock không thay xác minh Google/cookie thật.
 - Contract TS dùng const-derived types, sáu payload map và discriminated push/pull/enqueue;
   tăng kiểm tra compile-time, không thay wire/storage, không thay runtime validation.
 
