@@ -518,7 +518,11 @@ index.html cached cho cả `/auth/google/start` lẫn `/auth/google/callback` �
 302 của Google OAuth không bao giờ tới backend và user bị đẩy về `/sign-in`.
 nginx phục vụ `sw.js` với `Cache-Control: no-cache` để CDN (Cloudflare áp TTL
 mặc định nhiều giờ) không trì hoãn update worker; e2e-pwa
-`backend-navigation.spec.ts` kiểm chứng passthrough này với worker thật.
+`backend-navigation.spec.ts` kiểm chứng passthrough này với worker thật. Khi
+thêm path proxy mới phải cập nhật cả nginx.conf lẫn denylist: plugin
+`validate-sw-denylist` trong `client/vite.config.ts` fail build khi hai file
+lệch nhau. Hướng dẫn đầy đủ (risk map, checklist theo từng loại endpoint,
+debugging playbook, incident record): `.docs/adding-endpoints.md`.
 
 Topology khuyến nghị: chỉ frontend Service được expose qua Ingress công khai,
 backend Service giữ `ClusterIP`. Callback Google là redirect trình duyệt nên
