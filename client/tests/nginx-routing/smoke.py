@@ -21,6 +21,7 @@ NGINX_IMAGE = "nginxinc/nginx-unprivileged:1.29-alpine"
 UPSTREAM_IMAGE = "python:3.13-alpine"
 SPA = b"<!doctype html><title>routing smoke SPA</title>"
 ASSET = b"/* routing smoke asset */"
+SW = b"/* routing smoke service worker */"
 COOKIE = "sid=smoke-session; csrf_token=smoke-csrf"
 CSRF = "smoke-csrf"
 RESPONSE_COOKIE = "sid=smoke-refreshed; Path=/; HttpOnly; SameSite=Lax"
@@ -134,9 +135,15 @@ def check_routes(base_url):
     assert headers.get("Expires"), "existing asset must retain Expires header"
     status, _, body = request(base_url, "/assets/missing.js")
     assert status == 404 and body != SPA, "missing assets must not return the SPA"
+    # sw.js must always revalidate: a long browser/CDN TTL on the worker script
+    # delays PWA updates (e.g. navigateFallbackDenylist fixes) for real users.
+    status, headers, body = request(base_url, "/sw.js")
+    assert status == 200 and body == SW, "service worker file must be served"
+    cache_control = ", ".join(headers.get_all("Cache-Control", []))
+    assert "no-cache" in cache_control, f"sw.js must always revalidate: {cache_control}"
     status, _, body = request(base_url, "/healthz")
     assert status == 200 and body == b"ok"
-    print("PASS SPA fallback, static assets/cache headers, missing asset 404, healthz")
+    print("PASS SPA fallback, static assets/cache headers, sw.js no-cache, missing asset 404, healthz")
 
 
 def wait_ready(base_url):
@@ -177,7 +184,8 @@ def smoke(config):
             assets.chmod(0o755)
             (root / "index.html").write_bytes(SPA)
             (root / "assets/smoke.js").write_bytes(ASSET)
-            for file in (root / "index.html", root / "assets/smoke.js"):
+            (root / "sw.js").write_bytes(SW)
+            for file in (root / "index.html", root / "assets/smoke.js", root / "sw.js"):
                 file.chmod(0o644)
 
             upstream = "routing-upstream-" + suffix

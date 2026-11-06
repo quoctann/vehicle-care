@@ -40,6 +40,18 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        // Backend-proxied paths (see client/nginx.conf) must bypass the cached
+        // app shell: the Google OAuth start and callback are full-page
+        // navigations whose backend 302 chain would otherwise be swallowed by
+        // the service worker serving index.html instead. Workbox matches these
+        // against url.pathname + url.search.
+        navigateFallbackDenylist: [
+          /^\/auth\//,
+          /^\/account\//,
+          /^\/devices\//,
+          /^\/sync\//,
+          /^\/part-types($|\?)/,
+        ],
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
       },
     }),

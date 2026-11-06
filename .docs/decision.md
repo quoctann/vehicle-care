@@ -511,6 +511,15 @@ Frontend image dùng nginx reverse proxy cùng origin; `/account/` được prox
 VITE_API_BASE_URL để trống trong production để fetch cùng origin; đặt sang hostname
 API riêng sẽ phá vỡ cookie SameSite=Lax và CSRF double-submit.
 
+Service worker PWA không được chặn navigation tới các path proxy đó:
+`navigateFallbackDenylist` trong `client/vite.config.ts` khớp đúng danh sách path
+nginx proxy (Workbox match theo `pathname + search`). Thiếu nó, worker trả
+index.html cached cho cả `/auth/google/start` lẫn `/auth/google/callback` — chuỗi
+302 của Google OAuth không bao giờ tới backend và user bị đẩy về `/sign-in`.
+nginx phục vụ `sw.js` với `Cache-Control: no-cache` để CDN (Cloudflare áp TTL
+mặc định nhiều giờ) không trì hoãn update worker; e2e-pwa
+`backend-navigation.spec.ts` kiểm chứng passthrough này với worker thật.
+
 Topology khuyến nghị: chỉ frontend Service được expose qua Ingress công khai,
 backend Service giữ `ClusterIP`. Callback Google là redirect trình duyệt nên
 phải ở cùng public application origin, ví dụ

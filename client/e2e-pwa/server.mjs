@@ -28,7 +28,11 @@ try {
           ],
         },
       ],
-      define: { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify('/api') },
+      // Same-origin topology like the production nginx proxy: an empty
+      // VITE_API_BASE_URL makes browser navigations to backend paths (for
+      // example the Google OAuth start) stay on this origin, where the
+      // fixture below answers them instead of the SPA fallback.
+      define: { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify('') },
     });
   }
 } catch (error) {
@@ -57,7 +61,14 @@ const server = createServer(async (request, response) => {
       return response.end('B');
     }
     // A disposable auth fixture, not a mocked worker or application entrypoint.
-    if (url.pathname.startsWith('/api/')) {
+    // Mirrors client/nginx.conf: prefix locations proxy /auth/, /account/,
+    // /devices/, /sync/ and the exact /part-types to the backend instead of
+    // the SPA fallback, so the real service worker topology is exercised.
+    const backendProxied =
+      ['/auth/', '/account/', '/devices/', '/sync/'].some((prefix) =>
+        url.pathname.startsWith(prefix),
+      ) || url.pathname === '/part-types';
+    if (backendProxied) {
       response.writeHead(401, { 'Content-Type': 'application/json' });
       return response.end(
         JSON.stringify({
