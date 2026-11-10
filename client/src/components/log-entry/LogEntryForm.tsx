@@ -240,7 +240,12 @@ export function LogEntryForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Form sở hữu cuộn dọc; ngăn cử chỉ vượt biên làm di chuyển document và
+          bottom tab bar trên Android. */}
+      <form
+        onSubmit={handleSubmit}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none"
+      >
         <header className="sticky top-0 z-10 border-b border-border-subtle bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-2xl items-center justify-between">
             <Button
