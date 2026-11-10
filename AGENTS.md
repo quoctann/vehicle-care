@@ -17,7 +17,7 @@
 - Focused Go test, from `server/`: `go test -race ./internal/application/datasync -run TestName`.
 - `make test-integration` forces PostgreSQL testcontainers tests with Docker, disables Go test caching, and fails rather than skipping when Docker is unavailable. Ordinary `make test` can skip PostgreSQL tests.
 - `npm run test:coverage:contracts --prefix client` enforces 80% only on the contract/persistence files listed in `client/vitest.contract.config.ts`, not all source.
-- Browser setup: from `client/`, `npx playwright install chromium`. Run `npm run test:e2e --prefix client`; append `-- e2e/<file>.spec.ts` to focus. Optional installed Chrome: `PLAYWRIGHT_CHANNEL=chrome`. Playwright starts its own Vite on **4179**, mocks API calls, and blocks service workers; it does not verify real backend sync or PWA offline navigation.
+- Browser setup: from `client/`, `npx playwright install chromium`. Run `npm run test:e2e --prefix client`; append `-- e2e/<file>.spec.ts` to focus. Optional installed Chrome: `PLAYWRIGHT_CHANNEL=chrome`. Playwright starts its own Vite on **4179**, mocks API calls, and blocks service workers; it does not verify real backend sync or PWA offline navigation. Real service worker behavior (navigation passthrough, update consent) is covered only by `npx playwright test --config playwright.pwa.config.ts` from `client/`.
 - CI runs backend vet/tests and frontend lint/build; it does **not** run frontend unit, coverage, or E2E suites.
 
 ## Boundaries and invariants
@@ -27,6 +27,7 @@
 - Odometer logs are append-only; editing/deleting Fuel or Service must not cascade to linked odometer records. Account timezones are fixed UTC offsets, not IANA/DST zones.
 - Backend composition is `server/cmd/api/main.go`. Application ports live in `internal/application/{user,datasync}/port.go`; application code must not depend on adapters or expose generated SQL models.
 - PostgreSQL mutation processing locks the account sequence **before** dedupe/stateful validation; entity, sequence, changefeed, and saved ACK commit in one transaction.
+- Same-origin proxy + PWA: every top-level path nginx proxies to the backend (`client/nginx.conf`) must also appear in the `navigateFallbackDenylist` in `client/vite.config.ts`, or the service worker answers backend navigations (OAuth start/callback) with the cached app shell. The `validate-sw-denylist` build guard fails the build on drift. Full guide, risk map, and debugging playbook: `.docs/adding-endpoints.md`.
 
 ## Database changes and deployment
 - Create new migration pairs with `make migrate-create name=<name>`; do not edit applied migrations or extend the baseline for new changes.

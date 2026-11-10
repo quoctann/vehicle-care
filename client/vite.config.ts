@@ -56,8 +56,8 @@ function assertDenylistCoversNginxProxies() {
     const probes = exact
       ? [name, `${name}?probe=1`]
       : [name, `${name}probe`, `${name}probe?probe=1`];
-    
-      for (const probe of probes) {
+
+    for (const probe of probes) {
       if (!navigateFallbackDenylist.some((pattern) => pattern.test(probe))) uncovered.push(probe);
     }
   }
@@ -75,7 +75,7 @@ function assertDenylistCoversNginxProxies() {
   const stale = navigateFallbackDenylist.filter(
     (pattern) => !locations.some(({ exact, name }) => pattern.test(exact ? name : `${name}probe`)),
   );
-  
+
   if (stale.length > 0) {
     throw new Error(
       `navigateFallbackDenylist patterns ${stale.map(String).join(', ')} match no proxy_pass ` +
@@ -100,7 +100,17 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: 'auto',
       devOptions: { enabled: false },
-      includeAssets: ['favicon.svg', 'pwa-icon.svg', 'apple-touch-icon.png'],
+      includeAssets: [
+        'favicon.ico',
+        'icons/favicon.svg',
+        'icons/favicon-32.png',
+        'icons/pwa-icon.svg',
+        'icons/apple-touch-icon.png',
+        'icons/pwa-192.png',
+        'icons/pwa-512.png',
+        'icons/maskable-192.png',
+        'icons/maskable-512.png',
+      ],
       manifest: {
         name: 'Xế iu',
         short_name: 'Xế iu',
@@ -112,15 +122,27 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/icons/pwa-icon.svg',
+            src: '/icons/pwa-192.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/icons/pwa-icon.svg',
+            src: '/icons/pwa-512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/maskable-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: '/icons/maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable',
           },
         ],
