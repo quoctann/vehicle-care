@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Archive, Car, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { EditVehicleSheet } from '@/components/sheets/EditVehicleSheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { EditVehicleSheet } from '@/components/sheets/EditVehicleSheet';
 import type { Vehicle } from '@/domain/types';
+import { Archive, Car, Motorbike, Plus, RotateCcw, Settings, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 
 type PendingAction = { kind: 'archive' | 'delete'; vehicle: Vehicle } | null;
@@ -95,7 +95,7 @@ export function GarageList({
                   <span
                     className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${archived ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}
                   >
-                    <Car className="size-[18px]" />
+                    <Motorbike className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">

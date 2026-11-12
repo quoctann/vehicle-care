@@ -76,8 +76,7 @@ export const vi = {
     },
     google: {
       title: 'Đăng nhập với Google',
-      description:
-        'Liên kết Google với tài khoản hiện tại. Dữ liệu xe và dữ liệu chưa đồng bộ được giữ nguyên.',
+      description: 'Liên kết Google với tài khoản hiện tại.',
       link: 'Liên kết Google',
       confirm: 'Xác nhận và tiếp tục với Google',
       password: 'Mật khẩu hiện tại để liên kết Google',
@@ -261,9 +260,9 @@ export const vi = {
       update: 'Cập nhật số công-tơ-mét',
       firstReading: 'Thêm số km đầu tiên cho xe này.',
       currentReading: 'Số km hiện tại là {{value}} km.',
-      decrease: 'Giảm 10 ki-lô-mét',
-      increase: 'Tăng 10 ki-lô-mét',
-      inputLabel: 'Số công-tơ-mét theo ki-lô-mét',
+      decrease: 'Giảm 10 km',
+      increase: 'Tăng 10 km',
+      inputLabel: 'Số công-tơ-mét theo km',
       vehicleUnavailable: 'Không tìm thấy thông tin xe. Hãy mở lại bảng này.',
       saved: 'Đã lưu số công-tơ-mét. Dữ liệu sẽ đồng bộ khi có kết nối.',
       saveFailed: 'Không thể lưu số công-tơ-mét.',
@@ -323,14 +322,12 @@ export const vi = {
       timezoneCacheFailed:
         'Đã lưu trên máy chủ nhưng chưa lưu được ngoại tuyến. Vui lòng tải lại khi có kết nối.',
       units: 'Đơn vị',
-      kilometres: 'Ki-lô-mét',
+      kilometres: 'Kilometer',
       miles: 'Dặm',
       appearance: 'Giao diện',
-      appearanceDescription: 'Sáng hoặc tối',
       light: 'Sáng',
       dark: 'Tối',
       sync: 'Đồng bộ',
-      syncDescription: 'Nhiều thiết bị',
     },
     reminder: {
       eyebrow: 'Bảo dưỡng xe',
@@ -367,7 +364,7 @@ export const vi = {
       deleteFailed: 'Không thể xóa nhắc nhở.',
       addTitle: 'Thêm nhắc bảo dưỡng',
       addDescription:
-        'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Ứng dụng không tự điền thông số của nhà sản xuất.',
+        'Đặt chu kỳ theo quãng đường, thời gian hoặc cả hai. Nhắc nhở đến hạn khi một trong hai chu kỳ đạt ngưỡng.',
       allConfigured: 'Mọi hạng mục hiện có đều đã được tạo nhắc nhở.',
       part: 'Hạng mục',
       choosePart: 'Chọn hạng mục',
@@ -394,7 +391,7 @@ export const vi = {
       errorDetail: 'Đã xảy ra lỗi khi đồng bộ. Hãy thử lại.',
       recoveryTitle: 'Xử lý dữ liệu chưa đồng bộ',
       recoveryDescription:
-        'Hệ thống dừng tại thay đổi lỗi để không ghi đè dữ liệu local. Bạn có thể sửa payload hoặc khôi phục toàn bộ từ server.',
+        'Đồng bộ bằng dữ liệu mới nhất từ server, lưu ý hành động này không thể hoàn tác.',
       blockedReason: 'Thay đổi này bị server từ chối.',
       repairPayload: 'Payload đã sửa',
       repair: 'Sửa và tiếp tục',

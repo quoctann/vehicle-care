@@ -1,11 +1,11 @@
-import { Check, CarFront, Plus } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { useVehicles } from '@/hooks/useVehicles';
 import { setLastVehicleId } from '@/lib/lastVehicle';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useUiStore } from '@/stores/useUiStore';
+import { Check, Motorbike, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 type SwitchVehicleSheetProps = {
   currentVehicleId?: string;
@@ -74,7 +74,7 @@ export function SwitchVehicleSheet({ currentVehicleId }: SwitchVehicleSheetProps
                         : 'border-border bg-muted text-muted-foreground'
                     }`}
                   >
-                    <CarFront className="size-[18px]" />
+                    <Motorbike className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{vehicle.name}</span>

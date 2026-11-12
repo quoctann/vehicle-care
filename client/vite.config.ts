@@ -115,7 +115,7 @@ export default defineConfig({
         name: 'Xế iu',
         short_name: 'Xế iu',
         description: 'Theo dõi số km, lịch bảo dưỡng và chi phí của xế iu',
-        theme_color: '#f9f9fb',
+        theme_color: '#18181b',
         background_color: '#f9f9fb',
         display: 'standalone',
         start_url: '/',

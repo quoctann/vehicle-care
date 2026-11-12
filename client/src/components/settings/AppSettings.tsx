@@ -1,7 +1,4 @@
-import { ChevronRight, Gauge, Moon, Ruler, ShieldCheck, SunMoon, Wrench } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 import {
   Select,
   SelectContent,
@@ -10,8 +7,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import {
+  ChevronRight,
+  ClipboardList,
+  CloudBackup,
+  Gauge,
+  Moon,
+  Ruler,
+  SunMoon,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { PREFERENCE_KEYS, useLocalStoragePreference } from './preferences';
-import { SyncStatusBadge } from '@/components/layout/SyncStatusBadge';
 import { TimezoneSetting } from './TimezoneSetting';
 
 function SettingsRow({
@@ -46,7 +54,10 @@ export function AppSettings() {
     PREFERENCE_KEYS.askForOdometer,
     true,
   );
-  const [quietHours, setQuietHours] = useLocalStoragePreference<boolean>(PREFERENCE_KEYS.quietHours, true);
+  const [quietHours, setQuietHours] = useLocalStoragePreference<boolean>(
+    PREFERENCE_KEYS.quietHours,
+    true,
+  );
   const [units, setUnits] = useLocalStoragePreference<'km' | 'mi'>(PREFERENCE_KEYS.units, 'km');
   return (
     <div className="space-y-5">
@@ -57,7 +68,7 @@ export function AppSettings() {
         <div className="divide-y divide-border-subtle overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
           <Link to="/settings/part-types" className="block transition hover:bg-muted/50">
             <SettingsRow
-              icon={Wrench}
+              icon={ClipboardList}
               title={t('partType.title')}
               description={t('partType.settingsRowDescription')}
             >
@@ -109,7 +120,6 @@ export function AppSettings() {
           <SettingsRow
             icon={SunMoon}
             title={t('settings.appearance')}
-            description={t('settings.appearanceDescription')}
           >
             <Select value={theme ?? 'light'} onValueChange={setTheme}>
               <SelectTrigger size="sm" aria-label={t('settings.appearance')}>
@@ -122,9 +132,8 @@ export function AppSettings() {
             </Select>
           </SettingsRow>
           <SettingsRow
-            icon={ShieldCheck}
+            icon={CloudBackup}
             title={t('settings.sync')}
-            description={t('settings.syncDescription')}
           >
             <div className="ml-11 shrink-0 sm:ml-0">
               <SyncStatusBadge />

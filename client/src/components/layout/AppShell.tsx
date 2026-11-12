@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Plus, Settings } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SwitchVehicleSheet } from '@/components/sheets/SwitchVehicleSheet';
@@ -93,13 +93,6 @@ export function AppShell() {
           <header className="mx-auto flex w-full max-w-[600px] shrink-0 items-center gap-2.5 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] lg:hidden">
             <VehicleSwitcher vehicle={vehicle} variant="header" />
             <SyncStatusBadge />
-            <Link
-              to="/settings"
-              aria-label={t('navigation.settings')}
-              className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border bg-card shadow-[0_1px_1px_rgba(44,54,53,.025)] transition hover:border-foreground"
-            >
-              <Settings className="size-[19px]" />
-            </Link>
           </header>
         ) : null}
 

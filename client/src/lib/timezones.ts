@@ -50,7 +50,7 @@ export function formatUtcOffset(minutes: number): string {
 
 export const TIMEZONE_CHOICES: readonly TimezoneChoice[] = OPTIONS.map(([minutes, places]) => ({
   value: formatUtcOffset(minutes),
-  label: `${formatUtcOffset(minutes)} — ${places}`,
+  label: `${formatUtcOffset(minutes)} - ${places}`,
   offsetMinutes: minutes,
 }));
 

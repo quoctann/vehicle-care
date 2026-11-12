@@ -1,7 +1,3 @@
-import { useState } from 'react';
-import { AlertCircle, Check, CloudOff, RefreshCw, Wrench } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,16 +8,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { db } from '@/data/db';
 import { listOutboxForAccount, repairBlockedMutation } from '@/data/outbox';
-import { useOutboxState } from '@/hooks/useOutboxPendingCount';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
-import { runSync } from '@/sync/syncOrchestrator';
-import { restoreFromServer } from '@/sync/restore';
+import { useOutboxState } from '@/hooks/useOutboxPendingCount';
+import { formatTime } from '@/lib/formatters';
 import { useSessionStore } from '@/stores/useSessionStore';
 import { useSyncStore } from '@/stores/useSyncStore';
-import { formatTime } from '@/lib/formatters';
+import { restoreFromServer } from '@/sync/restore';
+import { runSync } from '@/sync/syncOrchestrator';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/data/db';
+import { AlertCircle, CircleCheck, CloudDownload, CloudOff, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 export function SyncStatusBadge() {
   const { t } = useTranslation();
@@ -76,7 +76,7 @@ export function SyncStatusBadge() {
     icon = <AlertCircle />;
   } else if (status === 'synced' && lastSyncedAt) {
     label = t('sync.syncedAt', { time: formatTime(lastSyncedAt, timezone) });
-    icon = <Check />;
+    icon = <CircleCheck />;
   }
 
   if (outboxState.pending > 0 && status !== 'blocked' && status !== 'retryable')
@@ -140,7 +140,7 @@ export function SyncStatusBadge() {
         title={t('sync.recoveryTitle')}
         aria-label={t('sync.recoveryTitle')}
       >
-        <Wrench className="size-4" />
+        <CloudDownload className="size-4" />
       </Button>
       <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
         <DialogContent className="max-h-[min(90dvh,42rem)] overflow-y-auto sm:max-w-lg">
