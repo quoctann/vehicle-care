@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { addFuelLog } from '@/data/repositories/fuelRepository';
+import { addServiceLog } from '@/data/repositories/serviceRepository';
 import { addOdometerLog } from '@/data/repositories/odometerRepository';
+import type { PartType } from '@/domain/types';
 import { LogEntryForm } from './LogEntryForm';
 import { UpdateOdometerSheet } from '../sheets/UpdateOdometerSheet';
 
@@ -10,6 +12,10 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@/data/repositories/fuelRepository', () => ({
   addFuelLog: vi.fn(),
   updateFuelLog: vi.fn(),
+}));
+vi.mock('@/data/repositories/serviceRepository', () => ({
+  addServiceLog: vi.fn(),
+  updateServiceLog: vi.fn(),
 }));
 vi.mock('@/data/repositories/odometerRepository', () => ({ addOdometerLog: vi.fn() }));
 vi.mock('@/components/layout/SyncStatusBadge', () => ({ SyncStatusBadge: () => null }));
@@ -20,6 +26,31 @@ afterEach(() => {
 });
 
 describe('log-entry contract feedback', () => {
+  const servicePartTypes: PartType[] = [
+    {
+      id: 'part-oil',
+      code: 'engine_oil',
+      displayName: 'Dầu máy',
+      displayOrder: 1,
+      active: true,
+      accountId: 'account',
+      createdAtClient: '2026-01-01T00:00:00Z',
+      serverSyncedAt: null,
+      serverSeq: null,
+    },
+    {
+      id: 'part-tire',
+      code: 'front_tire',
+      displayName: 'Lốp trước',
+      displayOrder: 2,
+      active: true,
+      accountId: 'account',
+      createdAtClient: '2026-01-01T00:00:00Z',
+      serverSyncedAt: null,
+      serverSeq: null,
+    },
+  ];
+
   it.each([
     ['log-odometer', '100000000', 'logEntry.odometerRange'],
     ['log-liters', '10000', 'logEntry.invalidLiters'],
@@ -63,6 +94,43 @@ describe('log-entry contract feedback', () => {
         expect.objectContaining({ odometerKm: 123.456, liters: 123.456 }),
       ),
     );
+  });
+
+  it('requires choosing a part before saving a service entry', async () => {
+    const { container } = render(
+      <LogEntryForm
+        accountId="account"
+        vehicleId="vehicle"
+        currentOdometerKm={null}
+        partTypes={servicePartTypes}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /logEntry\.service/ }));
+    fireEvent.submit(container.querySelector('form')!);
+    await waitFor(() => expect(screen.getByText('logEntry.choosePart')).toBeTruthy());
+    expect(document.getElementById('log-part-type')?.getAttribute('aria-invalid')).toBe('true');
+    expect(addServiceLog).not.toHaveBeenCalled();
+  });
+
+  it('auto-selects the only part type when switching to a service entry', () => {
+    render(
+      <LogEntryForm
+        accountId="account"
+        vehicleId="vehicle"
+        currentOdometerKm={null}
+        partTypes={[servicePartTypes[0]!]}
+        onCancel={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /logEntry\.service/ }));
+    // Radix also mirrors the selection into a hidden native <option>, so query
+    // the trigger itself rather than the whole screen.
+    const trigger = document.getElementById('log-part-type');
+    expect(trigger?.textContent).toContain('Dầu máy');
+    expect(screen.queryByText('logEntry.selectPartPlaceholder')).toBeNull();
   });
 });
 

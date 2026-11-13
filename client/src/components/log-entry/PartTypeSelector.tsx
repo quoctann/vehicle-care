@@ -11,6 +11,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { resolvePartTypeDisplay, type PartTypeIconKey } from '@/domain/partType';
 import type { PartType } from '@/domain/types';
 
@@ -18,6 +25,7 @@ type PartTypeSelectorProps = {
   partTypes: PartType[];
   value: string | null;
   onChange: (partTypeId: string) => void;
+  invalid?: boolean;
 };
 
 const icons: Record<PartTypeIconKey, LucideIcon> = {
@@ -34,8 +42,14 @@ const icons: Record<PartTypeIconKey, LucideIcon> = {
   unknown: Wrench,
 };
 
-export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelectorProps) {
+export function PartTypeSelector({ partTypes, value, onChange, invalid }: PartTypeSelectorProps) {
   const { t } = useTranslation();
+  const selectedPartType = partTypes.find((partType) => partType.id === value);
+  const selectedDisplay = selectedPartType
+    ? resolvePartTypeDisplay(selectedPartType.code, partTypes)
+    : null;
+  const SelectedIcon = selectedDisplay ? icons[selectedDisplay.icon] : null;
+
   return (
     <fieldset>
       <legend className="mb-2 px-0.5 text-[10px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
@@ -46,38 +60,53 @@ export function PartTypeSelector({ partTypes, value, onChange }: PartTypeSelecto
           {t('logEntry.noPartTypes')}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {partTypes.map((partType) => {
-            const display = resolvePartTypeDisplay(partType.code, partTypes);
-            const Icon = icons[display.icon];
-            const selected = value === partType.id;
-
-            return (
-              <button
-                key={partType.id}
-                type="button"
-                aria-pressed={selected}
-                disabled={!partType.active}
-                onClick={() => onChange(partType.id)}
-                className={`flex min-h-24 flex-col items-start justify-between rounded-2xl border bg-card p-3 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed ${
-                  selected
-                    ? 'border-foreground shadow-sm ring-2 ring-background'
-                    : 'border-border-subtle text-muted-foreground hover:border-border hover:text-foreground'
-                }`}
-              >
-                <Icon className={`size-5 ${selected ? 'text-primary' : ''}`} aria-hidden="true" />
-                <span className="mt-3 text-xs font-semibold leading-tight text-foreground">
-                  {display.displayName}
+        <Select value={value ?? ''} onValueChange={onChange}>
+          {/* `''` giữ Select luôn controlled (Radix coi rỗng = placeholder state). */}
+          <SelectTrigger
+            id="log-part-type"
+            aria-label={t('logEntry.partServiced')}
+            aria-invalid={invalid || undefined}
+            className="h-12 w-full min-w-0 text-left data-[size=default]:h-12"
+          >
+            {/* Trigger render label thủ công (pattern TimezoneSetting) — SelectValue không
+                tự resolve text của `value` đặt sẵn trước khi content mở lần đầu (luồng sửa). */}
+            <SelectValue placeholder={t('logEntry.selectPartPlaceholder')}>
+              {selectedDisplay && SelectedIcon ? (
+                <span className="flex min-w-0 items-center gap-2">
+                  <SelectedIcon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{selectedDisplay.displayName}</span>
                 </span>
-                {!partType.active ? (
-                  <span className="mt-1 text-[10px] font-medium text-muted-foreground">
-                    {t('partType.disabled')}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+              ) : null}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            align="start"
+            className="max-h-[min(18rem,var(--radix-select-content-available-height))]"
+          >
+            {partTypes.map((partType) => {
+              const display = resolvePartTypeDisplay(partType.code, partTypes);
+              const Icon = icons[display.icon];
+
+              return (
+                <SelectItem
+                  key={partType.id}
+                  value={partType.id}
+                  disabled={!partType.active}
+                  textValue={display.displayName}
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{display.displayName}</span>
+                  {!partType.active ? (
+                    <span className="ml-auto pl-2 text-[10px] font-medium text-muted-foreground">
+                      {t('partType.disabled')}
+                    </span>
+                  ) : null}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
       )}
     </fieldset>
   );

@@ -53,7 +53,8 @@ export function PartTypeFormSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="gap-0 rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:inset-x-0 md:mx-auto md:max-w-[600px] lg:inset-auto lg:left-1/2 lg:top-1/2 lg:w-[440px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
+        centerOnDesktop
+        className="gap-0 rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:inset-x-0 md:mx-auto md:max-w-[600px] lg:w-[440px] lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
       >
         <div className="mx-auto mb-3.5 h-1 w-9 rounded-full bg-border lg:hidden" />
         <SheetTitle className="mx-0.5 text-[15px] font-semibold tracking-[-0.01em]">

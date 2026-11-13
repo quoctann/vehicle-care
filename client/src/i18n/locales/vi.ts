@@ -226,6 +226,7 @@ export const vi = {
       serviceDescription: 'Bảo dưỡng đã hoàn thành',
       partServiced: 'Hạng mục đã bảo dưỡng',
       noPartTypes: 'Không có hạng mục bảo dưỡng đang hoạt động.',
+      selectPartPlaceholder: 'Chọn hạng mục bảo dưỡng',
       odometer: 'Số công-tơ-mét',
       noCurrentReading: 'Chưa có số km hiện tại',
       currentOdometer: 'Hiện tại: {{value}} km',

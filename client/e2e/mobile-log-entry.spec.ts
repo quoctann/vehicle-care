@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 const account = {
   id: 'c50fa56c-b7a0-43d0-9741-f81565bd2c1d',
@@ -10,6 +10,7 @@ const account = {
 
 const vehicleId = '13038800-180d-4bf0-97b7-1b30086c07a2';
 const partTypeId = '13038800-180d-4bf0-97b7-1b30086c07a3';
+const tirePartTypeId = '13038800-180d-4bf0-97b7-1b30086c07a4';
 const serverTime = '2026-10-25T08:00:00Z';
 
 /**
@@ -24,16 +25,10 @@ test.use({
   hasTouch: true,
 });
 
-test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', async ({
-  page,
-  context,
-}) => {
-  page.on('pageerror', (error) => {
-    throw error;
-  });
-
+/** Seeds session/device/pull (plus a permissive push ACK) so a vehicle and the
+ * "Dầu máy" + "Lốp trước" part types exist locally before the form opens. */
+async function mockAccountBackend(context: BrowserContext) {
   let pullSeeded = false;
-
   await context.route(
     (url) => {
       const path = url.pathname;
@@ -46,12 +41,11 @@ test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', a
     },
     async (route) => {
       const request = route.request();
-      const url = new URL(request.url());
-      const path = url.pathname;
-      if (path === '/api/auth/session' || path === '/auth/session') {
+      const path = new URL(request.url()).pathname.replace(/^\/api/, '');
+      if (path === '/auth/session') {
         return route.fulfill({ json: { account } });
       }
-      if (path === '/api/devices/register' || path === '/devices/register') {
+      if (path === '/devices/register') {
         return route.fulfill({
           json: {
             account_id: account.id,
@@ -60,7 +54,22 @@ test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', a
           },
         });
       }
-      if (path === '/api/sync/pull' || path === '/sync/pull') {
+      if (path === '/sync/push') {
+        const body = request.postDataJSON() as { mutations: { mutation_id: string }[] };
+        return route.fulfill({
+          json: {
+            account_id: account.id,
+            results: body.mutations.map((mutation) => ({
+              mutation_id: mutation.mutation_id,
+              status: 'applied',
+              server_seq: 4,
+              server_synced_at: serverTime,
+            })),
+          },
+        });
+      }
+      if (path === '/sync/pull') {
+        const url = new URL(request.url());
         const afterSeq = Number(url.searchParams.get('after_seq')) || 0;
         if (!pullSeeded && afterSeq === 0) {
           pullSeeded = true;
@@ -95,9 +104,22 @@ test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', a
                     active: true,
                   },
                 },
+                {
+                  entity_type: 'part_type',
+                  entity_id: tirePartTypeId,
+                  operation: 'create',
+                  server_seq: 3,
+                  server_synced_at: serverTime,
+                  payload: {
+                    code: 'front_tire',
+                    name: 'Lốp trước',
+                    display_order: 2,
+                    active: true,
+                  },
+                },
               ],
-              next_cursor: 2,
-              until_seq: 2,
+              next_cursor: 3,
+              until_seq: 3,
               has_more: false,
               server_time: serverTime,
             },
@@ -117,6 +139,17 @@ test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', a
       return route.continue();
     },
   );
+}
+
+test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', async ({
+  page,
+  context,
+}) => {
+  page.on('pageerror', (error) => {
+    throw error;
+  });
+
+  await mockAccountBackend(context);
 
   // Let the app bootstrap and pull the seeded vehicle, then open the form.
   await page.goto('/');
@@ -168,4 +201,45 @@ test('Log Entry form absorbs vertical overscroll and keeps the tab bar fixed', a
 
   // The sticky save action must still sit above the tab bar.
   await expect(saveButton).toBeInViewport();
+});
+
+test('service entry picks a part from the dropdown and saves', async ({ page, context }) => {
+  page.on('pageerror', (error) => {
+    throw error;
+  });
+
+  await mockAccountBackend(context);
+
+  await page.goto('/');
+  await page.waitForURL(new RegExp(`/v/${vehicleId}/home$`), { timeout: 10000 });
+  await page.goto(`/v/${vehicleId}/log-entry`);
+
+  await expect(page.getByRole('heading', { name: 'Mục ghi mới' })).toBeVisible();
+
+  // Switching to the service type renders the part selector as one dropdown
+  // instead of a full-screen button grid.
+  await page.getByRole('button', { name: /Bảo dưỡng/ }).click();
+  const partTrigger = page.getByRole('combobox', { name: 'Hạng mục đã bảo dưỡng' });
+  await expect(partTrigger).toBeVisible();
+  await expect(partTrigger).toContainText('Chọn hạng mục bảo dưỡng');
+  // Touch-friendly trigger height (h-12) must beat the select's default h-8.
+  await expect(partTrigger).toHaveCSS('height', '48px');
+
+  // Saving without a part surfaces the validation error, not a local write.
+  await page.getByRole('button', { name: 'Lưu mục ghi' }).click();
+  await expect(page.getByText('Vui lòng chọn hạng mục đã bảo dưỡng.')).toBeVisible();
+  await expect(partTrigger).toHaveAttribute('aria-invalid', 'true');
+
+  // Open the collapsed list and pick the seeded part.
+  await partTrigger.click();
+  const oilOption = page.getByRole('option', { name: 'Dầu máy' });
+  await expect(oilOption).toBeVisible();
+  await oilOption.click();
+  await expect(partTrigger).toContainText('Dầu máy');
+  await expect(page.getByText('Nhắc Dầu máy sẽ được đặt lại khi lưu')).toBeVisible();
+
+  // Saving the service entry lands back on home with a success toast.
+  await page.getByRole('button', { name: 'Lưu mục ghi' }).click();
+  await expect(page.getByText('Đã lưu lần bảo dưỡng và bắt đầu lại chu kỳ nhắc.')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/v/${vehicleId}/home$`));
 });

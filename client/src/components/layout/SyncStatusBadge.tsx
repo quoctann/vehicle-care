@@ -114,34 +114,39 @@ export function SyncStatusBadge() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant={status === 'error' ? 'destructive' : 'outline'}
-        size="sm"
-        className="max-w-[11rem] shrink-0"
-        disabled={!online || status === 'syncing' || status === 'restoring'}
-        onClick={() => {
-          if (openRecovery) setRecoveryOpen(true);
-          else void runSync().catch(() => undefined);
-        }}
-        title={lastError ?? label}
-        aria-label={lastError ? `${label}: ${lastError}` : label}
-        aria-live="polite"
-      >
-        {icon}
-        <span className="truncate">{label}</span>
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled={status === 'syncing' || status === 'restoring'}
-        onClick={() => setRecoveryOpen(true)}
-        title={t('sync.recoveryTitle')}
-        aria-label={t('sync.recoveryTitle')}
-      >
-        <CloudDownload className="size-4" />
-      </Button>
+      {/* Gộp 2 nút thành 1 nhóm duy nhất — KHÔNG leak 2 button sibling ra ngoài,
+          nếu không parent dùng `justify-between` (vd header desktop của HomePage)
+          sẽ dàn đều chúng ra giữa hàng thay vì giữ nhóm bên phải. */}
+      <div className="flex items-center gap-2.5">
+        <Button
+          type="button"
+          variant={status === 'error' ? 'destructive' : 'outline'}
+          size="sm"
+          className="max-w-[11rem] shrink-0"
+          disabled={!online || status === 'syncing' || status === 'restoring'}
+          onClick={() => {
+            if (openRecovery) setRecoveryOpen(true);
+            else void runSync().catch(() => undefined);
+          }}
+          title={lastError ?? label}
+          aria-label={lastError ? `${label}: ${lastError}` : label}
+          aria-live="polite"
+        >
+          {icon}
+          <span className="truncate">{label}</span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={status === 'syncing' || status === 'restoring'}
+          onClick={() => setRecoveryOpen(true)}
+          title={t('sync.recoveryTitle')}
+          aria-label={t('sync.recoveryTitle')}
+        >
+          <CloudDownload className="size-4" />
+        </Button>
+      </div>
       <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
         <DialogContent className="max-h-[min(90dvh,42rem)] overflow-y-auto sm:max-w-lg">
           <DialogHeader>

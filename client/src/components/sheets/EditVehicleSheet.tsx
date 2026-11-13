@@ -72,7 +72,8 @@ export function EditVehicleSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="max-h-[calc(100dvh-max(1rem,env(safe-area-inset-top)))] gap-0 overflow-hidden rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:mx-auto md:max-w-[600px] lg:mx-0 lg:max-h-[calc(100dvh-2rem)] lg:data-[side=bottom]:inset-x-auto lg:data-[side=bottom]:bottom-auto lg:data-[side=bottom]:left-1/2 lg:top-1/2 lg:w-[440px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
+        centerOnDesktop
+        className="max-h-[calc(100dvh-max(1rem,env(safe-area-inset-top)))] gap-0 overflow-hidden rounded-t-[24px] border-x-0 border-b-0 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:mx-auto md:max-w-[600px] lg:mx-0 lg:max-h-[calc(100dvh-2rem)] lg:w-[440px] lg:rounded-[20px] lg:border lg:p-[18px] lg:shadow-lg"
       >
         <div className="mx-auto mb-3.5 h-1 w-9 shrink-0 rounded-full bg-border lg:hidden" />
         <SheetTitle className="mx-0.5 shrink-0 text-[15px] font-semibold tracking-[-0.01em]">

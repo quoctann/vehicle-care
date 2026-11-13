@@ -280,7 +280,12 @@ export function LogEntryForm({
 
           {entryType === 'service' ? (
             <div>
-              <PartTypeSelector partTypes={partTypes} value={partTypeId} onChange={setPartTypeId} />
+              <PartTypeSelector
+                partTypes={partTypes}
+                value={partTypeId}
+                onChange={setPartTypeId}
+                invalid={Boolean(errors.partTypeId)}
+              />
               {errors.partTypeId ? (
                 <p className="mt-2 px-0.5 text-xs text-destructive">{errors.partTypeId}</p>
               ) : null}
